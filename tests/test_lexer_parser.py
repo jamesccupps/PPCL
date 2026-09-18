@@ -287,3 +287,64 @@ def test_a_C_comment_is_still_a_comment_not_a_disabled_line():
     line = prog.by_number()[10]
     assert not line.disabled
     assert type(line.stmt).__name__ == "Comment"
+
+
+# -- the dot problem, in the places it was still unguarded ------------------
+#
+# All three found by parsing Siemens' own 84-program application library, where
+# 146 of 15,726 lines failed. Ten still do, and those are real syntax errors in
+# the library itself.
+
+
+def test_an_unquoted_DEFINE_substitution_is_one_name():
+    """%X%RDP is a name prefix plus a name, not two tokens.
+
+    The documented example quotes it -- ON("%A01%.RAF") -- and quoted always
+    worked. Siemens' shipped library writes it bare throughout, which is 116
+    of the 146 failures.
+    """
+    prog = parser.parse("00010\tON(%X%RDP)\n00020\tGOTO 10\n")
+    assert prog.errors == []
+    assert prog.lines[0].stmt.name == "ON"
+
+    both = parser.parse('00010\tON("%X%RDP")\n00020\tON(%X%RDP)\n'
+                        "00030\tGOTO 10\n")
+    assert both.errors == []
+
+
+def test_a_substitution_tail_may_start_with_a_digit():
+    """%X%1AL is a real name in the library; _IDENT_RE would refuse it."""
+    prog = parser.parse("00010\t%X%NAL = %X%1AL + %X%2AL\n00020\tGOTO 10\n")
+    assert prog.errors == []
+
+
+def test_a_substitution_does_not_swallow_a_dotted_operator():
+    """%X%NAL.GT.%X%OAL is name, operator, name."""
+    prog = parser.parse("00010\tIF (%X%NAL.GT.%X%OAL) THEN ON(%X%HRN)\n"
+                        "00020\tGOTO 10\n")
+    assert prog.errors == []
+    assert type(prog.lines[0].stmt).__name__ == "If"
+
+
+def test_an_at_name_does_not_swallow_a_dotted_operator():
+    """@NONE.AND.$ARG3 lexed as one @-name plus $ARG3.
+
+    Every condition written without spaces around a dotted operator after an
+    @priority failed to parse. Siemens' optimum-start-stop programs are
+    written that way throughout.
+    """
+    tokens = [t.text for t in tokenize("IF (C.EQ.@NONE.AND.D.EQ.OFF) THEN X=1.0")]
+    assert "@NONE" in tokens
+    assert ".AND." in tokens
+    assert not [t for t in tokens if t.upper().startswith("@NONE.")]
+
+    prog = parser.parse("00010\tIF (A.GT.B.AND.C.EQ.@NONE.AND.D.EQ.OFF) "
+                        "THEN X = 1.0\n00020\tGOTO 10\n")
+    assert prog.errors == []
+
+
+def test_ordinary_at_names_still_lex_whole():
+    assert parser.parse("00010\tON(@EMER,FAN)\n00020\tGOTO 10\n").errors == []
+    assert parser.parse("00010\tON(@1FAN)\n00020\tGOTO 10\n").errors == []
+    assert parser.parse("00010\tIF(FAN .EQ. @OPER) THEN ON(H)\n"
+                        "00020\tGOTO 10\n").errors == []

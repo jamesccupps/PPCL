@@ -2045,6 +2045,57 @@ def _apply_pxc_a_removals() -> None:
 _apply_pxc_a_removals()
 
 
+_add(
+    Command(
+        "LSTSQR",
+        "Recursive least-squares fit of a quadratic through six (x,y) pairs",
+        fixed=(
+            Param("execution", Arg.VALUE, "Execution control, as for LSQ2"),
+            Param("c", Arg.POINT, "Constant term of the fitted quadratic"),
+            Param("b", Arg.POINT, "Linear coefficient"),
+            Param("a", Arg.POINT, "Quadratic coefficient"),
+        ),
+        repeat=(
+            Param("x", Arg.POINT, "x of a data pair"),
+            Param("y", Arg.POINT, "y of a data pair"),
+        ),
+        min_repeat=1,
+        max_repeat=6,
+        # NOT transcribed. This command appears in NO Siemens documentation on
+        # hand -- not the 736-page Insight Program Editor help, not the Desigo
+        # CC Engineering or Operating help, not A6V10374898, A6V12954388 or
+        # A6V10324350. It was recovered from Siemens' own shipped application
+        # library, where the chiller-sequence programs chseq2 through chseq5
+        # use it and nothing else does.
+        #
+        # The shape is inferred from nine call sites, which all pass an
+        # execution control, three output points, and six (x,y) pairs. The
+        # ORDER of the three outputs comes from what those programs compute
+        # from them a few lines later: an expression of the form
+        # -second_output / 2 / third_output, which is the vertex of a
+        # parabola, -b/(2a). That fixes the order as constant, linear,
+        # quadratic -- c, b, a.
+        #
+        # So: the command is real, the ORDER is evidence-based, and the
+        # argument COUNT is not enforced, because no source states it.
+        signature_known=False,
+        notes=(
+            "UNDOCUMENTED. Recovered from Siemens' shipped PPCL application "
+            "library (chseq2-chseq5); it appears in no manual available here.",
+            "Comments in those programs call it a 'recursive least squares "
+            "curve fit' producing 'the coefficients of the best fit quadratic "
+            "curve'.",
+            "Argument order c, b, a is inferred from how the programs use the "
+            "results: they compute -b/(2a), the vertex of a parabola.",
+            "Every observed call passes exactly six (x,y) pairs, which with "
+            "the four leading arguments is 16 operands -- the statement limit.",
+            "Distinct from LSQ2/LSQDAT, which fit a two-variable XYZ surface "
+            "across eight lines. The library uses LSTSQR and never LSQ2.",
+        ),
+        see_also=("LSQ2", "LSQDAT", "TABLE"),
+    )
+)
+
 #: PARAMETER is handled separately: it is an assignment-style directive that
 #: does not require a line number and is resolved at compile time.
 PARAMETER_KEYWORD = "PARAMETER"
@@ -2172,6 +2223,13 @@ COMMAND_CATEGORIES = {
     "Property Access": [
         "GETVAL", "SETVAL",
     ],
+    # Also NOT a Siemens category, and for a stronger reason: LSTSQR appears
+    # in no Siemens documentation at all. It was recovered from their own
+    # shipped application library. Filing it under an existing heading would
+    # imply a source that does not exist.
+    "Undocumented": [
+        "LSTSQR",
+    ],
 }
 
 #: The subset of COMMAND_CATEGORIES that is a verbatim transcription of the
@@ -2179,7 +2237,7 @@ COMMAND_CATEGORIES = {
 #: own grouping and is labelled as such in the UI.
 SIEMENS_COMMAND_CATEGORIES = frozenset(
     COMMAND_CATEGORIES
-) - {"Property Access"}
+) - {"Property Access", "Undocumented"}
 
 
 def category_of(name: str):

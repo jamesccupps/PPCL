@@ -141,9 +141,19 @@ def tokenize(text: str) -> list:
             if not m:
                 raise LexError("'@' must be followed by a name", i)
             word = m.group()
+            # The dot problem again, and this branch did not guard it:
+            # @NONE.AND.$ARG3 lexed as one @-name plus $ARG3, so every
+            # condition written without spaces around a dotted operator after
+            # an @priority failed to parse. Siemens' own optimum-start-stop
+            # programs are written that way throughout.
+            for opword in _DOTOPS:
+                cut = word.upper().find(opword)
+                if cut > 0:
+                    word = word[:cut]
+                    break
             kind = Tok.PRIORITY if word.upper() in spec.PRIORITY_RANK else Tok.ATNAME
             tokens.append(Token(kind, word, i))
-            i = m.end()
+            i += len(word)
             continue
 
         # -- [Node]Point reference on another PXC.A device -----------------
@@ -174,8 +184,30 @@ def tokenize(text: str) -> list:
             m = _MACRO_RE.match(text, i)
             if not m:
                 raise LexError("unterminated %macro% reference", i)
-            tokens.append(Token(Tok.MACRO, m.group(), i))
-            i = m.end()
+            end = m.end()
+            # A DEFINE abbreviation is a name PREFIX, so what follows it with
+            # no space belongs to the same point name: DEFINE(X,"BLD1.AHU1.")
+            # then %X%RDP is one object, not two tokens. Siemens' own shipped
+            # application library writes these unquoted throughout, and 146
+            # lines of it failed to parse until this joined them.
+            # The tail may start with a digit -- %X%1AL is a real name in
+            # Siemens' own library -- so this is a plain character run rather
+            # than _IDENT_RE, which requires a leading letter.
+            while end < n and (text[end].isalnum() or text[end] in "_$"):
+                end += 1
+            # The same dot problem as everywhere else: %X%NAL.GT.%X%OAL is a
+            # name, a dotted operator and another name -- not one long name.
+            # Guarded exactly as the [NodeName] branch above guards it.
+            while end < n and text[end] == ".":
+                rest = text[end:].upper()
+                if any(rest.startswith(op) for op in _DOTOPS):
+                    break
+                seg = _IDENT_RE.match(text, end + 1)
+                if not seg:
+                    break
+                end = seg.end()
+            tokens.append(Token(Tok.MACRO, text[i:end], i))
+            i = end
             continue
 
         # -- numbers and times --------------------------------------------

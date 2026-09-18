@@ -708,3 +708,40 @@ def test_pdl_order_and_roles_are_declared():
     everything = set(spec.PDL_ROLES["predictor"]) | set(
         spec.PDL_ROLES["load_handler"])
     assert everything == set(spec.PDL_COMMAND_ORDER)
+
+
+def test_LSTSQR_is_recorded_as_undocumented():
+    """A command recovered from code, not from a manual.
+
+    It appears in Siemens' shipped chiller-sequence programs and in no
+    documentation available here. The category says so rather than filing it
+    under a Siemens heading, which would imply a source that does not exist.
+    """
+    from ppcl import spec
+
+    cmd = spec.ALL["LSTSQR"]
+    assert spec.category_of("LSTSQR") == "Undocumented"
+    assert "Undocumented" not in spec.SIEMENS_COMMAND_CATEGORIES
+    # The argument count is not enforced, because no source states it.
+    assert not cmd.signature_known
+    assert any("UNDOCUMENTED" in n for n in cmd.notes)
+
+
+def test_an_LSTSQR_call_is_neither_unknown_nor_miscounted():
+    from ppcl import linter, parser
+
+    src = ("10\tLSTSQR(1,C,B,$LOC5,X11,Y11,X12,Y12,X13,Y13,"
+           "X14,Y14,X15,Y15,X16,Y16)\n20\tGOTO 10\n")
+    codes = {d.code for d in linter.lint(parser.parse(src))}
+    assert "E110" not in codes     # it is a real command
+    assert "E111" not in codes     # but we do not claim to know its arity
+
+
+def test_the_siemens_categories_stay_a_verbatim_transcription():
+    from ppcl import spec
+
+    assert spec.SIEMENS_COMMAND_CATEGORIES == frozenset({
+        "Point Control", "Operational Control", "Emergency Control",
+        "Program Control", "Energy Management", "Special Function",
+        "Arithmetic Function",
+    })

@@ -1723,3 +1723,111 @@ executable lines is a defect.
 3. A rule noting `ACT`/`DEACT`/`ENABLE`/`DISABL` cost resources on PXC.A.
 4. Lint the 84-program Siemens application library.
 5. `A6V12954390` if it ever becomes reachable.
+
+---
+
+## 2026-09-18 (fourteenth pass) — the Siemens application library, and what it broke
+
+84 programs, **15,726 lines**, shipped by Siemens with Insight. The largest body
+of idiomatic, vendor-authored PPCL available, and never once parsed until now.
+It is kept out of this repository -- it is licensed Siemens material, used here
+as a test corpus only.
+
+### Parse first, because a parse failure is our bug
+
+**146 of 15,726 lines failed.** Three distinct parser defects, all of them the
+"hard part is the dot" problem the conventions file names, in three places that
+had never been reached by any program seen before.
+
+| Defect | Lines | What it is |
+|---|---|---|
+| Unquoted `%X%NAME` | ~116 | A DEFINE abbreviation used bare rather than quoted |
+| `%X%1AL` | ~6 | A substitution whose tail starts with a digit |
+| `@NONE.AND.` | ~20 | The `@`-name branch swallowing a dotted operator |
+
+**The first is the significant one.** Every documented example quotes the
+substitution -- `ON("%A01%.RAF")` -- and quoted always worked. Siemens' own
+library writes it bare throughout. Two forms, one documented, and the code uses
+the other.
+
+**The third was a genuine hole.** `_DOTOPS` guards the identifier branch and
+the `[NodeName]` branch, but not `@`-names, so `@NONE.AND.$ARG3` lexed as a
+single `@NONE.AND.` token plus `$ARG3`. Any condition writing a dotted operator
+against an `@priority` without spaces failed, which is how every one of
+Siemens' optimum-start-stop programs is written.
+
+A fourth was self-inflicted and caught immediately: the first cut of the
+substitution fix absorbed `.` unconditionally, so `%X%NAL.GT.%X%OAL` became one
+name. Guarded the same way the bracket branch already guards it.
+
+**146 to 10.** Five tests pin the three fixes and the two forms that must keep
+working.
+
+### The ten that remain are Siemens' own syntax errors
+
+| Program | Line | |
+|---|---|---|
+| `Fscsppcl` | 6003 | a stray closing parenthesis after the `GOTO` target of an `IF` |
+| `Mainppcl` | 1012 | a `SET` whose point list is missing a comma between the last two points |
+| `Switch` | 10002 | an `OFF` whose point list is missing two commas |
+| `chseq5` | 7080 | a statement fragment with an unbalanced parenthesis |
+
+Described rather than quoted, per HANDOFF section 0: the library is licensed
+Siemens material and nothing from it is reproduced here.
+
+These are in the library as shipped. They are the strongest kind of validation
+the rule set can get: real defects, in vendor code, found by a tool that had
+never seen the file.
+
+### `LSTSQR` — a command in no manual anywhere
+
+`E110` fired 28 times on `LSTSQR`, in the chiller-sequence programs `chseq2`
+through `chseq5`. It appears in **none** of the documentation on this machine:
+not the 736-page Insight Program Editor help, not the Desigo CC Engineering or
+Operating help, not A6V10374898, A6V12954388 or A6V10324350.
+
+Nine call sites, all the same shape: an execution control, three output
+points, then six `(x,y)` pairs. The programs' own comments say what it is --
+they describe determining the coefficients of a best-fit quadratic of chiller
+load against COP, by a recursive least-squares curve fit.
+
+The **argument order is recoverable from what the programs do with the results
+a few lines later**: they compute an expression of the form
+
+```
+-second_output / 2 / third_output
+```
+
+That is the vertex of a parabola, `-b/(2a)`. So the three outputs are the
+constant, the linear coefficient and the quadratic coefficient, in that order:
+`c, b, a`. Six `(x,y)` pairs follow, which with the four leading arguments is
+exactly 16 operands -- the statement limit.
+
+Added with `signature_known=False`, so `E110` stops firing but **no argument
+count is enforced**, because no source states one. Filed under a new
+`"Undocumented"` category rather than a Siemens heading, which would imply a
+source that does not exist; `SIEMENS_COMMAND_CATEGORIES` still holds exactly
+the seven verbatim ones.
+
+Distinct from `LSQ2`/`LSQDAT`, which fit a two-variable XYZ surface across
+eight lines. The library uses `LSTSQR` and never `LSQ2`.
+
+### `W104` is now measured on two independent corpora
+
+| Corpus | `W104` share of all warnings |
+|---|---|
+| The reference site's 22 programs | 65% |
+| Siemens' 84-program library | **70%** (2,134 of 3,040) |
+
+Seventy per cent of the linter's output on Siemens' own reference code is a
+finding about the MMI port, which nobody enters programs through. The case for
+regrading it is no longer a hunch.
+
+### Still to do
+
+1. **Decide `W104`.** Two corpora now say the same thing.
+2. `W330` fires 340 times on the library -- the single largest real-rule count.
+   Worth checking whether that is a false-positive pattern or whether the
+   library genuinely commands without releasing.
+3. Handle the `UNKNOWN (...)` marker in the lexer.
+4. A rule for the `SET`-without-deadband idiom on PXC.A.
