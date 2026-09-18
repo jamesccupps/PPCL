@@ -1,12 +1,12 @@
 ---
 name: ppcl
-description: Read, review, debug, optimise and write Siemens PPCL for APOGEE and Desigo PXC.A field panels. Use whenever PPCL program text appears, when the user mentions PPCL, APOGEE, PXC, Insight or Desigo CC sequence programming, or asks to review, fix, renumber, simulate or author a control sequence. Also use for questions about PPCL commands, point priority, point types, or why a sequence misbehaves on a panel.
+description: Read, review, debug, optimise and write Siemens PPCL for field panels, as edited through Desigo CC or Insight. Use whenever PPCL program text appears, when the user mentions PPCL, APOGEE, PXC, Insight or Desigo CC sequence programming, or asks to review, fix, renumber, simulate or author a control sequence. Also use for questions about PPCL commands, point priority, point types, or why a sequence misbehaves on a panel.
 ---
 
 # PPCL
 
-Siemens PPCL, on APOGEE field panels and current Desigo PXC.A automation
-stations alike. This skill pairs a
+Siemens PPCL. Current, not legacy: Siemens' 2025 manual for its current panels
+points at the same PPCL manual as the old ones. This skill pairs a
 deterministic toolkit (`python -m ppcl.cli`) with the judgement calls the
 toolkit cannot make.
 

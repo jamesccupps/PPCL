@@ -5,8 +5,7 @@
 > the honest gap list, and the prioritised roadmap. This file is conventions
 > and invariants only.
 
-Tooling for Siemens PPCL, APOGEE through Desigo PXC.A: parse, lint, analyse,
-simulate, renumber,
+Tooling for Siemens PPCL: parse, lint, analyse, simulate, renumber,
 generate, redact. Python 3.10+, **stdlib only, zero dependencies** — deliberate,
 so it runs on any engineering workstation without a package install.
 

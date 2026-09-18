@@ -2,11 +2,12 @@
 
 Read, inspect, lint, debug, optimise and **write** Siemens **PPCL**.
 
-PPCL is not a legacy language. Siemens' own *PXC.A Reference Manual*
-(A6V12954388, 04/2025) sends you to the same *PPCL User's Manual* (125-1896)
-for a current Desigo PXC4/5/7.A, and the 2026 modernization guide converts
-PPCL *forward* onto PXC.A from MBC/MEC and BACnet PXC panels. This toolkit
-covers six firmware families, APOGEE through PXC.A.
+PPCL is not a legacy language. Siemens' 2025 reference manual for its current
+panels points you at the same *PPCL User's Manual* (125-1896) that covered the
+old ones, and its 2026 modernization guide converts PPCL *onto* the new
+hardware rather than off it. You edit it in Desigo — on the panel itself if you
+have to, but that is not where the work happens. This toolkit covers six
+firmware families.
 
 Zero dependencies, Python 3.10+, stdlib only. Everything runs locally — no
 program text ever leaves the machine.
