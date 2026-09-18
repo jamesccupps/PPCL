@@ -42,6 +42,8 @@ COLUMNS = {
     "address": ("address", "hardwareaddress", "point address", "slot"),
     "value": ("value", "presentvalue", "currentvalue", "lastvalue"),
     "kind": ("kind", "category", "class"),
+    "slope": ("slope", "gain", "scalefactor", "conversionslope"),
+    "intercept": ("intercept", "offset", "conversionintercept", "bias"),
 }
 
 
@@ -60,6 +62,13 @@ class PointRecord:
     device: str = ""
     address: str = ""
     value: float = None
+    #: Engineering conversion. An analog point's engineering value maps to a
+    #: digital count through these, and the panel refuses any command whose
+    #: count falls outside 0 to 32,767 -- error E12, "Value out of range".
+    #: The classic way to hit it is a virtual LAO defined with intercept 0
+    #: commanded to a negative value.
+    slope: float = None
+    intercept: float = None
 
     @property
     def key(self):
@@ -254,10 +263,11 @@ def load_csv(text, source=""):
             if column:
                 setattr(record, field_name,
                         (row.get(column) or "").strip())
-        column = mapping.get("value")
-        if column:
-            raw = (row.get(column) or "").strip()
-            record.value = _to_value(raw)
+        for field_name in ("value", "slope", "intercept"):
+            column = mapping.get(field_name)
+            if column:
+                raw = (row.get(column) or "").strip()
+                setattr(record, field_name, _to_value(raw))
         if record.key in db.points:
             db.problems.append(
                 "line %d: %s appears more than once; the last one wins"

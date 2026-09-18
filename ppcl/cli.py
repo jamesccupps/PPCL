@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import sys
+import textwrap
 
 from . import __version__, analyzer, formatter, generator, linter, parser as ppcl_parser
 from . import report as report_mod
@@ -745,6 +746,31 @@ def cmd_serve(args):
 
 def cmd_explain(args):
     topic = args.topic.upper()
+
+    # A panel error code, so that a code read off a panel or a Desigo output
+    # pane can be looked up here. Checked before commands because no command
+    # shares these spellings.
+    found = spec.panel_error(topic)
+    if found is not None:
+        kind, text, why = found
+        print("%s -- %s" % (topic, text))
+        if kind == "compiler":
+            print("  reported by: the PPCL compiler, when the line is entered "
+                  "or downloaded")
+            print("  meaning:     the line was REFUSED and is not in the panel")
+        else:
+            print("  reported by: the field panel at runtime")
+            print("  meaning:     the line compiled and loaded; the panel "
+                  "failed while carrying it out")
+            hexcode = spec.PANEL_RUNTIME_ERRORS[topic][0]
+            print("  hex:         %s" % hexcode)
+        if why:
+            print()
+            for line in textwrap.wrap(why, 74):
+                print("  " + line)
+        print("\n  manual: APOGEE BACnet ALN Field Panel User's Manual "
+              "(125-3020), Appendix C")
+        return 0
 
     if topic in spec.ALL:
         cmd = spec.ALL[topic]

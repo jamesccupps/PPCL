@@ -36,9 +36,22 @@ happens *before* the commit, every time.
    `ppcl redact` exists for sharing a program with a vendor, not for turning
    site code into public samples.
 
-Before a commit that touches documentation, grep the tree for the site's name,
-its panel names and its point prefixes. It takes ten seconds and it is the one
-mistake that cannot be quietly undone.
+Before every commit, grep the tree. **Grep for more than names** -- the first
+audit checked for the building and its panels and passed, while a test carried
+a line copied verbatim out of the site's PPCL editor, complete with its real
+point name and BACnet device instance. A round-looking number like `22222` is
+not evidence that it is invented.
+
+What to look for, at minimum:
+
+- the site and building name, panel and node names, floor and tenant names
+- **real point names**, including DEFINE prefixes like `%X%`
+- **BACnet device instances** (`BAC_<n>_...`) and object identifiers
+- IP addresses and device addresses
+- any comment block lifted out of a real program
+
+If an example needs to look real, invent one. Siemens' own manuals use
+`BAC_12345_AO_67`, which is a fine model.
 
 ---
 
@@ -331,6 +344,51 @@ tune them against programs that are running in a building.
   availability. `OIP` is rejected there and the linter now says so.
 - Rules added: `W336` (SETVAL to a behaviour-changing property), `W337`
   (SSTO whose times nothing reads), `E119` (firmware availability).
+
+### Tier 3.5 — the reference deliverable (the user has asked for this)
+
+**A PPCL quick reference a working tech would actually carry**, and later a
+quick-reference app. Not a rewrite of the manual: the thing you want at 6am in
+a mechanical room with a laptop balanced on a fan housing.
+
+**This is gated, deliberately.** It ships only once the language is known
+completely and accurately, because a quick reference that is 95% right is worse
+than none -- it gets trusted and then it is wrong about the one thing you
+looked up. Every previous research pass has turned up a correction (`OIP` dead
+on PXC.A, the line limit being 512 not 66, `LOCAL`'s sixteen being per
+statement, the `W202` severity, this site not being PXC.A at all). Until a pass
+produces no corrections, the language is not known well enough to condense.
+
+The material already exists and is cited -- `spec.py`, the 79 rules,
+`PPCL-REFERENCE.md`, `helpdocs.py`, the panel error tables. The work is
+selection and layout, not discovery. Likely shape:
+
+- the execution model in five statements, and the priority table
+- the failure catalogue, each entry with its symptom in the building
+- every command on one line: signature, limits, firmware availability
+- the panel's own error codes, compiler and runtime, and what each means
+- what differs by firmware family, in one table
+
+Generate it from `spec.py` rather than writing it by hand, so it cannot drift
+from what the linter enforces. An app is a later step over the same data; the
+MCP server and `ppcl explain` already answer these questions programmatically.
+
+### Tier 3.6 — Insight versus Desigo, deliberately compared
+
+Both document sets are on this machine and both have been mined, but never
+**against each other**. Two questions worth answering properly:
+
+1. **What did Desigo update?** Where the two disagree, Desigo is the current
+   authority for a BACnet ALN site and Insight is the historical one.
+2. **What does Insight have that Desigo dropped?** The Insight Program Editor
+   help is far deeper on the language itself -- 736 pages, a page per command
+   with worked examples, the compiler error list, the decision-table and
+   pseudocode method. The Desigo PPCL pages are a glossary by comparison. A
+   fact being absent from Desigo does not make it untrue.
+
+Already known to differ: `LSQ2`/`LSQDAT` are documented in Insight and absent
+from the PXC.A manual; `GETVAL`/`SETVAL` are the reverse. The `ARC`/`ATN`
+spelling conflict survives in all four document sets.
 
 ### Tier 4 — AI assistance (the user has asked for this)
 The useful shape is narrow and grounded, not a chat box:

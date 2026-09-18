@@ -568,13 +568,18 @@ def test_unknown_function_suggests_a_correction():
     assert "SQRT" in diag.detail
 
 
-def test_real_bacnet_line_from_a_panel():
-    """A line taken verbatim from a live Desigo CC PPCL Editor."""
+def test_a_bacnet_sampled_assignment_lints_clean():
+    """The shape a real Desigo program uses to mirror a third-party sensor.
+
+    Names and device instance are invented -- see HANDOFF section 0. What the
+    test is for is the *form*: a SAMPLE gating an assignment from a BACnet
+    encoded reference, which has to parse and produce no findings.
+    """
     src = (
         "00010\tC\n"
-        "00020\tC New Virtual Outdoor Air Temp Bacnet\n"
+        "00020\tC Virtual outdoor air temp, mirrored over BACnet\n"
         "00030\tC\n"
-        '00040\tSAMPLE(120) "NEWOATEMP" = "BAC_22222_AI_1"\n'
+        '00040\tSAMPLE(120) "VIRTOAT" = "BAC_12345_AI_1"\n'
         "00050\tGOTO 40\n"
     )
     prog = parser.parse(src, name="t")

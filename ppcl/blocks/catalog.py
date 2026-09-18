@@ -151,7 +151,7 @@ def block_type(name, label, category, summary, **kw):
     ),
     help="The starting point for most logic. Any reference the panel accepts "
          "works here, including a colon-qualified FLN subpoint such as "
-         "Dev201:DAY_CLG_STPT and a BACnet object such as BAC_22222_AI_1.",
+         "Dev201:DAY_CLG_STPT and a BACnet object such as BAC_12345_AI_1.",
     manual="125-1896 Rev.5 ch.2, point referencing",
 )
 def _emit_point_in(ctx, block):

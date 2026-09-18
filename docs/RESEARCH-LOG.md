@@ -1270,3 +1270,84 @@ something this toolkit touches, but worth knowing it is on.
 3. `Point.chm` bundled-point detail: the proof DI is optional on every bundled
    type except `L2SL`, and `LOOAP` mixes pulsed On/Off with a latched Auto.
 4. `A6V12954388` — still unread.
+
+---
+
+## 2026-09-18 (ninth pass) — panel error codes, and Operating vs Engineering
+
+### The Operating help adds nothing — measured, not assumed
+
+Both trees ship inside `EngineeringHelp.zip`. Compared title by title:
+
+| | |
+|---|---|
+| Engineering pages | 3,618 |
+| Operating pages | 844 |
+| Distinct titles, Engineering | 2,997 |
+| Distinct titles, Operating | 733 |
+| Shared | **733** |
+| **Only in Operating** | **0** |
+
+Of the 733 shared, **702 are within 20 characters of identical**. All 31 that
+differ are **longer in Engineering**, the largest being a contents page.
+
+**The Operating help is a strict subset.** Mine the Engineering tree and skip
+the other. The PPCL *Viewer* pages, which are the genuinely operator-facing
+ones, are present in both.
+
+### Panel error codes — now in `spec.py` and in `explain`
+
+`A6V10324350` Appendix C, transcribed. The distinction between the two sets is
+the useful part and is recorded in the module docstring:
+
+- **R-codes come from the PPCL compiler.** The line was *refused*. A rule that
+  predicts an R-code is saying "this will not load."
+- **E-codes come from the running system.** The line compiled, loaded, and then
+  the panel failed carrying it out. A rule that predicts an E-code is saying
+  "this will load and then not work" -- the more dangerous of the two.
+
+Twelve compiler errors, and **R4 and R12 genuinely do not exist** in the manual;
+a test asserts they are not invented. Seventeen runtime errors, filtered to
+those that bear on writing PPCL -- the full E-code list runs to the thousands
+and covers cassette tapes and report printers.
+
+The ones that matter:
+
+| Code | | Corresponds to |
+|---|---|---|
+| `R5` | Invalid control statement -- commanding an analog point with a digital statement, e.g. `OFF(DAMPER)` | point-type checking |
+| `R7` | Invalid assignment -- a decimal to a digital point | |
+| `R9` | Line numbers out of order | `W103` |
+| `R10` / `R11` | Too many arguments / operands | `E111` / `E315` |
+| **`E4`** | **Priority too low** | `W330`/`W331` -- this is the panel's own error for the single most common PPCL defect |
+| `E22` / `E23` | Line not traced / not enabled | `R703` / `R704` |
+| `E26` | Has unresolved points | `R701` |
+
+`ppcl explain E4` and `ppcl explain R5` now work, and say which of the two
+kinds the code is and what that implies.
+
+### `E12` — a hazard nothing here checks yet
+
+> "An analog point was commanded to a value that, given the point's slope and
+> intercept, puts the digital value outside 0 to 32,767. Commonly hit by
+> commanding a virtual LAO defined with an intercept of zero to a **negative**
+> value."
+
+A line that compiles, loads, and then silently refuses to take the command --
+the same shape as the priority defect, and just as invisible.
+
+Checking it needs the point's **slope and intercept**, which the point database
+did not carry. `PointRecord` now has both, with the column aliases an export is
+likely to use (`slope`/`gain`/`scalefactor`, `intercept`/`offset`/`bias`). The
+rule itself waits on a real point export to tune against -- writing it now
+would be exactly the speculative tuning the immediate roadmap item warns about.
+
+### Still to do
+
+1. **The `E12` rule**, once a point export with slope and intercept exists.
+2. `Point.chm` bundled-point detail: the proof DI is optional on every bundled
+   type except `L2SL`; `LOOAP` mixes pulsed On/Off with a latched Auto.
+3. A real `PPCL DISPLAY REPORT` to run `lint --report` against.
+4. `A6V12954388` -- still unread.
+5. See the roadmap's Tier 3.5 and 3.6: the quick reference deliverable, and a
+   deliberate Insight-versus-Desigo comparison.

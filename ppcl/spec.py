@@ -2126,3 +2126,122 @@ def _check_categories():
 
 
 _check_categories()
+
+
+# --------------------------------------------------------------------------
+# Panel error codes
+# --------------------------------------------------------------------------
+
+#: Errors the *field panel* reports, as opposed to findings this toolkit
+#: derives. Transcribed from the APOGEE BACnet ALN Field Panel User's Manual
+#: (A6V10324350 / 125-3020), Appendix C.
+#:
+#: Two sets, and the distinction matters. **R-codes come from the PPCL
+#: compiler** -- the line was refused when it was entered or downloaded.
+#: **E-codes come from the running system** -- the line is loaded and the panel
+#: failed while carrying it out. A rule that predicts an R-code is saying "this
+#: will not load"; one that predicts an E-code is saying "this will load and
+#: then not work", which is the more dangerous of the two.
+#:
+#: Only the codes that bear on writing PPCL are transcribed. The manual's full
+#: E-code list runs into the thousands and covers cassette tapes, report
+#: printers and FLN drops.
+
+#: ``{code: (text, explanation)}`` -- the PPCL compiler's own errors.
+PPCL_COMPILER_ERRORS = {
+    "R0": ("Line not accepted, cause unknown",
+           "The panel refused the line but cannot say why. Examine it, "
+           "recompose it and re-enter."),
+    "R1": ("Invalid line number",
+           "A line was entered without a valid number. Must be an integer "
+           "from 1 to 32,767."),
+    "R2": ("Unrecognized statement",
+           "A typographical mistake is the usual cause -- ONN for ON, LOP for "
+           "LOOP."),
+    "R3": ("Invalid RETURN statement",
+           "RETURN has been used incorrectly in the line."),
+    "R5": ("Invalid control statement",
+           "Most often an attempt to command an analog point with a digital "
+           "statement or the reverse, for example OFF(DAMPER) where DAMPER is "
+           "analog."),
+    "R6": ("Invalid IF statement",
+           "The IF is used incorrectly or improperly constructed."),
+    "R7": ("Invalid ASSIGNMENT statement",
+           "An illegal value for the point, for example assigning a decimal "
+           "to a digital point."),
+    "R8": ("Unbalanced parentheses",
+           "The number of opening and closing parentheses differs."),
+    "R9": ("Line numbers out of order",
+           "Program line numbers are not in ascending order."),
+    "R10": ("Too many arguments in the statement", ""),
+    "R11": ("Too many operands in the statement", ""),
+    "R13": ("Invalid binary operator",
+            "The binary operator is not recognized. Usually a mistyped "
+            "relational operator."),
+}
+
+#: ``{code: (hex, text, explanation)}`` -- runtime errors worth knowing when
+#: reading PPCL. These fire on a line that compiled cleanly.
+PANEL_RUNTIME_ERRORS = {
+    "E2": ("0x0002", "Invalid command",
+           "A command inappropriate for the point type -- commanding an "
+           "analog point ON, or putting a non-alarmable point into "
+           "alarm-by-command."),
+    "E3": ("0x0003", "Not found",
+           "The point is not defined in any online field panel, or the "
+           "program line does not exist, or the field panel is not a member "
+           "of that network."),
+    "E4": ("0x0004", "Priority too low",
+           "The point cannot be commanded because the priority of the "
+           "statement is lower than the point's current priority. This is the "
+           "error behind the single most common PPCL defect: a point "
+           "commanded above NONE and never released."),
+    "E5": ("0x0005", "No change",
+           "The point's condition was already what the program asked for."),
+    "E7": ("0x0007", "Failed",
+           "The point is failed, which usually means hardware: the panel, the "
+           "board, or the termination."),
+    "E8": ("0x0008", "Out of service",
+           "The point is operator disabled and cannot be altered until it is "
+           "re-enabled."),
+    "E11": ("0x000B", "Value unchanged",
+            "The point is already at the commanded value or state."),
+    "E12": ("0x000C", "Value out of range",
+            "An analog point was commanded to a value that, given the point's "
+            "slope and intercept, puts the digital value outside 0 to 32,767. "
+            "Commonly hit by commanding a virtual LAO defined with an "
+            "intercept of zero to a NEGATIVE value."),
+    "E22": ("0x0016", "Line not traced",
+            "The line was accessed but not executed."),
+    "E23": ("0x0017", "Line not enabled",
+            "The line is disabled and must be enabled before the system can "
+            "reach it."),
+    "E25": ("0x0019", "Line already exists",
+            "A line was added using a number already present in the panel."),
+    "E26": ("0x001A", "Has unresolved points",
+            "The line names points that cannot be found in any active field "
+            "panel on the network."),
+    "E28": ("0x001C", "Bad statement type",
+            "Loop tuning was attempted on a statement that is not a LOOP."),
+    "E31": ("0x001F", "Not set up for TOD",
+            "The point is not configured for Time-Of-Day functions."),
+    "E34": ("0x0022", "Cannot override",
+            "An attempt to override an override statement."),
+    "E3605": ("0x0e15", "Physical point not commandable",
+              "An attempt to change a physical point that cannot process "
+              "commands. Most often an FLN device point."),
+    "E3606": ("0x0e16", "Value out of range",
+              "A point was commanded outside its physical range."),
+}
+
+
+def panel_error(code: str):
+    """Look up a panel error by code. Returns ``(kind, text, explanation)``."""
+    key = code.upper().strip()
+    if key in PPCL_COMPILER_ERRORS:
+        text, why = PPCL_COMPILER_ERRORS[key]
+        return ("compiler", text, why)
+    if key in PANEL_RUNTIME_ERRORS:
+        _hex, text, why = PANEL_RUNTIME_ERRORS[key]
+        return ("runtime", text, why)
+    return None

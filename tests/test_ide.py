@@ -612,3 +612,69 @@ def test_meta_publishes_the_command_categories_the_ui_filters_by(ws):
     assert "Energy Management" in meta["command_categories"]
     assert "LOOP" in meta["command_categories"]["Energy Management"]
     assert meta["limits"]["locals"] == 16
+
+
+# -- panel error codes -----------------------------------------------------
+
+
+def test_panel_error_lookup_tells_compiler_from_runtime():
+    """The distinction is the point: R-codes refuse the line, E-codes do not.
+
+    A rule that predicts an R-code is saying "this will not load". One that
+    predicts an E-code is saying "this will load and then not work", which is
+    the more dangerous of the two.
+    """
+    from ppcl import spec
+
+    kind, text, _why = spec.panel_error("R5")
+    assert kind == "compiler"
+    assert "control statement" in text.lower()
+
+    kind, text, why = spec.panel_error("E4")
+    assert kind == "runtime"
+    assert text == "Priority too low"
+    assert "never released" in why
+
+    assert spec.panel_error("e12")[0] == "runtime"      # case insensitive
+    assert spec.panel_error("W999") is None             # not a panel code
+
+
+def test_the_error_tables_are_well_formed():
+    from ppcl import spec
+
+    for code, entry in spec.PPCL_COMPILER_ERRORS.items():
+        assert code.startswith("R") and len(entry) == 2, code
+    for code, entry in spec.PANEL_RUNTIME_ERRORS.items():
+        assert code.startswith("E") and len(entry) == 3, code
+        assert entry[0].startswith("0x"), code
+    # R4 and R12 are genuinely absent from the manual; do not invent them.
+    assert "R4" not in spec.PPCL_COMPILER_ERRORS
+    assert "R12" not in spec.PPCL_COMPILER_ERRORS
+
+
+def test_point_database_carries_slope_and_intercept():
+    """Needed for panel error E12, and useful on its own.
+
+    An analog point's engineering value maps to a count through slope and
+    intercept, and the panel refuses any command whose count leaves 0..32,767.
+    """
+    from ppcl import points
+
+    db = points.load_csv(
+        "Point Name,Point Type,Slope,Intercept\n"
+        "DASP,LAO,0.1,0\n"
+        "MAT,LAI,0.01,-40\n"
+        "SFAN,LDO,,\n"
+    )
+    assert db.lookup("DASP").intercept == 0.0
+    assert db.lookup("MAT").intercept == -40.0
+    assert db.lookup("SFAN").slope is None
+    assert db.ignored_columns == []
+
+
+def test_slope_and_intercept_accept_the_usual_column_names():
+    from ppcl import points
+
+    db = points.load_csv("name,type,gain,offset\nX,LAO,2.5,10\n")
+    assert db.lookup("X").slope == 2.5
+    assert db.lookup("X").intercept == 10.0

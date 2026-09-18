@@ -843,7 +843,7 @@ live panel:
 4. Which operand limit the PXC.A compiler actually enforces.
 5. What A6V10374898 changed.
 6. BACnet **property** referencing syntax. Object referencing is known:
-   `BAC_<device>_<objtype>_<instance>`, for example `BAC_22222_AI_1`.
+   `BAC_<device>_<objtype>_<instance>`, for example `BAC_12345_AI_1`.
 7. What values `LSQ2`'s execution parameter accepts.
 
 ## Other PPCL tooling
