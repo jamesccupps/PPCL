@@ -1652,3 +1652,74 @@ no-op but costs network traffic every pass. A rule candidate.
 3. A rule for the `SET`-without-deadband idiom on PXC.A.
 4. A rule noting `ACT`/`DEACT`/`ENABLE`/`DISABL` cost resources on PXC.A.
 5. Lint the 84-program Siemens application library.
+
+---
+
+## 2026-09-18 (thirteenth pass) — A6V12954390 is real but not reachable
+
+### What was established
+
+The PXC.A Web Interface guide cites "the PXC.A PPCL Manual (A6V12954390)" twice.
+It is **not a phantom**: Siemens' own PXC4.A datasheet, edition **2026-04-03**,
+lists it in the structured product-documentation table:
+
+| Topic | Title | Number |
+|---|---|---|
+| Setup and commissioning | PXC.A Web Interface User Guide | A6V12893115 |
+| | **PPCL User Manual** | **A6V12954390** |
+| | PXC.A Reference Manual | A6V12954388 |
+| | BACnet PIC Statement | … |
+
+**But it is not publicly reachable.** `sid.siemens.com/r/A6V12954390` returns
+404, as do the `_en` and `/v/` forms, while `A6V10374898`, `A6V12893115` and
+`A6V12954388` all resolve at Internet access level. Siemens' own support search
+finds nothing. So it is either restricted to partners, or the number is wrong.
+
+**Wrong is plausible.** The A6V12954388 "PPCL Editor" page cites the Web
+Interface guide as `A6V12853115` -- an `8` where the live document has a `9`.
+Siemens' documents carry document-number typos. Appearing in a structured
+datasheet table is stronger evidence than prose, but not proof.
+
+**What is public and current** is `A6V10374898`, "PXC.A PPCL User Guide",
+Document No. **125-1896**, revision **`A6V10374898_en--_j`**, HTML, Internet
+access level. Recording the revision so a later session can tell whether it has
+moved. That is the document this project has been mining, and it covers the
+same ground the missing number's title implies.
+
+**Status: not obtainable without a Siemens account.** Do not spend more time on
+it; if a PXC.A site ever needs it, it is a request to a Siemens rep, not a
+search.
+
+### A measurement that was wrong for a small, specific reason
+
+> "When entering comment lines through the web user interface, the maximum
+> number of characters per line is 512 **(not including the line number or
+> operator C)**."
+
+`W104` measured `ln.raw` -- the whole line, number and `C` included -- against
+that limit for comments as well as statements. So a comment was flagged roughly
+seven characters early.
+
+Fixed: a comment is now measured on its **text**, an executable line still on
+the whole raw line, because 125-1896 gives the executable limit as characters
+per line *including* the line number. Two limits, two ways of counting, both
+cited. Two tests pin the boundary at exactly 66 and 67.
+
+Small, but it is the class of error that makes a tool look unreliable: a
+finding a user can disprove by counting.
+
+### Also on that page
+
+A PPCL program made **only of comment lines** is a documented idiom -- a
+notepad held in the automation station for activity records, to-do lists and
+instructions to follow-up personnel, addable and viewable from the web UI and
+archivable. Worth knowing before some future rule decides a program with no
+executable lines is a defect.
+
+### Still to do
+
+1. Handle the `UNKNOWN (...)` marker in the lexer.
+2. A rule for the `SET`-without-deadband idiom on PXC.A.
+3. A rule noting `ACT`/`DEACT`/`ENABLE`/`DISABL` cost resources on PXC.A.
+4. Lint the 84-program Siemens application library.
+5. `A6V12954390` if it ever becomes reachable.

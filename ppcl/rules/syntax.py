@@ -98,11 +98,18 @@ def line_too_long(ctx):
     for ln in ctx.program.lines:
         if ln.continued:
             continue
+        if ln.is_comment:
+            # A comment's limit is measured on the comment TEXT: "the maximum
+            # number of characters per line is 512 (not including the line
+            # number or operator C)" -- A6V10374898, Maximum Number of
+            # Characters per Comment Line. Measuring ln.raw instead flags a
+            # comment several characters early, which is how this read until
+            # that page was found.
+            if len(ln.stmt.text) > limit:
+                long_comments.append(ln)
+            continue
         text = ln.raw.strip()
         if len(text) <= limit:
-            continue
-        if ln.is_comment:
-            long_comments.append(ln)
             continue
         yield _d(
             "W104",
@@ -121,13 +128,16 @@ def line_too_long(ctx):
         yield Diagnostic(
             code="W104",
             severity=Severity.STYLE,
-            message="%d comment line(s) exceed the %d-character MMI limit"
+            message="%d comment line(s) exceed %d characters of comment text"
             % (len(long_comments), limit),
             line=long_comments[0].number,
             source_line=long_comments[0].source_line,
             detail="Comments are truncated rather than rejected, so this only "
-            "matters if the program is re-entered through the MMI port.",
-            manual="Chapter 2, PPCL rules",
+            "matters if the program is re-entered through the MMI port. The "
+            "limit counts the comment text alone -- neither the line number "
+            "nor the C counts against it.",
+            manual="Chapter 2, PPCL rules; A6V10374898, Maximum Number of "
+                   "Characters per Comment Line",
         )
 
 

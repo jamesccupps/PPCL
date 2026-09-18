@@ -894,3 +894,22 @@ def test_the_finding_carries_siemens_reason_not_just_the_refusal():
     assert "warmstart" in d.detail
     assert "first line after a power failure" in d.detail
     assert "Obsolete PPCL Statements" in d.manual
+
+
+def test_a_comment_limit_counts_the_comment_text_only():
+    """"not including the line number or operator C" -- A6V10374898.
+
+    Measuring the raw line instead flags a comment several characters early,
+    which is how this read until that page was found.
+    """
+    at_limit = "00010\tC " + "x" * 66 + "\n00020\tON(F)\n00030\tGOTO 20\n"
+    over = "00010\tC " + "x" * 67 + "\n00020\tON(F)\n00030\tGOTO 20\n"
+    assert "W104" not in codes(at_limit)
+    assert "W104" in codes(over)
+
+
+def test_an_executable_line_still_counts_its_line_number():
+    """Different rule for a different reason: 125-1896 gives the executable
+    limit as characters per line *including* the line number."""
+    body = "ON(" + ",".join('"LONGPOINT%d"' % i for i in range(1, 8)) + ")"
+    assert "W104" in codes("00010\t" + body + "\n00020\tGOTO 10\n")
