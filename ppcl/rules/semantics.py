@@ -777,6 +777,48 @@ def unguarded_duty_cycle(ctx):
                 )
 
 
+@rule("E316", "Command used on a point type it cannot control", Severity.ERROR)
+def command_point_type(ctx):
+    """Only fires when the point's type is known.
+
+    ``spec`` has carried a ``point_types`` set on the commands that restrict
+    their target since the beginning -- AUTO takes only the two On/Off/Auto
+    types, FAST and SLOW only the speed types -- and until now nothing read
+    it. It was documentation that no one could be wrong about, which is the
+    same as documentation nobody checks.
+
+    A point database is required: without a declared type there is nothing to
+    compare, and guessing from a name would be worse than silence.
+    """
+    for ln in ctx.program.lines:
+        for stmt in substatements(ln.stmt):
+            if not isinstance(stmt, CommandCall):
+                continue
+            cmd = spec.ALL.get(stmt.name)
+            if cmd is None or not cmd.point_types:
+                continue
+            for arg in stmt.args:
+                if not isinstance(arg, Ref) or arg.is_local:
+                    continue
+                ptype = ctx.point_type(arg.name)
+                if ptype is None or ptype in cmd.point_types:
+                    continue
+                if ptype not in spec.POINT_TYPES:
+                    continue        # a type this spec does not know
+                yield _d(
+                    "E316",
+                    Severity.ERROR,
+                    "%s is a %s point and %s controls only %s"
+                    % (arg.name, ptype, stmt.name,
+                       ", ".join(sorted(cmd.point_types))),
+                    ln.number,
+                    detail="%s. The panel rejects the command rather than "
+                    "carrying it out on the wrong kind of output."
+                    % spec.POINT_TYPES[ptype].description,
+                    manual="Chapter 4, %s" % stmt.name,
+                )
+
+
 @rule("W334", "Analog value compared for exact equality", Severity.WARNING)
 def analog_equality(ctx):
     for ln in ctx.program.lines:

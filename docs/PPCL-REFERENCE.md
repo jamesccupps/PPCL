@@ -515,6 +515,59 @@ refuse. Comparing the two enumerated lists word for word in both directions
 found `LESS` to be their **only** difference that is not a page-layout
 artifact — every other entry of either list was already reserved here.
 
+**Two point types exist that Table 3-2 does not list — 2026-09-18.**
+125-1896 Rev. 5 titles its table "The 11 Point Types" and names only `LFSSL`
+and `LFSSP` wherever a speed type appears, including all three status
+indicators. The Insight Program Editor help names **four** — `LFSSL`, `LFSSP`,
+`LFMSSL`, `LFMSSP` — on every one of `FAST`, `SLOW`, `EMFAST` and `EMSLOW`, and
+on the `FAST`, `SLOW` and `OFF` status-indicator pages. The Point Details help
+carries a definition for `LFMSSL`: *four-state control (Fast/Medium/Slow/Stop)
+of three-speed latched motor starters that provide proof indication*. The
+controller's own point-type enum puts the pair at 22 and 23, after the original
+block — which is what a later addition looks like.
+
+`LFSSL`/`LFSSP` are the **two**-speed types; `LFMSSL`/`LFMSSP` are the
+**three**-speed ones. Both pairs are now in `POINT_TYPES` and in `SPEED_TYPES`.
+Their address organisation is **inferred** from their two-speed siblings and
+says so in `spec.py`, because no published table covers them.
+
+One wrinkle worth knowing if you read the same pages: the Commanding help's
+`LFSSL` page describes *three* latched outputs including a Medium — which is
+`LFMSSL`'s organisation, not `LFSSL`'s. Table 3-2 is unambiguous that `LFSSL`
+has `DO(OFF/FAST)`, `DO(OFF/SLOW)`, `DI(PROOF)`, and that is what this toolkit
+carries.
+
+**Five statements exist that nobody can document — 2026-09-18.** The
+controller's own `PPCL_statement_type` enum has 71 members. Sixty map onto
+commands in `spec.ALL`; two are explicitly unnamed (`WHOPUNKNOWN1` and
+`WHOPUNKNOWN2`, values 61 and 62 — the vendor's table admitting its own
+incompleteness); the rest are `IF` parts, assignment, comment and
+declarations. **Five are left over:**
+
+| Token | Value | What the name suggests |
+|---|---|---|
+| `ONERR` | 21 | an error handler — nothing says what it traps or where control goes |
+| `ENTHAL` | 48 | enthalpy, though the manuals build economizer logic out of ordinary arithmetic and never with a statement of this name |
+| `MMI` | 49 | the man-machine interface port, which the manuals discuss constantly but never as a statement |
+| `RELTCU` | 60 | "release TCU" — the Terminal Control Unit generation that predates the documentation on hand |
+| `DIM` | 68 | a dimension or array declaration, which would be unlike anything else in the language |
+
+Every manual here was searched: the 736-page Insight Program Editor help, the
+Desigo CC engineering and operating help, 125-1896, A6V10374898, A6V12954388,
+A6V10324350, A6V13998441. **None mentions any of the five.** Nor does any
+program: zero occurrences across Siemens' shipped application library, the
+reference site's programs, and 2,644 lines recovered from panels over the wire.
+
+So the name is real and everything else is not established. They are kept out
+of `spec.ALL` — a name whose arguments nobody can state must not be offered by
+completion or emitted by the generator — and `E110` is taught not to call one
+"not a PPCL command", which would be confidently wrong about the vendor's own
+firmware. `W121` says the true thing: the line was not checked.
+
+This is the second time absence from a vendor enum has proved to mean nothing.
+`OIP` is used constantly in real programs and is *also* missing from that same
+71-entry table. An enum is evidence of what exists, never of what does not.
+
 **`NODE0` or `NODE1` — where the node range starts. Settled 2026-09-18.**
 The Program Editor's reserved-word page prints `NODE1 through NODE99`. The
 dedicated node-points page **in the same book** states the range in prose —
@@ -568,6 +621,8 @@ Following the discipline of tagging each claim by how it was established:
 | `SSTO`, `PDL`, `OIP`, `DC`/`DCR` execution | **Not modelled** — traced as no-ops |
 | PXC.A statement availability | **Manual-verified** — A6V10374898, "Obsolete PPCL Statements Removed from the Language". Ten statements, each with Siemens' stated reason |
 | Panel error codes | **Manual-verified** — A6V10324350 Appendix C. R-codes are compiler refusals, E-codes are runtime failures on a line that loaded |
+| Per-line state (`report.py`) | **Confirmed from the panel's own record.** The five flags the `PPCL DISPLAY REPORT` state column carries — enabled, traced, unresolved, failed, looped — are exactly the five booleans of the controller's `PPCL_data` structure as read off the wire by an independent project. The model is complete, not a guess from a column of letters |
+| Five statement tokens the firmware names | **Known to exist, unknown in every other way.** `ONERR`, `ENTHAL`, `MMI`, `RELTCU`, `DIM` are members 21, 48, 49, 60 and 68 of the controller's `PPCL_statement_type` enum. No manual on hand documents any of them and no program in any corpus uses one. They are deliberately **not** in `spec.ALL`; `W121` reports a line using one as unchecked rather than wrong. See §7 |
 | `LSTSQR` | **Inferred from code, not documented anywhere.** Recovered from Siemens' shipped chiller programs; argument order deduced from what those programs compute from the results. Argument count is deliberately NOT enforced |
 
 **Program planning method.** Siemens' recommended process, which is also a

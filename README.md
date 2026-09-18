@@ -41,7 +41,7 @@ with the same keys so muscle memory transfers: `Ctrl+G` go to statement,
 numbering on Enter, and **Command Assist** using Siemens' own eight command
 categories, with the signature and the argument you are on shown as you type.
 
-It adds what Desigo has nowhere to put: 81 lint rules, each citing the manual
+It adds what Desigo has nowhere to put: 83 lint rules, each citing the manual
 page it comes from, and a set of source transforms that are exact by machine
 and tedious by hand — DEFINE expand and collapse, point-name separator swap,
 clone a block of statements with renames and retargeted branches, and
@@ -183,7 +183,7 @@ python -m ppcl.cli lint programs/ --firmware logical --disable W104 --strict
   Several rules differ by firmware — `SET` accepts integers on APOGEE only.
 - `--strict` exits non-zero on warnings, for CI.
 
-81 rules across five groups: `E1xx` syntax, `E2xx`/`W2xx` control flow,
+83 rules across five groups: `E1xx` syntax, `E2xx`/`W2xx` control flow,
 `E3xx`/`W3xx` semantics and priority, `S6xx` style, `P7xx` optimisation.
 `python -m ppcl.cli rules` lists them all.
 
@@ -504,7 +504,7 @@ without errors -- so the guarantees survive a change to the generated layout.
 
 Everything in `ppcl/spec.py` traces to the *APOGEE Powers Process Control
 Language (PPCL) User's Manual*, 125-1896, Rev. 5 (10/00), Siemens Building
-Technologies — the 11 point types (Table 3-2), the priority hierarchy
+Technologies — its 11 point types (Table 3-2), the priority hierarchy
 (Table 3-1), the operator precedence table (Table 2-6), the reserved word list
 (Chapter 5), and every command signature (Chapter 4).
 

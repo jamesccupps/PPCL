@@ -680,6 +680,49 @@ def test_matched_release_is_clean():
     assert "W330" not in codes(text)
 
 
+def test_E316_needs_a_known_point_type_and_says_which():
+    """Declared on every restricted command since day one, enforced now.
+
+    AUTO is the clearest case: the manual says "can be used only with LOOAL or
+    LOOAP points", and until this rule nothing read that.
+    """
+    from ppcl import linter, parser
+
+    prog = parser.parse("10\tAUTO(SF1)\n20\tGOTO 10\n")
+
+    def run(types):
+        return [d for d in linter.lint(prog, point_types=types)
+                if d.code == "E316"]
+
+    bad = run({"SF1": "LDO"})
+    assert len(bad) == 1
+    assert "LOOAL" in bad[0].message and "LDO" in bad[0].message
+
+    assert run({"SF1": "LOOAP"}) == []
+    # No database, no finding -- guessing from a name would be worse.
+    assert run({}) == []
+    # A type this spec does not know is left alone rather than guessed at.
+    assert run({"SF1": "LXYZ"}) == []
+
+
+def test_a_firmware_only_statement_is_W121_not_E110():
+    """The controller's own enum names five statements no manual documents.
+
+    Calling one of them "not a PPCL command" would be confidently wrong about
+    the vendor's own firmware. W121 says the true thing instead -- the name is
+    real, nothing else about it is known, and the line went unchecked.
+    """
+    found = codes("10\tENTHAL(A,B,C)\n20\tGOTO 10\n")
+    assert "W121" in found
+    assert "E110" not in found
+
+
+def test_a_real_typo_is_still_E110():
+    found = codes("10\tENTHALPY(A,B)\n20\tGOTO 10\n")
+    assert "E110" in found
+    assert "W121" not in found
+
+
 def test_a_point_driven_at_priority_every_pass_is_W341_not_W330():
     """Both branches covered means the point cannot strand -- but an operator
     cannot hold it either.

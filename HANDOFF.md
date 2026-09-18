@@ -80,7 +80,7 @@ runs on any engineering workstation with no install. Windows is the primary
 platform.
 
 ```bash
-python -m pytest tests -q          # 485 tests, ~150s
+python -m pytest tests -q          # 491 tests, ~150s
 python -m ppcl.cli serve           # the app
 python -m ppcl.cli lint samples    # exercises the CLI on real programs
 python -m ppcl.cli help            # the built-in documentation
@@ -90,8 +90,8 @@ python -m ppcl.cli help            # the built-in documentation
 
 ## 2. Current state
 
-**485 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
-tests. 81 lint rules, 66 commands, 99 BACnet properties, 30 block types,
+**491 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
+tests. 83 lint rules, 66 commands, 99 BACnet properties, 30 block types,
 17 CLI subcommands, 11 MCP tools, 12 help pages, 20 settings, 6 firmware
 families, 29 panel error codes.
 
@@ -100,7 +100,7 @@ families, 29 panel error codes.
 | Language spec | `ppcl/spec.py` | Complete, manual-derived, cited. Now also carries Siemens' own Command Assist categories |
 | Lexer / parser | `ppcl/lexer.py`, `parser.py` | Solid. Parses every real program seen so far with zero errors |
 | Analysis | `ppcl/analyzer.py` | Control flow with wrap edge + Tarjan SCC; point read/write tracking |
-| Linter | `ppcl/linter.py`, `rules/` | 81 rules, each citing its source |
+| Linter | `ppcl/linter.py`, `rules/` | 83 rules, each citing its source |
 | Formatter | `ppcl/formatter.py` | Format + renumber with exact reference rewriting |
 | Simulator | `ppcl/simulator.py` | Interpreter with real priority arbitration, panel-faithful line budget |
 | **Debugger** | `ppcl/debug.py` | Line / write / condition breakpoints, step, step over, step out, run to cursor, watch with priority, mid-run override, coverage |
@@ -189,6 +189,7 @@ repository** -- findings from those corpora are described, not quoted.
 | **A6V13998441** PXC.A Modernization, 2026-04 | 23 pages | Newest document here. Its cross-reference is what led to the removed-statements page |
 | **Siemens' shipped application library** | 42 programs, 7,863 lines | *The regression corpus.* Found three parser bugs and one undocumented command. It ships in two product trees; the first collection of it took both copies, so every count taken from it before 2026-09-18 was exactly doubled |
 | **The reference site's own programs** | 42 from Desigo, 22 older | What every severity decision is tuned against |
+| **`PROTOCOL.md`, the P2 technical reference** | 11,216 lines | The other project's own document, read 2026-09-18. Its §14 is PPCL over the wire. Gave the 71-member `PPCL_statement_type` enum — five statement tokens no manual documents — and confirmed `report.py`'s five per-line flags against the controller's `PPCL_data` structure |
 | **An independent P2 wire corpus** | 2,644 lines | *A cross-check, not a source.* Programs running on panels at a working site, recovered from upload responses by a separate project with no source in common with this one. The parser met all 2,644 without a failure. Nothing in it is reproducible from this repository, so its findings are tiered below the rest |
 
 **Not obtainable:** `A6V12954390`, "PPCL User Manual", named in Siemens' 2026
@@ -474,7 +475,7 @@ on PXC.A, the line limit being 512 not 66, `LOCAL`'s sixteen being per
 statement, the `W202` severity, this site not being PXC.A at all). Until a pass
 produces no corrections, the language is not known well enough to condense.
 
-The material already exists and is cited -- `spec.py`, the 81 rules,
+The material already exists and is cited -- `spec.py`, the 83 rules,
 `PPCL-REFERENCE.md`, `helpdocs.py`, the panel error tables. The work is
 selection and layout, not discovery. Likely shape:
 

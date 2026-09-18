@@ -673,6 +673,69 @@ def test_the_word_form_comparisons_are_reserved():
     assert ".LESS." not in spec.DOTTED_OPS
 
 
+def test_the_three_speed_point_types_are_accepted_by_the_speed_commands():
+    """LFMSSL/LFMSSP postdate Table 3-2, and leaving them out rejected real code.
+
+    125-1896 Rev. 5 names only LFSSL and LFSSP wherever a speed type appears.
+    The Insight Program Editor help names all four on FAST, SLOW, EMFAST and
+    EMSLOW and on the FAST, SLOW and OFF status indicators, and the point-type
+    enum puts the pair at 22 and 23 -- after the original block, which is what
+    a later addition looks like.
+    """
+    from ppcl import spec
+
+    for name in ("LFMSSL", "LFMSSP"):
+        assert name in spec.POINT_TYPES, name
+        assert name in spec.SPEED_TYPES, name
+        assert name in spec.DIGITAL_COMMANDABLE, name
+        assert spec.POINT_TYPES[name].proof_optional
+        # The address organisation is inferred, and has to say so.
+        assert any("inferred" in n for n in spec.POINT_TYPES[name].notes), name
+
+    for cmd in ("FAST", "SLOW", "EMFAST", "EMSLOW"):
+        assert spec.ALL[cmd].point_types == spec.SPEED_TYPES, cmd
+
+    # AUTO is still the two On/Off/Auto types and nothing else.
+    assert spec.AUTO_TYPES == frozenset({"LOOAL", "LOOAP"})
+
+
+def test_a_three_speed_point_is_not_flagged_by_the_speed_commands():
+    """The end-to-end version: a real three-speed point, commanded."""
+    from ppcl import linter, parser
+
+    prog = parser.parse("10\tFAST(SF1)\n20\tSLOW(SF2)\n30\tGOTO 10\n")
+
+    def e3(types):
+        return [d.code for d in linter.lint(prog, point_types=types)
+                if d.code.startswith("E3")]
+
+    assert e3({"SF1": "LFMSSL", "SF2": "LFMSSP"}) == []
+    # The two-speed pair still works -- that is the regression that matters.
+    assert e3({"SF1": "LFSSL", "SF2": "LFSSP"}) == []
+    # And a type that genuinely cannot take FAST is still caught.
+    assert e3({"SF1": "LDO", "SF2": "LDO"}) != []
+
+
+def test_firmware_only_tokens_are_not_offered_as_commands():
+    """Known to exist, unknown in every other way -- so not in spec.ALL.
+
+    A name whose arguments nobody can state must not be completed, generated,
+    or listed as a command the engineer can reach for. The whole point of the
+    separate table is that it carries the name without implying a signature.
+    """
+    from ppcl import spec
+
+    assert len(spec.FIRMWARE_STATEMENT_TOKENS) == 5
+    for name, (value, note) in spec.FIRMWARE_STATEMENT_TOKENS.items():
+        assert name not in spec.ALL, name
+        assert name not in spec.FUNCTIONS, name
+        assert 1 <= value <= 71, name
+        assert note
+    # And they are still reserved: a point may not be named one.
+    for name in spec.FIRMWARE_STATEMENT_TOKENS:
+        assert len(name) <= 6, name
+
+
 def test_the_node_resident_points_start_at_zero():
     """NODE0 is real, and one Siemens table says the range starts at 1.
 

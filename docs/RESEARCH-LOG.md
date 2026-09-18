@@ -2229,3 +2229,160 @@ when a competing rule was thinned out — it got stronger.
 1. **Decide `W104`.** Now 78% of the library's warnings. Still the user's call.
 2. Handle the `UNKNOWN (...)` marker in the lexer.
 3. A rule for the `SET`-without-deadband idiom on PXC.A.
+
+---
+
+## 2026-09-18 (nineteenth pass) — `PROTOCOL.md`, and five statements nobody can document
+
+The user handed over the other project's own technical reference — 11,216
+lines, §14 of which is PPCL over the wire. It had not been read here; the
+earlier passes worked from a cross-check *derived* from it.
+
+### Five statement tokens the firmware names and no manual documents
+
+The document reproduces the controller's `PPCL_statement_type` enum in full:
+**71 members**, `WHOP`-prefixed, the token byte the panel stores with each
+compiled statement. Diffed mechanically against `spec.ALL`:
+
+- 60 map onto commands already here, once the vendor's token spellings are
+  reduced to source spellings (`WHOPDBSWITCH` → `DBSWIT`, `WHOPINITTOT` →
+  `INITTO`, `WHOPRELEASE` → `RELEAS`, `WHOPDISABLE` → `DISABL`);
+- 6 are `IF` parts, `ASSIGN`, `COMMENT` and declarations;
+- 2 are explicitly unnamed — `WHOPUNKNOWN1` and `WHOPUNKNOWN2`, values 61 and
+  62. The vendor's own table records that it is incomplete;
+- **5 are left over: `ONERR` (21), `ENTHAL` (48), `MMI` (49), `RELTCU` (60),
+  `DIM` (68).**
+
+Every manual on hand was then searched for those five — the Insight Program
+Editor help, the Desigo CC engineering and operating help, 125-1896,
+A6V10374898, A6V12954388, A6V10324350, A6V13998441. **Not one mention.** Nor
+any use: zero occurrences across Siemens' shipped library, the reference site's
+programs, and the 2,644 wire-recovered lines.
+
+The reverse direction is clean and explains itself: seven commands here are
+absent from the enum — `ADAPTM`, `ADAPTS`, `LSQ2`, `LSQDAT` (firmware 2.7+,
+from Command Assist), `GETVAL`, `SETVAL` (PXC.A, which postdates this enum),
+and `OIP`.
+
+`OIP` is the instructive one. It is used **152 times** across that project's
+corpus and is missing from the same 71-entry table. **Absence from a vendor
+enum is evidence of nothing.** It is the second time that has been shown here,
+and it cuts both ways: the five leftovers are real because the enum names them,
+and `OIP` is real although the enum does not.
+
+### What the toolkit does with them
+
+Before this pass, `ENTHAL(A,B,C)` produced `E110 ERROR — ENTHAL is not a PPCL
+command`. That is confidently wrong about the vendor's own firmware, which is
+the worst kind of diagnostic.
+
+They are recorded in `spec.FIRMWARE_STATEMENT_TOKENS` rather than `spec.ALL`,
+deliberately: **a name whose arguments nobody can state must not be offered by
+completion or emitted by the generator.** `E110` now skips them, and `W121`
+says the honest thing — the token is real, its arguments and behaviour are
+unknown, and this line was left unvalidated. `ppcl explain ONERR` answers with
+exactly what is and is not known.
+
+### `report.py` was right, and now it is confirmed
+
+`report.py` models the `PPCL DISPLAY REPORT` state column as five flags —
+enabled/disabled, traced, unresolved, failed, looped — read out of a column of
+letters in the Program Editor help.
+
+§14.5.1 gives the controller's `PPCL_data` record as it comes off the wire:
+`line_enabled`, `line_traced`, `line_unresolved`, `line_failed`, `line_looped`.
+**The same five booleans, in the same order.** The model is complete and it is
+the panel's own, not an inference from a report layout.
+
+### Confirmed in passing, from the manual side
+
+- **No PPCL statement keyword exceeds six characters.** That project measured
+  it over 4,731 statement lines and found six a hard ceiling. Independently:
+  no name in `spec.ALL` is longer than six characters either.
+- **`ACT`/`DEACT`/`ENABLE`/`DISABL` act on 1 to 16 lines.** Already the
+  `max_repeat` here; the wire-side range opcodes carry the same bound.
+- **The `@`-indicator consumes one of the sixteen parameter slots.** Already
+  how `E111` and `E314` count.
+
+### To send back
+
+1. **`NODE0` is settled, not a live disagreement.** §14.3 records the Insight
+   list's `NODE1` against the Desigo glossary's `NODE0` as unresolved. It is
+   resolvable *inside the Insight book*: that book's own dedicated node-points
+   page states the range in prose twice — "from 0 through 99", "between 0 and
+   99" — and carries `NODE0` in its title, as do its glossary and the PPCL
+   Debugger help. Four pages to one, three of them in the same book as the
+   outlier. The conclusion they reached on an asymmetry argument is right; the
+   evidence is stronger than they know.
+2. **`OIP`'s `[OPEN]` can be closed.** The Insight Program Editor documents it
+   fully: `OIP(trigger, "sequence")`, the sequence being a quoted keystroke
+   string of at most 80 characters, one `/` per menu level and a `/` acting as
+   a carriage return. Used for reports, point-priority changes, messages and
+   auto-dial. The trigger must go OFF then ON; it will not fire on the first
+   pass after a power failure, an `ENABLE`, or a database load. Stagger them
+   and never share a trigger. And the leading-`@` rule is asymmetric: a trigger
+   whose name starts with a digit needs one, a point named *inside* the
+   sequence must not have one. A6V10374898 removes the statement outright on
+   PXC.A, in those words.
+3. **`LN` is not a PPCL function.** §14.4's built-in list has `LN` for natural
+   log. It appears in no manual here and is not in the enumerated reserved-word
+   list, which carries `LOG` and `EXP` and no `LN`. The same list that settled
+   `EQUAL` and `LESS` is the one to check it against.
+
+### Still to do
+
+1. **Decide `W104`.** Now 78% of the library's warnings. Still the user's call.
+2. Handle the `UNKNOWN (...)` marker in the lexer.
+3. A rule for the `SET`-without-deadband idiom on PXC.A.
+
+### Postscript to pass 19 — the point-type enum, and a field nobody read
+
+The same appendix carries `Point_type_enum`. Diffed against `POINT_TYPES` it
+named five this toolkit did not have: `LDAO`, `LENUM`, `LFMSSL`, `LFMSSP`,
+`PPCL_LAI`. Two of them turned out to be documented, in pages that had been
+read and skimmed past.
+
+**`LFMSSL` and `LFMSSP` are three-speed.** Every page that names a speed type
+in the Insight Program Editor help names four, not two:
+
+> *"This command is used to change **LFSSL, LFSSP, LFMSSL, or LFMSSP** points
+> to the FAST state with emergency priority."*
+
+— on `EMFAST`, and the same on `EMSLOW`, `FAST` and `SLOW`, and on the `FAST`,
+`SLOW` and `OFF` status-indicator pages. The Point Details help defines
+`LFMSSL` outright: *four-state control (Fast/Medium/Slow/Stop) of three-speed
+latched motor starters that provide proof indication.*
+
+125-1896 Rev. 5 names only two, everywhere, and titles its table "The 11 Point
+Types". The enum puts the pair at 22 and 23, after the original block. So this
+is a generational addition of the same shape as the operand limit — the 2000
+manual is not wrong, it is earlier.
+
+Both are in `POINT_TYPES` and `SPEED_TYPES` now. Their address organisation is
+**inferred** from the two-speed siblings and says so, because no published
+table covers them.
+
+A smaller thing found in passing: the Commanding help's `LFSSL` page describes
+three latched outputs *including a Medium*, which is `LFMSSL`'s organisation.
+Table 3-2 is unambiguous that `LFSSL` has two outputs and a proof. The help
+page is a copy-paste.
+
+**And then the rule that was not there.** The natural next step was to check
+what this had been breaking — and the answer was nothing, because
+`spec.Command.point_types` had never been read by any rule. `AUTO` has carried
+`{LOOAL, LOOAP}` since the beginning, transcribed from *"can be used only with
+LOOAL or LOOAP points"*, and nothing checked it. It was documentation nobody
+could be wrong about, which is documentation nobody checks.
+
+**`E316`** now enforces it, and only when the point's type is actually known:
+no point database, no finding, because guessing a type from a name would be
+worse than silence. A type outside `POINT_TYPES` is left alone rather than
+guessed at.
+
+That is the more valuable find of the two. The missing point types were a
+one-line gap; the unenforced field had been quietly inert across eighty rules.
+
+`LDAO`, `LENUM` and `PPCL_LAI` are not added: `LENUM` appears only in the
+alarm and commanding help, never in a PPCL context, and the other two appear
+nowhere at all. The lesson from `ONERR` applies in reverse here — an enum
+naming something is not yet a reason to put it in the language spec.

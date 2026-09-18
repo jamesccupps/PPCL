@@ -772,6 +772,31 @@ def cmd_explain(args):
               "(125-3020), Appendix C")
         return 0
 
+    # A statement the firmware names and no manual documents. Answered before
+    # commands only because it cannot collide: nothing here is in spec.ALL.
+    if topic in spec.FIRMWARE_STATEMENT_TOKENS:
+        value, note = spec.FIRMWARE_STATEMENT_TOKENS[topic]
+        print("%s -- a statement token with no published documentation"
+              % topic)
+        print()
+        print("  known:    value %d of the controller's own PPCL_statement_type"
+              % value)
+        print("            enum, so the panel firmware has a token for it and")
+        print("            calling it a typo would be wrong")
+        print("  unknown:  its arguments, its semantics, everything else")
+        print("  observed: nowhere -- zero occurrences in Siemens' shipped")
+        print("            application library, in the reference site's")
+        print("            programs, or in 2,644 lines read off panels")
+        print()
+        for line in textwrap.wrap(note, 74):
+            print("  " + line)
+        print()
+        print("  The linter reports W121 on a line using it and checks nothing")
+        print("  else about that line. It is deliberately not in the command")
+        print("  list: completion and the generator must not offer a name")
+        print("  whose arguments nobody can state.")
+        return 0
+
     if topic in spec.ALL:
         cmd = spec.ALL[topic]
         print("%s -- %s\n" % (cmd.name, cmd.summary))

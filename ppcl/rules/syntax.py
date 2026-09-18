@@ -294,15 +294,50 @@ def reserved_word_as_point(ctx):
 def unknown_command(ctx):
     for ln in ctx.program.lines:
         for stmt in substatements(ln.stmt):
-            if isinstance(stmt, CommandCall) and stmt.name not in spec.ALL:
-                yield _d(
-                    "E110",
-                    Severity.ERROR,
-                    "%s is not a PPCL command" % stmt.name,
-                    ln.number,
-                    source_line=ln.source_line,
-                    suggestion=_suggest_command(stmt.name),
-                )
+            if not isinstance(stmt, CommandCall) or stmt.name in spec.ALL:
+                continue
+            if stmt.name in spec.FIRMWARE_STATEMENT_TOKENS:
+                continue            # W121 has the honest version
+            yield _d(
+                "E110",
+                Severity.ERROR,
+                "%s is not a PPCL command" % stmt.name,
+                ln.number,
+                source_line=ln.source_line,
+                suggestion=_suggest_command(stmt.name),
+            )
+
+
+@rule("W121", "Statement the firmware names but no manual documents",
+      Severity.WARNING)
+def firmware_only_statement(ctx):
+    for ln in ctx.program.lines:
+        for stmt in substatements(ln.stmt):
+            if not isinstance(stmt, CommandCall):
+                continue
+            entry = spec.FIRMWARE_STATEMENT_TOKENS.get(stmt.name)
+            if entry is None:
+                continue
+            value, note = entry
+            yield _d(
+                "W121",
+                Severity.WARNING,
+                "%s was not checked: the panel firmware has a statement token "
+                "for it, but no manual documents it" % stmt.name,
+                ln.number,
+                source_line=ln.source_line,
+                detail="Value %d of the controller's own PPCL_statement_type "
+                "enum, so the name is real and calling it a typo would be "
+                "wrong. But it appears in none of the manuals on hand and in "
+                "no program in any corpus, so its arguments and its behaviour "
+                "are unknown and this line has been left unvalidated -- the "
+                "argument count, the point types and the simulation all skip "
+                "it. %s" % (value, note),
+                manual="Not documented. Vendor enum PPCL_statement_type.",
+                suggestion="If you know what this does, it belongs in "
+                "spec.ALL with a signature. Until then, check the line by "
+                "hand.",
+            )
 
 
 def _suggest_command(name):

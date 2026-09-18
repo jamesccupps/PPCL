@@ -166,6 +166,50 @@ POINT_TYPES = {
             notes=("Commands two PULSED digital outputs, On and Off, and "
                    "reads one optional latched proof DI.",),
         ),
+        # The three-speed pair. NOT in Table 3-2, which is titled "The 11
+        # Point Types" and predates them -- 125-1896 Rev. 5 names only LFSSL
+        # and LFSSP wherever a speed type appears, including all three status
+        # indicators. The Insight Program Editor help names all four on every
+        # one of FAST, SLOW, EMFAST, EMSLOW and on the FAST, SLOW and OFF
+        # status-indicator pages, and the Point Details help carries a
+        # definition for LFMSSL. The controller's own point-type enum puts
+        # them at 22 and 23, after the original block, which is what a later
+        # addition looks like.
+        #
+        # Leaving them out made the linter reject four commands' documented
+        # arguments, which is why they are here.
+        PointType(
+            "LFMSSL",
+            "bundled",
+            # INFERRED by analogy with LFSSL plus a Medium output. The Point
+            # Details definition gives the semantics -- "four-state control
+            # (Fast/Medium/Slow/Stop) of three-speed latched motor starters
+            # that provide proof indication" -- but no published table gives
+            # the address organisation, because Table 3-2 predates the type.
+            ("DO(OFF/FAST)", "DO(OFF/MEDIUM)", "DO(OFF/SLOW)", "DI(PROOF)"),
+            "Fast/Medium/Slow/Stop, latched",
+            proof_optional=True,
+            notes=("Four-state control of a THREE-speed latched motor "
+                   "starter, where LFSSL is the two-speed equivalent.",
+                   "The address organisation here is inferred from LFSSL, "
+                   "not transcribed: Table 3-2 predates this type.",),
+        ),
+        PointType(
+            "LFMSSP",
+            "bundled",
+            # INFERRED by analogy with LFSSP. Thinner than LFMSSL: this one
+            # has no definition page at all. It is named only alongside
+            # LFMSSL on the four command pages and the status indicators.
+            ("DO(OFF)", "DO(FAST)", "DO(MEDIUM)", "DO(SLOW)", "DI(PROOF)"),
+            "Fast/Medium/Slow/Stop, pulsed",
+            proof_optional=True,
+            notes=("Four-state control of a THREE-speed pulsed motor "
+                   "starter, where LFSSP is the two-speed equivalent.",
+                   "Thinner evidence than LFMSSL: no definition page names "
+                   "it, only the FAST/SLOW/EMFAST/EMSLOW command pages and "
+                   "the FAST/SLOW/OFF status indicators. Both the address "
+                   "organisation and the description are inferred.",),
+        ),
         # Not in Table 3-2 but referenced by the DAY/NIGHT commands.
         PointType("LCTLR", "controller", ("CTLR",), "Logical controller (DAY/NIGHT)"),
     ]
@@ -175,15 +219,20 @@ POINT_TYPES = {
 ANALOG_TYPES = frozenset({"LAI", "LAO"})
 
 #: Point types that accept ON/OFF.
+#: The OFF status-indicator page is the source, and the newer Program Editor
+#: help adds the three-speed pair to the eight 125-1896 lists.
 DIGITAL_COMMANDABLE = frozenset(
-    {"LDI", "LDO", "L2SL", "L2SP", "LOOAL", "LOOAP", "LFSSL", "LFSSP"}
+    {"LDI", "LDO", "L2SL", "L2SP", "LOOAL", "LOOAP", "LFSSL", "LFSSP",
+     "LFMSSL", "LFMSSP"}
 )
 
 #: Point types that accept AUTO.
 AUTO_TYPES = frozenset({"LOOAL", "LOOAP"})
 
-#: Point types that accept FAST / SLOW.
-SPEED_TYPES = frozenset({"LFSSL", "LFSSP"})
+#: Point types that accept FAST / SLOW, and therefore EMFAST / EMSLOW.
+#: 125-1896 Rev. 5 names two; the Program Editor help names four, on every one
+#: of those command pages and on the FAST and SLOW status indicators.
+SPEED_TYPES = frozenset({"LFSSL", "LFSSP", "LFMSSL", "LFMSSP"})
 
 
 # --------------------------------------------------------------------------
@@ -2106,6 +2155,48 @@ _add(
         see_also=("LSQ2", "LSQDAT", "TABLE"),
     )
 )
+
+#: Statement tokens the panel firmware names but no manual on hand documents.
+#:
+#: The controller's own ``PPCL_statement_type`` enum has 71 members. Sixty of
+#: them map onto commands in ``ALL``; two are explicitly unnamed
+#: (``WHOPUNKNOWN1``/``WHOPUNKNOWN2``, values 61 and 62, which is how the
+#: vendor's own table admits it is incomplete); the rest are ``IF`` parts,
+#: ``ASSIGN``, ``COMMENT`` and declarations. **Five are left over**, and they
+#: are recorded here rather than in ``ALL`` because nothing about them can be
+#: checked or generated:
+#:
+#: * no signature, no argument list, no semantics -- they appear in none of
+#:   the manuals on hand, not the 736-page Insight Program Editor help, not
+#:   the Desigo CC help, not 125-1896, not A6V10374898;
+#: * no observed use -- zero occurrences across Siemens' own shipped
+#:   application library, the reference site's programs, and 2,644 lines
+#:   recovered from panels over the wire by an independent project.
+#:
+#: What is known is that the firmware has a token for each, which is enough
+#: that ``E110`` must not call one "not a PPCL command". That would be
+#: confidently wrong about the vendor's own enum. ``W121`` says the honest
+#: thing instead: this line was not checked.
+#:
+#: Keeping them out of ``ALL`` is deliberate. A name the toolkit cannot
+#: validate must not be offered by completion, emitted by the generator, or
+#: listed as a command the engineer can use.
+FIRMWARE_STATEMENT_TOKENS = {
+    "ONERR": (21, "Suggests an error handler, by name alone. Nothing "
+                  "establishes what it traps or where control goes."),
+    "ENTHAL": (48, "Suggests enthalpy, and the manuals do document enthalpy "
+                   "economizer logic -- but they build it out of ordinary "
+                   "arithmetic, never with a statement of this name."),
+    "MMI": (49, "The manuals use MMI for the man-machine interface port "
+                "throughout, never as a statement. A statement token of the "
+                "same name is presumably for controlling that port."),
+    "RELTCU": (60, "Reads as 'release TCU', a Terminal Control Unit -- the "
+                   "FLN device generation that predates the documentation on "
+                   "hand."),
+    "DIM": (68, "Reads as a dimension or array declaration, which would be "
+                "unlike anything else in the language. Nothing confirms it."),
+}
+
 
 #: PARAMETER is handled separately: it is an assignment-style directive that
 #: does not require a line number and is resolved at compile time.
