@@ -1563,10 +1563,16 @@ _add(
         subroutine_safe=False,
         notes=(
             "SSTO only calculates times; TOD and TODSET still command the "
-            "points. An SSTO whose cst/csp are never read by anything does "
-            "nothing at all -- see rule W337.",
+            "points. An SSTO whose cst/csp go nowhere does nothing at all "
+            "-- but do not look for the reader in the program text. See "
+            "rule W337.",
             "cst and csp must be virtual LAO points. They receive the "
-            "calculated start and stop times.",
+            "calculated start and stop times -- and a Time of Day zone's "
+            "START and STOP relative time points wire straight to them, "
+            "so the SCHEDULE reads the values and no PPCL line ever does. "
+            "\"These values are passed from PPCL to the control schedule.\" "
+            "Likewise ost and osp answer to the zone's SOCC and SVAC time "
+            "points, the desired occupancy and vacancy times.",
             "zone is 1 to 5. mode uses the TODMOD scheme -- 1 normal, "
             "2 extended, 4 shortened, 8 weekend, 16 holiday -- and values may "
             "be summed. Mode 16 only with HOLIDA.",

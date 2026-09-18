@@ -144,34 +144,63 @@ them directly — you need flag points. Revision 9.2+ adds `SMOKE` and direct
 
 ### The same five priorities, seen from BACnet
 
-On a BACnet ALN the five map onto slots of the BACnet priority array, and
-knowing which is the difference between reading a Desigo priority column and
-guessing at it. `BN01` is highest.
+BACnet specifies sixteen command priorities; APOGEE specifies five. Crossing
+between them is **not one mapping**, it is two, and they do not agree. Getting
+this wrong is how a command lands at a priority nobody intended.
 
-| BACnet slot | APOGEE priority | BACnet name |
-|---|---|---|
-| `BN01` | | Manual Life Safety |
-| `BN02` | | Automatic Life Safety |
-| `BN05` | | Critical Equipment Control |
-| `BN06` | | Minimum On/Off |
-| **`BN08`** | **`@OPER`** | Manual Operator |
-| **`BN10`** | **`@SMOKE`** | |
-| **`BN12`** | **`@EMER`** | |
-| **`BN14`** | **`@PDL`** | |
-| `BN16` | | Initial value of the point; TEC application |
-| **Relinquish Default** | **`@NONE`** | |
+**Outbound — PPCL, or a panel application, commanding a BACnet point.** Each
+APOGEE priority has a default BACnet slot:
 
-Three independent sources agree on the four middle rows. `BN16` matters more
-than it looks: it is where a P1 FLN subpoint's *initial value* lives —
-"for P1 FLN devices, the default initial value priority is BN16" — and
-releasing a subpoint's command is a different operation from releasing its
-initial value. The tooling makes them separate checkboxes for that reason.
+| APOGEE priority | Default BACnet slot |
+|---|---|
+| `@OPER` | `BN08` — Manual Operator |
+| `@SMOKE` | `BN10` |
+| `@EMER` | `BN12` |
+| `@PDL` | `BN14` |
+
+**These are defaults, and defaults are a site setting.** The workstation has a
+BACnet Command Priority Array dialog holding six of them — Operator, Smoke,
+Emergency, **Scheduler**, PDL and **PPCL Programs** — and it is global data,
+"replicated automatically to all field panels on the BLN". In Siemens' own
+words: *"unless you override the default priority, PPCL Programs will command
+BACnet points at the priority specified in this dialog."* So read the site's
+dialog before trusting the table above, and note that `Scheduler` and
+`PPCL Programs` are priority *sources* with their own slots even though
+neither is a PPCL `@` indicator.
+
+Siemens' own caution: **do not assign BACnet levels 1 or 2** — the Life Safety
+levels — to any of these defaults.
+
+**Inbound — a BACnet workstation commanding an APOGEE point** through the
+Insight BACnet Server. Completely different, and banded rather than one-to-one:
+
+| BACnet level | Becomes |
+|---|---|
+| 1 | `OPERATOR` |
+| 2–4 | `SMOKE` |
+| 5–7 | `EMERGENCY` |
+| 8–16 | `PDL` |
+| NULL | `NONE` |
+
+**Read those two tables together and the trap is obvious.** `BN08` is named
+"Manual Operator" and is `@OPER`'s default slot going out — and a command
+*arriving* at BACnet 8 becomes `@PDL`, which is the second *lowest* APOGEE
+priority. The slot's name describes neither end reliably.
+
+Commanding an APOGEE point from an Insight workstation also **clears the
+priority array** and removes pending commands: an APOGEE point has one
+priority, not a sixteen-deep stack, so the array ends up with zero entries at
+`NONE` and exactly one in every other case.
+
+**Relinquish Default is not a priority.** It is what a BACnet point's present
+value falls back to when *every* slot has been relinquished. `@NONE` is PPCL's
+own priority level, not a synonym for it.
 
 Also worth knowing before assuming five priorities exist everywhere: the four
-above `@NONE` **do not apply to Staefa points**, where only two exist —
-Manual, which maps to `@OPER`, and Automatic, which maps to `@NONE`. And
-command priority does not affect Fire points at all in a fire-alarm network
-integrated through the Life Safety Option.
+above `@NONE` **do not apply to Staefa points**, where only two exist — Manual,
+which maps to `@OPER`, and Automatic, which maps to `@NONE`. And command
+priority does not affect Fire points at all in a fire-alarm network integrated
+through the Life Safety Option.
 
 ---
 

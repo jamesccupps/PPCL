@@ -1133,18 +1133,26 @@ def setval_dangerous_property(ctx):
             )
 
 
-@rule("W337", "SSTO calculates times that nothing reads", Severity.WARNING)
+@rule("W337", "SSTO calculates times no PPCL line reads", Severity.INFO)
 def ssto_output_unused(ctx):
-    """SSTO only computes. TOD or TODSET has to act on the result.
+    """SSTO only computes. Something has to act on the result -- and the
+    something is very often outside the program.
 
-    The command writes its calculated start and stop times into two virtual
-    LAO points and stops there. If nothing reads those points the optimisation
-    runs every pass, produces correct numbers, and changes nothing in the
-    building -- with no error anywhere, because every statement involved is
-    valid.
+    This rule used to say "nothing reads these" and rank it a WARNING, which
+    was wrong in the ordinary case. ``cst`` and ``csp`` are virtual LAO points,
+    and the Time of Day application reads them directly: a TOD zone's START and
+    STOP relative time points are wired to exactly these LAOs, and "these
+    values are passed from PPCL to the control schedule" (Insight Time of Day
+    help, How Does Time of Day Work). The reader is the schedule, not a
+    statement.
 
-    This is the failure mode an SSTO installation actually has. It is worth a
-    warning even though the program is legal.
+    So a correctly wired SSTO can have no in-program reader at all. Both of
+    the ones in this project's reference corpus look like that.
+
+    The finding is still worth surfacing -- an SSTO wired to nothing really
+    does run every pass and change nothing, with no error anywhere -- but it
+    is INFO, and the message has to name the check the engineer must do
+    outside the program rather than assert a defect it cannot see.
     """
     read_names = {
         use.name.upper().strip('"')
@@ -1167,18 +1175,29 @@ def ssto_output_unused(ctx):
                 continue
             yield _d(
                 "W337",
-                Severity.WARNING,
-                "SSTO writes %s, which nothing in this program reads"
+                Severity.INFO,
+                "SSTO writes %s and no line in this program reads them, so "
+                "the reader is outside it -- or there is none"
                 % " and ".join(unused),
                 ln.number,
                 source_line=ln.source_line,
                 detail="SSTO only calculates the optimum start and stop "
-                "times. A TOD or TODSET command has to use them to command "
-                "the equipment. As written the optimisation runs every pass "
-                "and changes nothing.",
-                suggestion="Feed the calculated time into the TOD or TODSET "
-                "that schedules this zone, or remove the SSTO.",
-                manual="A6V10374898 PXC.A PPCL User Guide, SSTO",
+                "times; something else has to command the equipment. That is "
+                "usually NOT a PPCL statement: cst and csp are virtual LAOs, "
+                "and a Time of Day zone's START and STOP relative time points "
+                "are wired straight to them, so the schedule reads the values "
+                "and the program never does. That is the normal, correct "
+                "arrangement and it looks exactly like this. What it also "
+                "looks like is an SSTO connected to nothing, which runs every "
+                "pass and changes nothing with no error anywhere. Only the "
+                "Time of Day zone can tell the two apart.",
+                suggestion="Open the Time of Day zone for this equipment and "
+                "check that its START and STOP time points are these two "
+                "LAOs. If they are, nothing is wrong here. If the times are "
+                "meant to be used inside the program instead, feed them to "
+                "the TOD or TODSET that schedules the zone.",
+                manual="Insight Time of Day help, How Does Time of Day Work; "
+                       "A6V10374898, SSTO",
             )
 
 

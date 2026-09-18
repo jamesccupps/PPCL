@@ -1037,6 +1037,28 @@ def test_ssto_whose_calculated_times_are_never_read_is_flagged():
     assert "W337" in codes(orphaned)
 
 
+def test_ssto_output_finding_is_INFO_because_the_reader_may_be_the_schedule():
+    """It used to be a WARNING saying "nothing reads these", and that was
+    wrong in the ordinary case.
+
+    cst and csp are virtual LAOs, and a Time of Day zone's START and STOP
+    relative time points wire straight to them -- "these values are passed
+    from PPCL to the control schedule" (Insight Time of Day help). So a
+    correctly wired SSTO has no in-program reader at all, and looks identical
+    to one wired to nothing. Only the zone can tell them apart, so the rule
+    reports what it can see and names the check it cannot do.
+    """
+    orphaned = SSTOCO_LINE + SSTO_LINE + "30\tTOD(1,1,6:00,18:00,SFAN)\n40\tGOTO 10\n"
+    prog = parser.parse(orphaned, name="t")
+    hits = [d for d in linter.lint(prog) if d.code == "W337"]
+    assert len(hits) == 1
+    assert hits[0].severity.value == "info"
+    # The message must not assert a defect it cannot establish.
+    assert "nothing reads" not in hits[0].message
+    assert "outside" in hits[0].message
+    assert "Time of Day" in hits[0].suggestion
+
+
 def test_ssto_feeding_a_tod_stays_quiet():
     wired = SSTOCO_LINE + SSTO_LINE + "30\tTOD(1,1,ONTIM,OFTIM,SFAN)\n40\tGOTO 10\n"
     assert "W337" not in codes(wired)

@@ -2728,3 +2728,101 @@ enabled/disabled attributes and line numbers unchanged.
 
 1. **Decide `W104`.** Still the user's call.
 2. `Tod`, `Syspro`, `Commandr` and `Eqedit` remain unopened.
+
+---
+
+## 2026-09-18 (twenty-fourth pass) — two mappings, and a rule that was wrong
+
+`Syspro`, `Commandr` and `Tod`. Each corrected something.
+
+### The BACnet priority mapping is two mappings, and neither is fixed
+
+Pass 23 put the APOGEE-to-BACnet slot map into `PPCL-REFERENCE` §2 as a table.
+That table was incomplete in one way and wrong in another, and both show up
+within an hour of opening the right books.
+
+**It is a configurable default, not a mapping.** `Syspro`'s *BACnet Command
+Priority Array* dialog holds **six** defaults — Operator, Smoke, Emergency,
+**Scheduler**, PDL and **PPCL Programs** — as global data "replicated
+automatically to all field panels on the BLN", and states outright: *"unless
+you override the default priority, PPCL Programs will command BACnet points at
+the priority specified in this dialog."* So `BN08/10/12/14` is what a site
+starts with, not what a site has. Siemens also cautions against assigning the
+Life Safety levels 1 and 2 to any of them.
+
+That dialog also resolves an inconsistency recorded in pass 8 and never
+settled: a procedure page listed the modifiable priorities as "Operator,
+Smoke, Emergency, **Schedule**, PDL, or PPCL" while an HMI prompt offered only
+four. Both are right. The four are the PPCL `@` indicators; the six are
+priority *sources* with configurable BACnet slots, and `Scheduler` and
+`PPCL Programs` are sources that have no `@` spelling.
+
+**And there is a second mapping running the other way.** `Commandr`'s
+*Commanding APOGEE Points from a BACnet Workstation* gives the inbound
+direction, and it is banded rather than one-to-one:
+
+> "Insight priority PDL is executed at BACnet priority 16, EMERGENCY at 7,
+> SMOKE at 4, and OPERATOR at 1."
+
+1 → OPERATOR, 2–4 → SMOKE, 5–7 → EMERGENCY, 8–16 → PDL, NULL → NONE.
+
+Put the two side by side and the trap is plain: **`BN08` is named "Manual
+Operator", is `@OPER`'s default slot going out, and becomes `@PDL` coming in**
+— the second *lowest* APOGEE priority. The slot's name describes neither end
+reliably.
+
+Also from that page: commanding an APOGEE point from an Insight workstation
+**clears the priority array**, because an APOGEE point has one priority rather
+than a sixteen-deep stack — zero entries at `NONE`, exactly one otherwise. And
+**Relinquish Default is not a priority**: it is the value a BACnet point falls
+back to when every slot has been relinquished. Pass 8's table had `@NONE` in
+that row, which conflated two different things.
+
+§2 rewritten to say all of it.
+
+### `W337` was wrong, and the corpus had been telling us
+
+`Tod`'s *How Does Time of Day Work* explains the interface this project had
+only half of:
+
+> "Time points are linked to virtual Analog Output (LAO) points which
+> correspond to points in PPCL... **START, STOP** — Optimum Start and Stop
+> times calculated in PPCL using SOCC and SVAC. **These values are passed from
+> PPCL to the control schedule.**"
+
+So `SSTO`'s `cst` and `csp` are read by the **Time of Day application**, not by
+a PPCL statement. A correctly wired SSTO has **no in-program reader at all**.
+
+`W337` was a WARNING that said "SSTO writes X, which nothing in this program
+reads", with detail asserting "the optimisation runs every pass and changes
+nothing". That is a false positive on the ordinary, correct arrangement — and
+it fires **twice on the reference site's own programs**, on the same two `SSTO`
+statements `W342` flagged last pass. Those are very probably wired to a TOD
+zone and working.
+
+Regraded to **INFO** and reworded. The finding is still worth surfacing,
+because an SSTO wired to nothing looks exactly the same and really does run
+every pass for nothing. What changed is that the rule no longer asserts which
+one it is: it reports what it can see, says the reader may be the schedule,
+and names the check the engineer has to do outside the program — open the
+zone, look at its START and STOP time points.
+
+`spec.py`'s `SSTO` notes said the same wrong thing and would have led the next
+reader to rebuild the same rule. Corrected, with `ost`/`osp` ↔ `SOCC`/`SVAC`
+recorded alongside.
+
+### Smaller things from `Tod`
+
+- The **recommand delay is 0–900 seconds**, set per point in the Time of Day
+  zone rather than in PPCL. The `recomd` flag in `TOD`/`TODSET` turns the
+  behaviour on; the delay lives elsewhere.
+- **"All DOs de-energize during a power failure.** Make arrangements to
+  recommand them to their proper state either by TOD, PPCL, or operator
+  commands." Which is what `ONPWRT` and the recommand flag are for.
+- Points in a Time of Day zone **cannot be local or resident PPCL points**, and
+  a site may have at most 500 zones.
+
+### Still to do
+
+1. **Decide `W104`.** Still the user's call.
+2. `Eqedit` is the last book on the list with PPCL content.
