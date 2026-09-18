@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "ppcl": {
+      "command": "python",
+      "args": ["-m", "ppcl.mcp_server"],
+      "env": {
+        "PYTHONPATH": "${CLAUDE_PLUGIN_ROOT}",
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}

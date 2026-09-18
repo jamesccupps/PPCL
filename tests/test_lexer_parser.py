@@ -1,0 +1,236 @@
+"""Lexer and parser tests, driven by constructs that appear in real PPCL."""
+
+import pytest
+
+from ppcl import parser, spec
+from ppcl.ast_nodes import (
+    Assignment,
+    BinOp,
+    CommandCall,
+    Comment,
+    Gosub,
+    Goto,
+    If,
+    Num,
+    ParameterDecl,
+    Ref,
+    Return,
+    Sampled,
+    TimeLit,
+)
+from ppcl.lexer import LexError, Tok, tokenize
+
+
+# -- lexer -----------------------------------------------------------------
+
+
+def test_dotted_operators_do_not_eat_decimals():
+    toks = tokenize("RMTEMP.GT.80.0")
+    kinds = [t.kind for t in toks[:-1]]
+    assert kinds == [Tok.IDENT, Tok.DOTOP, Tok.NUMBER]
+    assert toks[1].text == ".GT."
+    assert toks[2].text == "80.0"
+
+
+def test_time_literal_beats_number():
+    toks = tokenize("TIME.EQ.23:58")
+    assert toks[2].kind is Tok.TIME
+    assert toks[2].text == "23:58"
+
+
+def test_quoted_names_keep_dots():
+    toks = tokenize('"BUILDING1.AHU01.SFAN"')
+    assert toks[0].kind is Tok.QUOTED
+    assert toks[0].text == "BUILDING1.AHU01.SFAN"
+
+
+def test_priority_versus_at_name():
+    toks = tokenize("ON(@EMER,@1FAN)")
+    assert toks[2].kind is Tok.PRIORITY
+    assert toks[4].kind is Tok.ATNAME
+
+
+def test_macro_reference():
+    toks = tokenize("%AHU%")
+    assert toks[0].kind is Tok.MACRO
+
+
+def test_unterminated_quote_is_an_error():
+    with pytest.raises(LexError):
+        tokenize('ON("UNCLOSED)')
+
+
+# -- line splitting --------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text,number,body",
+    [
+        ("00050\tC comment", 50, "C comment"),
+        ("  100  ON(FAN)", 100, "ON(FAN)"),
+        ("100 ON(FAN)", 100, "ON(FAN)"),
+        ("32767\tRETURN", 32767, "RETURN"),
+        ("PARAMETER X = 5", None, "PARAMETER X = 5"),
+    ],
+)
+def test_split_line_number(text, number, body):
+    assert parser.split_line_number(text) == (number, body)
+
+
+def test_comment_detection_does_not_catch_crtime():
+    prog = parser.parse("10\tCRTIME = 5\n20\tC a comment\n30\tC\n")
+    assert isinstance(prog.lines[0].stmt, Assignment)
+    assert isinstance(prog.lines[1].stmt, Comment)
+    assert isinstance(prog.lines[2].stmt, Comment)
+
+
+def test_continuation_lines_are_joined():
+    text = "00010\tON(A,B,&\n00020\tC,D)\n"
+    prog = parser.parse(text)
+    assert len(prog.lines) == 1
+    assert prog.lines[0].continued
+    assert len(prog.lines[0].stmt.args) == 4
+
+
+# -- statements ------------------------------------------------------------
+
+
+def test_if_then_else_with_priorities():
+    stmt = parser.parse_statement_text(
+        "IF (TIME.GT.8:00.AND.TIME.LT.16:00) THEN ON(@NONE,SFAN) ELSE ON(@OPER,SFAN)"
+    )
+    assert isinstance(stmt, If)
+    assert stmt.then_stmt.priority.name == "@NONE"
+    assert stmt.else_stmt.priority.name == "@OPER"
+
+
+def test_gosub_with_bare_arguments():
+    stmt = parser.parse_statement_text("GOSUB 4020 $ARG1,$ARG2,PT3")
+    assert isinstance(stmt, Gosub)
+    assert stmt.target == 4020
+    assert [a.name for a in stmt.args] == ["$ARG1", "$ARG2", "PT3"]
+
+
+def test_gosub_with_parenthesised_arguments():
+    stmt = parser.parse_statement_text("GOSUB 100 (A,B)")
+    assert stmt.target == 100 and len(stmt.args) == 2
+
+
+def test_sample_wraps_a_statement():
+    stmt = parser.parse_statement_text("SAMPLE(600) ON(HALFAN)")
+    assert isinstance(stmt, Sampled)
+    assert isinstance(stmt.statement, CommandCall)
+    assert stmt.seconds.value == 600
+
+
+def test_parameter_declaration():
+    stmt = parser.parse_statement_text("PARAMETER DELAY = 15")
+    assert isinstance(stmt, ParameterDecl)
+    assert stmt.name == "DELAY" and stmt.value.value == 15
+
+
+def test_operator_precedence_matches_the_manual():
+    # Multiplication (level 4) binds tighter than subtraction (level 5).
+    stmt = parser.parse_statement_text("X = 10 - 5 + 2 * 3")
+    top = stmt.expr
+    assert isinstance(top, BinOp) and top.op == "+"
+    assert top.right.op == "*"
+
+
+def test_parentheses_override_precedence():
+    stmt = parser.parse_statement_text("X = (10 - 5) * 2")
+    assert stmt.expr.op == "*"
+    assert stmt.expr.left.op == "-"
+
+
+def test_relational_binds_looser_than_arithmetic():
+    stmt = parser.parse_statement_text("IF(A + 1.GT.B) THEN ON(C)")
+    assert stmt.cond.op == ".GT."
+    assert stmt.cond.left.op == "+"
+
+
+def test_logical_binds_loosest():
+    stmt = parser.parse_statement_text("IF(A.GT.1.AND.B.LT.2) THEN ON(C)")
+    assert stmt.cond.op == ".AND."
+    assert stmt.cond.left.op == ".GT."
+
+
+def test_unparseable_line_becomes_unparsed_and_is_recorded():
+    prog = parser.parse("10\tON(A\n20\tRETURN\n")
+    assert len(prog.errors) == 1
+    assert isinstance(prog.lines[1].stmt, Return)
+
+
+def test_real_samples_parse_without_error(sample_files):
+    for path in sample_files:
+        prog = parser.parse_file(path)
+        assert prog.errors == [], "%s: %s" % (path, prog.errors)
+
+
+# -- [NodeName]PointName, A6V10374898 Ch.1 ---------------------------------
+
+
+def test_node_qualified_reference_lexes_as_one_point():
+    from ppcl import lexer
+
+    toks = [t for t in lexer.tokenize("[Room101]RoomTemp") if t.kind.name != "EOF"]
+    assert len(toks) == 1
+    assert toks[0].text == "[Room101]RoomTemp"
+
+
+def test_node_qualified_reference_still_yields_to_a_dotted_operator():
+    from ppcl import lexer
+
+    kinds = [t.kind.name for t in
+             lexer.tokenize("[AdminBldg1]ReturnWaterTemp.GT.80.0")
+             if t.kind.name != "EOF"]
+    assert kinds == ["IDENT", "DOTOP", "NUMBER"]
+
+
+def test_a_node_name_may_contain_spaces_and_a_subpoint_may_follow():
+    from ppcl import lexer
+
+    for text in ("[Bldg 1]Ahu01.SFAN", "[Dev201]Pt:SUBPT"):
+        toks = [t for t in lexer.tokenize(text) if t.kind.name != "EOF"]
+        assert len(toks) == 1, text
+        assert toks[0].text == text
+
+
+def test_an_unclosed_bracket_is_rejected_with_a_reason():
+    from ppcl import lexer
+
+    with pytest.raises(lexer.LexError) as excinfo:
+        lexer.tokenize("[unclosed")
+    assert "NodeName" in str(excinfo.value)
+
+
+def test_getval_and_setval_parse():
+    prog = parser.parse(
+        "10\tGETVAL(TheRoomTemp,[Room101]RoomTemp,@PrVal)\n"
+        '20\tSETVAL(1,@OoServe,"Room101:ROOM TEMP")\n'
+        "30\tGOTO 10\n"
+    )
+    assert prog.errors == []
+
+
+# -- BACnet property table -------------------------------------------------
+
+
+def test_property_numbers_resolve_by_name_number_and_at_form():
+    assert spec.property_number("@PrVal") == 85
+    assert spec.property_number("PrVal") == 85
+    assert spec.property_number(85) == 85
+    assert spec.property_number("85") == 85
+    assert spec.property_number("@NotAProperty") is None
+    assert spec.property_number(999999) is None
+
+
+def test_property_name_round_trips():
+    for number, (short, _desc) in spec.BACNET_PROPERTIES.items():
+        assert spec.property_name(number) == short
+        assert spec.property_number("@" + short) is not None
+
+
+def test_every_dangerous_property_is_in_the_property_table():
+    for number in spec.DANGEROUS_PROPERTIES:
+        assert number in spec.BACNET_PROPERTIES

@@ -1,0 +1,104 @@
+00050	C=================================================================C
+00060	C Template: 2.0                                                   C
+00070	C Organization Name: AOM                                          C
+00080	C Title: time                                                     C
+00090	C Author: Bryan Hazelbaker <bryan.hazelbaker@gmail.com>           C
+00100	C See: https://github.com/delphian/ppcl-library                   C
+00119	C                                                                 C
+00120	C Description: At this time Siemens building controllers do not   C
+00121	C have any system variables to account for time passage. Creating C
+00122	C them allows programs to sync on the minute or second with each  C
+00123	C other.                                                          C
+00139	C                                                                 C
+00140	C Requires: Nothing                                               C
+00149   C                                                                 C
+00150	C Version: 2.0                                                    C
+00160	C Conforming program to PPCL template 2.0. Adding comments.       C
+00179   C                                                                 C
+00180	C Bug: 05000 Fails on leap years.                                 C
+00199	C                                                                 C
+00200	C License MIT: Copyright (C) 2013 Bryan Hazelbaker                C
+00205	C Permission is hereby granted, free of charge, to any person     C
+00210	C obtaining a copy of this software and associated documentation  C
+00215	C files (the "Software"), to deal in the Software without         C
+00220	C restriction, including without limitation the rights to use,    C
+00225	C copy, modify, merge, publish, distribute, sublicense, and/or    C
+00230	C sell copies of the Software, and to permit persons to whom the  C
+00235	C Software is furnished to do so, subject to the following        C
+00240	C conditions:                                                     C
+00245	C                                                                 C
+00250	C The above copyright notice and this permission notice shall be  C
+00255	C included in all copies or substantial portions of the Software. C
+00260	C                                                                 C
+00265	C THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, C
+00270	C EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES C
+00275	C OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND        C
+00280	C NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT     C
+00285	C HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,    C
+00290	C WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    C
+00300	C FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR   C
+00305	C OTHER DEALINGS IN THE SOFTWARE.                                 C
+00398	C=================================================================C
+00399	C
+00400	C ----- Declare locals and power restart line ---------------------
+00410	LOCAL("TIME_MIN","TIME_SEC","TIME_DIM")
+00490	ONPWRT(500)
+00499	C
+00500	C ----- Initialize Program ----------------------------------------
+00510	C - Get Minute Component Out of Current Time
+00520	GOSUB 3000
+00530	C - Get Hour Component Out of Current Time
+00540	GOSUB 4000
+00550	C - Calculate Total Days in Current Month
+00560	GOSUB 5000
+00999	C
+01000	C ===== Main Control Loop =========================================
+01010	VTIME = CRTIME
+01020	C - Get Second Component Out of Current Time
+01030	GOSUB 2000
+01040	C - Get Minute Component Out of Current Time
+01050	SAMPLE(1) GOSUB 3000
+01060	C - Get Hour Component Out of Current Time
+01070	SAMPLE(60) GOSUB 4000
+01080	C - Calculate Total Days in Current Month
+01090	SAMPLE(60) GOSUB 5000
+01980	C - Loop Back to Top of the Main Control Loop
+01990	GOTO 20000
+01998	C ===== End Main Control Loop =====================================
+01999	C
+02000	C ----- Get Second Component Out of Current Time ------------------
+02010	"$TIME_SEC" = "$TIME_MIN"
+02020	"$TIME_SEC" = "$TIME_SEC" - 1
+02030	IF("$TIME_SEC" .GT. 1) THEN GOTO 2020
+02040	"$TIME_SEC" = "$TIME_SEC" * 60
+02050	C - Export seconds value to a virtual point
+02060	"CPLT_TIME.SECOND" = "$TIME_SEC"
+02990	RETURN
+02999	C
+03000	C ----- Get Minute Component Out of Current Time ------------------
+03010	"$TIME_MIN" = CRTIME
+03020	IF("$TIME_MIN" .GT. 1) THEN "$TIME_MIN" = "$TIME_MIN" - 1
+03030	IF("$TIME_MIN" .GT. 1) THEN GOTO 3020
+03040	"$TIME_MIN" = "$TIME_MIN" * 60
+03050	C - Export minutes value to a virtual point
+03060	"CPLT_TIME.MINUTE" = "$TIME_MIN"
+03990	RETURN
+03999	C
+04000	C ----- Get Hour Component Out of Current Time --------------------
+04010	C - Export hour value to a virtual point
+04020	"CPLT_TIME.HOUR" = CRTIME
+04990	RETURN
+04999	C
+05000	C ----- Calculate Total Days in Current Month ---------------------
+05010	"$TIME_DIM" = 31
+05020	IF(MONTH .EQ. 2) THEN "$TIME_DIM" = 28
+05030	IF(MONTH .EQ. 3 .OR. MONTH .EQ. 4) THEN "$TIME_DIM" = 30
+05040	IF(MONTH .EQ. 6 .OR. MONTH .EQ. 9) THEN "$TIME_DIM" = 30
+05050	IF(MONTH .EQ. 11) THEN "$TIME_DIM" = 30
+05060	C - Export Day of Month to a virtual point
+05070	"CPLT_TIME.DIM" = "$TIME_DIM"
+05990	RETURN
+05999	C
+20000	C ----- Return to Main Control Loop -------------------------------
+29990	GOTO 1000
+29999	C

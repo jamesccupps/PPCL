@@ -1,0 +1,7 @@
+* text=auto
+
+# PPCL programs are test fixtures and are compared byte for byte in places.
+# Keep them exactly as committed rather than letting checkout rewrite them.
+*.ppcl -text
+*.pcl  -text
+*.seq  -text

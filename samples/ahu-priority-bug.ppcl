@@ -1,0 +1,24 @@
+00010	C =================================================================
+00020	C Title: AHU-1 supply fan and heating coil
+00030	C Purpose: demonstration program containing a deliberate priority bug
+00040	C =================================================================
+00050	C
+00060	C ----- Declarations ----------------------------------------------
+00070	LOCAL("FRZSTAT")
+00080	ONPWRT(100)
+00090	C
+00100	C ===== Main loop =================================================
+00110	C - Occupied schedule drives the supply fan
+00120	IF(TIME.GE.6:00.AND.TIME.LT.18:00) THEN ON(SFAN) ELSE OFF(SFAN)
+00130	C
+00140	C - Freeze protection: latch the fan off at emergency priority
+00150	IF(MAT.LT.38.0) THEN "$FRZSTAT" = 1
+00160	IF("$FRZSTAT".EQ.1) THEN OFF(@EMER,SFAN)
+00170	C
+00180	C - Hot water reset schedule from outside air
+00190	TABLE(OAT,HWSP,0.0,180.0,60.0,100.0)
+00200	C
+00210	C - Discharge temperature control
+00220	LOOP(0,DAT,HVLV,DASP,4000,80,0,10,50.0,0.0,100.0,0)
+00230	C
+00240	C ===== End main loop =============================================

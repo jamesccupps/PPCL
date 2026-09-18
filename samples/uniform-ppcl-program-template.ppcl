@@ -1,0 +1,76 @@
+00001	C Uniform PPCL Program Template 2.0.
+00002	C Using the below template voids the need for goto statements. 
+00003	C Also, a software programmer that is unfamiliar with control work
+00004	C will have an easier time examining this style of code. A modular
+00005	C approach to coding is more standard in the software community; 
+00006	C though unfortunately virtually unheard of to a controls
+00007	C programmer. The template begins at line 50.
+00008	C
+00008	C @see https://gist.github.com/delphian/5906264
+00009	C @see https://github.com/delphian/ppcl-library
+00010	C @author Bryan Hazelbaker <bryan.hazelbaker@gmail.com>
+00040	C
+00050	C=================================================================C
+00060	C Template: [Uniform PPCL Program Template Version]               C
+00070	C Organization Name: [Authoring Company Name]                     C
+00080	C Title: [Program Title]                                          C
+00090	C Author: [First and Last Name] <[Email address]>                 C
+00100	C See: [Fully formed URL of permalink source code or docs]        C
+00119	C                                                                 C
+00120	C Description: [Description of _why_ this program must exit]      C
+00122	C [It is appropriate for this description to take several lines]  C
+00139	C                                                                 C
+00140	C Requires: [Required 3rd Party Programs|Nothing]                 C
+00149   C                                                                 C
+00150	C Version: [Version Number]                                       C
+00160	C [Description of changes since last version]                     C
+00179   C                                                                 C
+00180	C Bug: [Full line #] [Omit line if no bug. One line per bug]      C
+00199	C                                                                 C
+00200	C License MIT: Copyright (C) 2013 Bryan Hazelbaker                C
+00205	C Permission is hereby granted, free of charge, to any person     C
+00210	C obtaining a copy of this software and associated documentation  C
+00215	C files (the "Software"), to deal in the Software without         C
+00220	C restriction, including without limitation the rights to use,    C
+00225	C copy, modify, merge, publish, distribute, sublicense, and/or    C
+00230	C sell copies of the Software, and to permit persons to whom the  C
+00235	C Software is furnished to do so, subject to the following        C
+00240	C conditions:                                                     C
+00245	C                                                                 C
+00250	C The above copyright notice and this permission notice shall be  C
+00255	C included in all copies or substantial portions of the Software. C
+00260	C                                                                 C
+00265	C THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, C
+00270	C EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES C
+00275	C OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND        C
+00280	C NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT     C
+00285	C HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,    C
+00290	C WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    C
+00300	C FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR   C
+00305	C OTHER DEALINGS IN THE SOFTWARE.                                 C
+00398	C=================================================================C
+00399	C
+00400	C ----- Declare locals and power restart line ---------------------
+00410	C LOCAL("TESTLDI")
+00490	C ONPWRT(500)
+00499	C
+00500	C ----- Initialize Program ----------------------------------------
+00999	C
+01000	C ===== Main Control Loop =========================================
+01010	C - Short description of first function. Gosub to comment line #.
+01020	GOSUB 2000
+01030	C - Short description of second function. Gosub to comment line #.
+01040	GOSUB 3000
+01980	C - Loop Back to Top of the Main Control Loop
+01990	GOTO 20000
+01998	C ===== End Main Control Loop =====================================
+01999	C
+02000	C ----- First Function --------------------------------------------
+02990	Return
+02999	C
+03000	C ----- Second Function -------------------------------------------
+03990	Return
+03999	C
+20000	C ----- Return to Main Control Loop -------------------------------
+29990	GOTO 1000
+29999	C

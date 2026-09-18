@@ -1,0 +1,22 @@
+{
+  "name": "ppcl",
+  "version": "0.2.0",
+  "description": "Siemens PPCL for APOGEE and PXC field panels: a skill that carries the language, and an MCP server that runs the real linter, analyzer, simulator and equipment bench so answers come from the tool rather than from recollection.",
+  "author": {
+    "name": "James Cupps",
+    "url": "https://github.com/jamesccupps"
+  },
+  "keywords": [
+    "ppcl",
+    "siemens",
+    "apogee",
+    "pxc",
+    "desigo",
+    "hvac",
+    "building-automation",
+    "bas"
+  ],
+  "homepage": "https://github.com/jamesccupps/PPCL",
+  "repository": "https://github.com/jamesccupps/PPCL",
+  "license": "MIT"
+}

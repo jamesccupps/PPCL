@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ppcl-workbench"
+version = "0.2.0"
+description = "IDE, linter, simulator and debugger for Siemens APOGEE PPCL"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = [
+    "ppcl", "siemens", "apogee", "desigo", "hvac", "bas",
+    "building-automation", "linter", "simulator",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: Manufacturing",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+# Deliberately empty, and meant to stay that way. The whole point is that this
+# runs on an engineering workstation with no package install and no network.
+dependencies = []
+
+[project.optional-dependencies]
+# Only ever for the future read-only BACnet point adapter, kept optional so the
+# core never grows a dependency.
+bacnet = ["bacpypes3"]
+dev = ["pytest>=7"]
+
+[project.scripts]
+ppcl = "ppcl.cli:main"
+ppcl-mcp = "ppcl.mcp_server:serve"
+
+[tool.setuptools.packages.find]
+include = ["ppcl*"]
+
+[tool.setuptools.package-data]
+"ppcl.web" = ["static/*.html", "static/css/*.css", "static/js/*.js"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

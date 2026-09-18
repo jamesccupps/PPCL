@@ -1,0 +1,185 @@
+{
+  "name": "AHU-1 fan and freeze protection",
+  "equipment": "AHU1",
+  "author": "",
+  "description": "",
+  "version": "1.0",
+  "start_line": 10,
+  "line_step": 10,
+  "blocks": [
+    {
+      "id": "mat",
+      "type": "point_in",
+      "x": 40,
+      "y": 60,
+      "label": "",
+      "note": "",
+      "params": {
+        "point": "MAT",
+        "kind": "analog"
+      }
+    },
+    {
+      "id": "lo",
+      "type": "constant",
+      "x": 40,
+      "y": 160,
+      "label": "",
+      "note": "",
+      "params": {
+        "value": 38
+      }
+    },
+    {
+      "id": "hi",
+      "type": "constant",
+      "x": 40,
+      "y": 250,
+      "label": "",
+      "note": "",
+      "params": {
+        "value": 45
+      }
+    },
+    {
+      "id": "trip",
+      "type": "compare",
+      "x": 230,
+      "y": 90,
+      "label": "",
+      "note": "",
+      "params": {
+        "op": "<"
+      }
+    },
+    {
+      "id": "clear",
+      "type": "compare",
+      "x": 230,
+      "y": 220,
+      "label": "",
+      "note": "",
+      "params": {
+        "op": ">"
+      }
+    },
+    {
+      "id": "freeze",
+      "type": "latch",
+      "x": 420,
+      "y": 140,
+      "label": "FREEZE",
+      "note": "Freeze trip: latches low, clears only above the reset limit",
+      "params": {
+        "priority": "set"
+      }
+    },
+    {
+      "id": "sched",
+      "type": "schedule",
+      "x": 40,
+      "y": 380,
+      "label": "OCC",
+      "note": "",
+      "params": {
+        "on": "6:00",
+        "off": "18:00",
+        "mode": 1
+      }
+    },
+    {
+      "id": "safe",
+      "type": "not",
+      "x": 620,
+      "y": 140,
+      "label": "",
+      "note": "",
+      "params": {}
+    },
+    {
+      "id": "run",
+      "type": "and",
+      "x": 780,
+      "y": 300,
+      "label": "RUN",
+      "note": "",
+      "params": {}
+    },
+    {
+      "id": "fan",
+      "type": "command",
+      "x": 960,
+      "y": 300,
+      "label": "",
+      "note": "",
+      "params": {
+        "point": "SFAN",
+        "action": "on",
+        "priority": "@EMER",
+        "release_when_false": "yes"
+      }
+    }
+  ],
+  "wires": [
+    {
+      "src": "mat",
+      "src_pin": "out",
+      "dst": "trip",
+      "dst_pin": "a"
+    },
+    {
+      "src": "lo",
+      "src_pin": "out",
+      "dst": "trip",
+      "dst_pin": "b"
+    },
+    {
+      "src": "mat",
+      "src_pin": "out",
+      "dst": "clear",
+      "dst_pin": "a"
+    },
+    {
+      "src": "hi",
+      "src_pin": "out",
+      "dst": "clear",
+      "dst_pin": "b"
+    },
+    {
+      "src": "trip",
+      "src_pin": "out",
+      "dst": "freeze",
+      "dst_pin": "set"
+    },
+    {
+      "src": "clear",
+      "src_pin": "out",
+      "dst": "freeze",
+      "dst_pin": "reset"
+    },
+    {
+      "src": "freeze",
+      "src_pin": "out",
+      "dst": "safe",
+      "dst_pin": "in"
+    },
+    {
+      "src": "sched",
+      "src_pin": "out",
+      "dst": "run",
+      "dst_pin": "a"
+    },
+    {
+      "src": "safe",
+      "src_pin": "out",
+      "dst": "run",
+      "dst_pin": "b"
+    },
+    {
+      "src": "run",
+      "src_pin": "out",
+      "dst": "fan",
+      "dst_pin": "when"
+    }
+  ]
+}

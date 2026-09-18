@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+
+# Workbench state and backups
+.ppcl-workbench.json
+*.bak
+
+# Site data must never be committed. Run `ppcl redact` before sharing
+# anything, and keep the reversal mapping local.
+*-map.json
+exports/
+points.csv

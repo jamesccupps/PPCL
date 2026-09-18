@@ -1,0 +1,74 @@
+00010	C ==========================================================
+00020	C Title: AHU-1 single zone
+00030	C Equipment: AHU1
+00040	C Organization: ACME
+00050	C Author: A Tech
+00060	C Version: 1.0
+00070	C
+00080	C Generated from a sequence document. Edit the document and
+00090	C recompile rather than editing this program by hand.
+00100	C
+00110	C Single zone AHU with freeze protection and discharge reset.
+00120	C
+00130	C Modes, lowest priority first:
+00140	C   1 = Unoccupied
+00150	C   2 = Occupied
+00160	C   3 = Shutdown
+00170	C ==========================================================
+00180	C
+00190	C ----- Declarations and power restart ---------------------
+00200	LOCAL("MODE","FREEZE","DMD")
+00210	ONPWRT(210)
+00220	C
+00230	C ----- Main loop ------------------------------------------
+00240	C
+00250	C ----- Safety interlocks - latch --------------------------
+00260	C Evaluated before the mode so a mode can react to a trip.
+00270	C Freeze -- Low mixed air temperature
+00280	IF(MAT.LT.38.0) THEN "$FREEZE" = 1.0
+00290	IF(MAT.GT.45.0) THEN "$FREEZE" = 0.0
+00300	C
+00310	C ----- Determine the operating mode -----------------------
+00320	C Tested lowest priority first; the last match wins.
+00330	"$MODE" = 1.0
+00340	C Occupied
+00350	IF(TIME.GE.6:00.AND.TIME.LT.18:00) THEN "$MODE" = 2.0
+00360	C Shutdown
+00370	IF("$FREEZE".EQ.1.0) THEN "$MODE" = 3.0
+00380	C
+00390	C ----- Reset schedules ------------------------------------
+00400	C   68.0       -> 95.0
+00410	C   74.0       -> 55.0
+00420	TABLE(ZNT,DASP,68.0,95.0,74.0,55.0)
+00430	C   50.0       -> 0.0
+00440	C   100.0      -> 100.0
+00450	TABLE("$DMD",HVLV,50.0,0.0,100.0,100.0)
+00460	C   0.0        -> 100.0
+00470	C   50.0       -> 0.0
+00480	TABLE("$DMD",CVLV,0.0,100.0,50.0,0.0)
+00490	C
+00500	C ----- Control loops --------------------------------------
+00510	C Unconditional, so their sample timing stays correct.
+00520	C Discharge: reverse acting, throttling range 10
+00530	LOOP(128,DAT,"$DMD",DASP,10000,200,0,10,50.0,0.0,100.0,0)
+00540	C
+00550	C ----- Decision table -------------------------------------
+00560	C Issued after the loops so a cell can override a loop.
+00570	C Mode 1: Unoccupied
+00580	IF("$MODE".EQ.1.0) THEN OFF(SFAN,RFAN)
+00590	IF("$MODE".EQ.1.0) THEN SET(0.0,OADPR,HVLV,CVLV)
+00600	C Mode 2: Occupied
+00610	IF("$MODE".EQ.2.0) THEN ON(SFAN,RFAN)
+00620	IF("$MODE".EQ.2.0) THEN SET(20.0,OADPR)
+00630	C Mode 3: Shutdown
+00640	IF("$MODE".EQ.3.0) THEN OFF(SFAN,RFAN)
+00650	IF("$MODE".EQ.3.0) THEN SET(0.0,OADPR,HVLV,CVLV)
+00660	C
+00670	C ----- Safety interlocks - force --------------------------
+00680	C Command and release at the SAME priority, or the release
+00690	C silently does nothing.
+00700	IF("$FREEZE".EQ.1.0) THEN OFF(@EMER,SFAN)
+00710	IF("$FREEZE".EQ.0.0) THEN RELEAS(@EMER,SFAN)
+00720	C
+00730	C ----- Close the main loop --------------------------------
+00740	GOTO 280

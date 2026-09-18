@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PPCL Workbench</title>
+<link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/static/css/panes.css">
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <h1>PPCL <span>Workbench</span></h1>
+    <nav id="nav">
+      <button data-pane="editor" class="on" data-tip="Write and check PPCL. Ctrl+1">Editor</button>
+      <button data-pane="builder" data-tip="Author from a decision table: equipment against modes. Ctrl+2">Builder</button>
+      <button data-pane="blocks" data-tip="Draw the control as blocks and wires, and compile it. Ctrl+3">Blocks</button>
+      <button data-pane="bench" data-tip="Run against simulated equipment, with breakpoints. Ctrl+4">Bench</button>
+      <button data-pane="settings" data-tip="Firmware, editor behaviour, point database. Ctrl+5">Settings</button>
+      <button data-pane="help" data-tip="Built-in documentation. F1">Help</button>
+    </nav>
+    <div class="spacer"></div>
+    <div class="status" id="status"></div>
+  </header>
+
+  <!-- ================================================================ -->
+  <main id="pane-editor" class="on">
+    <aside class="side">
+      <div class="sidehead">
+        <h2>Workspace</h2>
+        <button class="icon" id="btn-refresh-files" data-tip="Re-read the workspace directory">&#8635;</button>
+      </div>
+      <div class="scroll" id="files"></div>
+
+      <div class="sidehead">
+        <h2>Points</h2>
+        <span class="badge" id="pointcount" data-tip="Points in the loaded database">none</span>
+      </div>
+      <div class="bar tight">
+        <input type="search" id="pointq" placeholder="search points"
+               data-tip="Search the imported point database">
+      </div>
+      <div class="scroll pointlist" id="pointlist"></div>
+
+      <div class="sidehead"><h2>Reference</h2></div>
+      <div class="bar tight">
+        <input type="search" id="explain-q" placeholder="ON, LOOP, EMER, E205"
+               data-tip="Look up a command, point type, priority, or rule code">
+      </div>
+      <div class="scroll help" id="help"></div>
+    </aside>
+
+    <div class="col">
+      <div class="tabs" id="tabs"></div>
+
+      <div class="bar">
+        <button class="act" id="btn-new" data-tip="Start a new empty program">New</button>
+        <button class="act" id="btn-save" data-tip="Save the active file. Ctrl+S">Save</button>
+        <button class="act" id="btn-fmt" data-tip="Sort by line number and normalise spacing">Format</button>
+        <button class="act" id="btn-renumber"
+                data-tip="Renumber every line and rewrite every GOTO, GOSUB, ACT, DEACT, ENABLE, DISABL and ONPWRT reference">Renumber</button>
+        <label>from</label><input type="number" id="rn-start" value="10" min="1"
+               data-tip="First line number after renumbering">
+        <label>step</label><input type="number" id="rn-step" value="10" min="1"
+               data-tip="Gap between statements. Ten leaves room to insert without renumbering again">
+        <label data-tip="Keep blank-line groupings when renumbering"><input type="checkbox" id="rn-blocks"> keep blocks</label>
+
+        <div class="menu" id="menu-transform">
+          <button class="act" data-tip="Source transforms that are exact by machine and tedious by hand">Transform &#9662;</button>
+          <div class="items">
+            <button data-op="expand_defines" data-tip="Replace every %ABBREV% with the text its DEFINE gives it">Expand DEFINE references</button>
+            <button data-op="collapse_defines" data-tip="Put the %ABBREV% shorthand back">Collapse to DEFINE shorthand</button>
+            <button data-op="separators_dot" data-tip="Point names use periods. Numbers and dotted operators are untouched">Point names &rarr; periods</button>
+            <button data-op="separators_underscore" data-tip="Point names use underscores">Point names &rarr; underscores</button>
+            <button data-op="toggle_comment" data-tip="Comment or uncomment the selected statements. Ctrl+/">Toggle comment on selection</button>
+            <button data-op="disable" data-tip="Mark the selected statements disabled. They become comments, so re-enable before loading to a panel">Disable selection</button>
+            <button data-op="enable" data-tip="Restore disabled statements">Enable selection</button>
+            <button data-op="clone" data-tip="Copy a block of statements with point renames applied and branches retargeted">Clone lines with rename&hellip;</button>
+          </div>
+        </div>
+
+        <div class="spacer"></div>
+        <label>firmware</label>
+        <select id="firmware" data-tip="Changes real results: the operand limit and how a GOTO to a missing line is treated"></select>
+        <button class="act primary" id="btn-tobench" data-tip="Send this program to the bench and run it. F5">Bench &rarr;</button>
+      </div>
+
+      <div class="findbar" id="findbar" hidden>
+        <input type="text" id="find-q" placeholder="find" data-tip="Text to find">
+        <input type="text" id="find-r" placeholder="replace with" data-tip="Replacement text">
+        <label data-tip="Match upper and lower case exactly"><input type="checkbox" id="find-case"> case</label>
+        <span class="count" id="find-count"></span>
+        <button class="act" id="find-prev" data-tip="Previous match. Shift+Enter">&#8593;</button>
+        <button class="act" id="find-next" data-tip="Next match. Enter">&#8595;</button>
+        <button class="act" id="find-rep" data-tip="Replace this match">Replace</button>
+        <button class="act" id="find-all" data-tip="Replace every match">All</button>
+        <div class="spacer"></div>
+        <button class="icon" id="find-close" data-tip="Close. Escape">&times;</button>
+      </div>
+
+      <div class="editwrap" id="editwrap">
+        <div class="inner" id="editinner">
+          <div class="gutter" id="gutter"></div>
+          <pre class="hl" id="hl"></pre>
+          <textarea class="code" id="code" spellcheck="false"
+                    autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+        </div>
+        <div class="complete" id="complete" hidden></div>
+        <div class="sighelp" id="sighelp" hidden></div>
+      </div>
+
+      <div class="splitbar" id="splitbar" data-tip="Drag to resize the findings panel"></div>
+      <div class="diags" id="diags"></div>
+    </div>
+  </main>
+
+  <!-- ================================================================ -->
+  <main id="pane-builder">
+    <div class="col builder">
+      <div class="bar">
+        <button class="act" id="btn-seq-new" data-tip="Start from a worked example">New</button>
+        <button class="act" id="btn-seq-save" data-tip="Save the sequence document">Save .seq</button>
+        <button class="act primary" id="btn-seq-compile" data-tip="Compile the document to PPCL and lint the result">Compile</button>
+        <button class="act" id="btn-seq-toeditor" data-tip="Open the generated program in the editor">To editor</button>
+        <button class="act" id="btn-seq-tobench" data-tip="Compile and run in the bench">Bench &rarr;</button>
+        <div class="spacer"></div>
+        <span class="status" id="seq-status"></span>
+      </div>
+
+      <div class="builderbody">
+        <div class="doc">
+          <div class="subtabs" id="seq-subtabs">
+            <button data-sec="table" class="on" data-tip="Equipment against modes. Siemens' own recommended design artifact">Table</button>
+            <button data-sec="points" data-tip="Points this sequence uses">Points</button>
+            <button data-sec="modes" data-tip="Operating modes, lowest priority first. The last match wins">Modes</button>
+            <button data-sec="interlocks" data-tip="Latching safeties. Every force gets a matching release">Interlocks</button>
+            <button data-sec="loops" data-tip="PID control loops">Loops</button>
+            <button data-sec="resets" data-tip="Linear reset schedules, compiled to TABLE">Resets</button>
+            <button data-sec="rules" data-tip="Free-form when/then rules for logic a table cannot express">Rules</button>
+            <button data-sec="text" data-tip="The document as text. Edit either side">Text</button>
+          </div>
+          <div class="secbody" id="seq-body"></div>
+        </div>
+        <div class="out">
+          <h3 class="sec">Compiled PPCL</h3>
+          <div class="editwrap" style="flex:1">
+            <div class="inner" id="seqoutinner">
+              <div class="gutter" id="seqgutter"></div>
+              <pre class="hl" id="seqhl"></pre>
+            </div>
+          </div>
+          <div class="diags" id="seqdiags"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ================================================================ -->
+  <main id="pane-blocks">
+    <aside class="side palette">
+      <div class="sidehead"><h2>Palette</h2></div>
+      <div class="bar tight">
+        <input type="search" id="palq" placeholder="search blocks"
+               data-tip="Filter the palette">
+      </div>
+      <div class="scroll" id="palette"></div>
+    </aside>
+
+    <div class="col">
+      <div class="bar">
+        <button class="act" id="btn-dia-new" data-tip="Start from a worked example">New</button>
+        <button class="act" id="btn-dia-open" data-tip="Open a saved diagram">Open</button>
+        <button class="act" id="btn-dia-save" data-tip="Save the diagram as JSON">Save</button>
+        <button class="act primary" id="btn-dia-compile" data-tip="Compile the diagram to PPCL and lint it">Compile</button>
+        <button class="act" id="btn-dia-toeditor" data-tip="Open the generated program in the editor">To editor</button>
+        <button class="act" id="btn-dia-tobench" data-tip="Compile and run in the bench">Bench &rarr;</button>
+        <div class="spacer"></div>
+        <button class="act" id="btn-dia-tidy" data-tip="Lay the blocks out left to right in compilation order">Tidy</button>
+        <button class="act" id="btn-dia-delete" data-tip="Delete the selected block. Del">Delete</button>
+        <span class="status" id="dia-status"></span>
+      </div>
+
+      <div class="canvaswrap" id="canvaswrap">
+        <svg class="wires" id="wires"></svg>
+        <div class="canvas" id="canvas"></div>
+        <div class="hint" id="canvashint">
+          Drag a block from the palette. Drag from an output dot to an input
+          dot to wire them.
+        </div>
+      </div>
+
+      <div class="subtabs" id="dia-outtabs">
+        <button data-out="diags" class="on" data-tip="Findings from the linter, run against the generated program">Findings</button>
+        <button data-out="code" data-tip="The PPCL this diagram compiles to">Generated PPCL</button>
+      </div>
+      <div class="diags" id="diadiags"></div>
+      <div class="editwrap diaCode" id="diacode" hidden>
+        <div class="inner">
+          <div class="gutter" id="diagutter"></div>
+          <pre class="hl" id="diahl"></pre>
+        </div>
+      </div>
+    </div>
+
+    <aside class="side inspector">
+      <div class="sidehead"><h2>Block</h2></div>
+      <div class="scroll" id="inspector"></div>
+    </aside>
+  </main>
+
+  <!-- ================================================================ -->
+  <main id="pane-bench">
+    <div class="col bench">
+      <div class="bar">
+        <div class="segmented" id="bench-mode">
+          <button data-mode="run" class="on" data-tip="Run the whole simulation and chart the result">Simulate</button>
+          <button data-mode="debug" data-tip="Step through the program with breakpoints and a watch window">Debug</button>
+        </div>
+        <div class="spacer"></div>
+        <span class="status" id="bench-status"></span>
+      </div>
+
+      <!-- simulate ------------------------------------------------- -->
+      <div id="bench-run">
+        <div class="bar">
+          <label>weather</label><select id="b-weather" data-tip="Outside conditions driving the simulation"></select>
+          <label>plant</label><select id="b-preset" data-tip="Which simulated equipment to run against"></select>
+          <label>start</label><input type="number" id="b-hour" value="5" min="0" max="23" step="1" data-tip="Simulated time of day the run begins">
+          <label>hours</label><input type="number" id="b-hours" value="3" min="1" max="24" step="1" data-tip="How long to run">
+          <label>fault</label>
+          <select id="b-fault" data-tip="Inject a failure and see what the program does about it"><option value="">none</option></select>
+          <label>at min</label><input type="number" id="b-fault-at" value="30" min="0" data-tip="Minutes into the run when the fault starts">
+          <label>value</label><input type="number" id="b-fault-val" value="100" data-tip="Fault magnitude, meaning depends on the kind">
+          <div class="spacer"></div>
+          <button class="act primary" id="btn-run" data-tip="Run. F5">Run</button>
+        </div>
+        <div id="b-notes"></div>
+        <div class="charts" id="charts">
+          <div class="empty">Open a program in the Editor, or compile one in
+            the Builder or Blocks pane, then press Run. The program is driven
+            against a simulated air handler with sensor lag, actuator stroke
+            time and damper leakage.</div>
+        </div>
+        <div class="checks" id="checks"></div>
+      </div>
+
+      <!-- debug ---------------------------------------------------- -->
+      <div id="bench-debug" hidden>
+        <div class="bar">
+          <button class="act primary" id="dbg-start" data-tip="Load the current program into a debug session">Start</button>
+          <button class="act" id="dbg-run" data-tip="Run until a breakpoint fires. F8">Run</button>
+          <button class="act" id="dbg-step" data-tip="Execute one statement, entering subroutines. F11">Step</button>
+          <button class="act" id="dbg-over" data-tip="Execute one statement, running any GOSUB to completion. F10">Over</button>
+          <button class="act" id="dbg-out" data-tip="Run until the current subroutine returns. Shift+F11">Out</button>
+          <button class="act" id="dbg-reset" data-tip="Restart the program from the first line">Reset</button>
+          <div class="spacer"></div>
+          <label>time</label><span class="clock" id="dbg-clock">--:--</span>
+          <span class="status" id="dbg-status"></span>
+        </div>
+
+        <div class="debugbody">
+          <div class="dbgsource">
+            <div class="editwrap" style="flex:1">
+              <div class="inner" id="dbginner">
+                <div class="gutter" id="dbggutter"></div>
+                <pre class="hl" id="dbghl"></pre>
+              </div>
+            </div>
+          </div>
+
+          <aside class="dbgside">
+            <div class="sidehead">
+              <h2>Watch</h2>
+              <button class="icon" id="dbg-add-watch" data-tip="Watch another point">+</button>
+            </div>
+            <div class="watchlist" id="dbg-watch"></div>
+
+            <div class="sidehead">
+              <h2>Breakpoints</h2>
+              <button class="icon" id="dbg-add-bp" data-tip="Add a breakpoint on a write or a condition">+</button>
+            </div>
+            <div class="bplist" id="dbg-bps"></div>
+
+            <div class="sidehead"><h2>Call stack</h2></div>
+            <div class="stacklist" id="dbg-stack"></div>
+
+            <div class="sidehead"><h2>Recent activity</h2></div>
+            <div class="eventlist" id="dbg-events"></div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ================================================================ -->
+  <main id="pane-settings">
+    <div class="col settings">
+      <div class="bar">
+        <button class="act primary" id="set-save" data-tip="Write the settings file in the workspace">Save</button>
+        <button class="act" id="set-reset" data-tip="Restore every setting to its default">Restore defaults</button>
+        <div class="spacer"></div>
+        <span class="status" id="set-status"></span>
+      </div>
+      <div class="scroll settingsbody" id="settingsbody"></div>
+    </div>
+  </main>
+
+  <!-- ================================================================ -->
+  <main id="pane-help">
+    <aside class="side">
+      <div class="sidehead"><h2>Contents</h2></div>
+      <div class="bar tight">
+        <input type="search" id="helpq" placeholder="search the documentation"
+               data-tip="Search titles and page text">
+      </div>
+      <div class="scroll" id="helpnav"></div>
+    </aside>
+    <div class="col">
+      <div class="scroll doc-body" id="helpbody"></div>
+    </div>
+  </main>
+
+</div>
+
+<div class="tooltip" id="tooltip" hidden></div>
+<div class="toasts" id="toasts"></div>
+
+<div class="modal" id="modal" hidden>
+  <div class="sheet">
+    <h3 id="modal-title"></h3>
+    <div id="modal-body"></div>
+    <div class="modal-actions">
+      <button class="act" id="modal-cancel">Cancel</button>
+      <button class="act primary" id="modal-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+sequence "AHU-1 single zone"
+  equipment AHU1
+  author A Tech
+  organization ACME
+  description "Single zone AHU with freeze protection and discharge reset."
+
+points
+  SFAN    digital output   supply fan
+  RFAN    digital output   return fan
+  OADPR   analog  output   outside air damper
+  HVLV    analog  output   heating valve
+  CVLV    analog  output   cooling valve
+  MAT     analog  input    mixed air temperature
+  DAT     analog  input    discharge air temperature
+  ZNT     analog  input    zone temperature
+  DASP    analog  virtual  discharge air setpoint
+  DMD     analog  local    heat/cool demand
+
+modes
+  Unoccupied  otherwise
+  Occupied    when TIME between 6:00 and 18:00
+  Shutdown    when Freeze is on
+
+table
+              Unoccupied  Occupied  Shutdown
+  SFAN        off         on        off
+  RFAN        off         on        off
+  OADPR       closed      20        closed
+  HVLV        closed      modulate  closed
+  CVLV        closed      modulate  closed
+
+interlock Freeze
+  description "Low mixed air temperature"
+  trip when MAT < 38
+  reset when MAT > 45
+  force SFAN off at emer
+
+reset DASP from ZNT
+  68 -> 95
+  74 -> 55
+
+loop Discharge
+  measure DAT
+  output DMD
+  setpoint DASP
+  acting reverse
+  throttling 10
+  range 0 to 100
+
+reset HVLV from DMD
+  50 -> 0
+  100 -> 100
+
+reset CVLV from DMD
+  0 -> 100
+  50 -> 0
