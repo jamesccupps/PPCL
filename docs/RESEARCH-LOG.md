@@ -2386,3 +2386,83 @@ one-line gap; the unenforced field had been quietly inert across eighty rules.
 alarm and commanding help, never in a PPCL context, and the other two appear
 nowhere at all. The lesson from `ONERR` applies in reverse here — an enum
 naming something is not yet a reason to put it in the language spec.
+
+---
+
+## 2026-09-18 (twentieth pass) — SSTO's learned state, and an 80 that was mine
+
+### `W342` — the panel writes its own learned state into the program you read back
+
+Chasing SSTO through `PROTOCOL.md` §15.3.1 landed on a sentence in the Program
+Editor's `SSTO` page that had been transcribed into `spec.py` as a note and
+never acted on:
+
+> *"When AST or ASP are entered as zero, the current adjustment value is
+> displayed each time the command is displayed."*
+
+`SSTO` self-tunes. It carries a start adjustment and a stop adjustment day to
+day, nudged by `SSTOCO`'s `coef4` whenever the zone misses its target. Enter
+zero and the panel keeps that adjustment internally — **and prints it into the
+statement every time the statement is displayed.**
+
+So a program *exported from a panel* carries a number in that slot that nobody
+typed. Load that text back and the zone stops tuning from zero and starts
+tuning from whatever the panel had learned on export day. The program looks
+identical and behaves differently, which is the exact failure this toolkit
+exists to catch.
+
+**It is not hypothetical.** Linting the reference site's older programs found
+**four** of them, in one file: two `SSTO` statements carrying a four-decimal
+literal in `AST` -- of the shape `87.4416`, invented here, because the real
+ones are the site's -- and a negated literal in `ASP`. Four decimal places is
+not something an engineer types into a start-time adjustment.
+
+`W342` fires on a non-zero numeric literal in either slot and stays quiet on a
+zero or a point reference — a virtual LAO is the documented way to seed an
+adjustment deliberately, and that is a choice, not an accident. Zero hits on
+Siemens' library and on the Desigo-era exports; four on the older corpus.
+
+### `OIP`'s sequence limit is 60, and the 80 was ours
+
+The other project pushed back on the second-round reply: every `OIP` page in
+their copy says 60. They are right.
+
+| Source | |
+|---|---|
+| 125-1896 Rev. 5, Ch. 4, `OIP` | *"The sequence must not exceed 60 characters (including slashes) in length."* |
+| Program Editor, `Statement Arguments — OIP` | the same sentence, verbatim |
+| A third-party syntax reference transcribing the manual | the same sentence again |
+
+Every corpus here was searched for an `80` in any `OIP` or sequence context.
+There is none. This is not a two-source split of the 13-vs-16 shape — it is a
+single-source figure and **the source was this project**, confusing it with the
+80-character MMI line length. That figure had been in `spec.py` since the first
+pass and was sent to the other project as authoritative.
+
+Corrected, and made harder to get wrong: the limit is now
+`spec.OIP_SEQUENCE_MAX`, so the parameter documentation and the rule read the
+same constant. **`E122`** enforces it, at ERROR, because `OIP` validates its
+sequence *when the trigger fires* rather than when the line is entered — an
+over-long sequence shows as `FAILED` on the panel and nowhere else.
+
+One piece of corroboration: across the three program corpora there are **158
+`OIP` statements** and the longest sequence is **56** characters. If the ceiling
+were 80, some of 158 would be expected in the 60–80 band. None is.
+
+### `ALMPRI`, and which enumeration you checked
+
+They noted `ALMPRI` is not on the enumerated reserved-word list. True of the
+**Program Editor's** list; it *is* on **125-1896 Chapter 5's**, as a bare cell
+in alphabetical position, along with `DEAD` and `HAND`.
+
+The two enumerations differ in both directions. Twelve words are on 125-1896's
+and not the Program Editor's — `ALMACK`, `ALMPRI`, `DEAD`, `DEFINE`, `DISCOV`,
+`ENCOV`, `HAND`, `LOCAL`, `LOW`, `NOR`, `OK`, `STATE` — and `LESS` is on the
+Program Editor's and not 125-1896's. Neither is complete, so a word's absence
+from one means nothing by itself. Same lesson as `NODE0`, from the other side.
+
+### Still to do
+
+1. **Decide `W104`.** Still the user's call.
+2. Handle the `UNKNOWN (...)` marker in the lexer.
+3. A rule for the `SET`-without-deadband idiom on PXC.A.

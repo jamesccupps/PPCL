@@ -16,6 +16,7 @@ from ..ast_nodes import (
     Ref,
     Sampled,
     TimeLit,
+    UnaryOp,
 )
 from ..diagnostics import Diagnostic, Severity
 from ..linter import rule
@@ -817,6 +818,62 @@ def command_point_type(ctx):
                     % spec.POINT_TYPES[ptype].description,
                     manual="Chapter 4, %s" % stmt.name,
                 )
+
+
+def _numeric_literal(node):
+    """The value of a numeric literal, negated form included, else None."""
+    if isinstance(node, Num):
+        return node.value
+    if isinstance(node, UnaryOp) and isinstance(node.operand, Num):
+        return -node.operand.value if node.op == "-" else node.operand.value
+    return None
+
+
+@rule("W342", "SSTO adjustment looks like a captured value, not an entered one",
+      Severity.WARNING)
+def ssto_adjustment_literal(ctx):
+    """The panel writes its learned state into the statement you read back.
+
+    Siemens: "When AST or ASP are entered as zero, the current adjustment
+    value is displayed each time the command is displayed." So a program
+    *displayed* from a panel shows the adjustment the zone has learned, in the
+    place where a zero was entered -- and text exported that way carries a
+    number nobody typed.
+
+    Load it back and the zone stops tuning from zero and starts tuning from
+    whatever the panel happened to have learned on export day. That is a
+    silent behaviour change in a program that looks identical.
+
+    Fires on a numeric literal; a point reference is the documented way to
+    seed an adjustment deliberately and is left alone.
+    """
+    for ln, call in _calls(ctx, "SSTO"):
+        for index, name in ((10, "AST"), (11, "ASP")):
+            if index >= len(call.args):
+                continue
+            value = _numeric_literal(call.args[index])
+            if value is None or value == 0:
+                continue
+            computed = value != int(value)
+            yield _d(
+                "W342",
+                Severity.WARNING,
+                "SSTO %s is %g, and a displayed SSTO shows the adjustment the "
+                "zone has learned" % (name, value),
+                ln.number,
+                detail="Entered as zero, %s is where the panel prints the "
+                "current self-tuning adjustment every time the statement is "
+                "displayed. A non-zero literal here is therefore most likely "
+                "a captured display rather than anything an engineer chose%s. "
+                "Loading this text to a panel writes it back as a fixed entry, "
+                "and the zone tunes from that offset instead of from zero."
+                % (name, ", and a value carrying several decimal places is "
+                   "almost certainly captured" if computed else ""),
+                manual="Chapter 4, SSTO (Remarks)",
+                suggestion="If you did not deliberately fix the adjustment, "
+                "restore 0 -- or a virtual LAO, which is the documented way to "
+                "seed one -- before loading this program.",
+            )
 
 
 @rule("W334", "Analog value compared for exact equality", Severity.WARNING)

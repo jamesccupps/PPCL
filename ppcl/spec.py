@@ -70,6 +70,14 @@ MMI_CONTINUATION_LIMIT = {
 LINE_MIN = 1
 LINE_MAX = 32767
 
+#: Longest OIP keystroke sequence, slashes included. Stated in identical words
+#: by 125-1896 Rev. 5 Chapter 4, by the Program Editor's Statement Arguments
+#: page, and by a third-party syntax reference that transcribes the manual:
+#: "The sequence must not exceed 60 characters (including slashes) in length."
+#: No source anywhere says anything else -- an earlier 80 here was this
+#: project confusing it with the MMI line length, and it was wrong.
+OIP_SEQUENCE_MAX = 60
+
 #: Valid length for a PPCL *program* name. Desigo CC engineering help,
 #: "Program Naming" -- not generation-specific, and the same 30 across every
 #: firmware family here.
@@ -1799,7 +1807,7 @@ _add(
         fixed=(
             Param("trigger", Arg.POINT, "LDO/LDI point or local that fires the sequence"),
             Param("seq", Arg.STRING,
-                  "Keystroke sequence, max 80 characters including the "
+                  "Keystroke sequence, max 60 characters including the "
                   "slashes, quoted, one / per menu level"),
         ),
         firmware=frozenset(

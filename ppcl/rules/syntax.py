@@ -308,6 +308,44 @@ def unknown_command(ctx):
             )
 
 
+@rule("E122", "OIP keystroke sequence is too long", Severity.ERROR)
+def oip_sequence_length(ctx):
+    """Sixty characters including the slashes, and it fails at run time.
+
+    OIP reports FAILED when the sequence is malformed, which happens on the
+    panel rather than in the editor -- so nothing tells the engineer until the
+    trigger fires and the sequence silently does not run.
+    """
+    for ln in ctx.program.lines:
+        for stmt in substatements(ln.stmt):
+            if not isinstance(stmt, CommandCall) or stmt.name != "OIP":
+                continue
+            if len(stmt.args) < 2:
+                continue
+            seq = stmt.args[1]
+            text = getattr(seq, "name", None)
+            if text is None or not getattr(seq, "quoted", False):
+                continue
+            if len(text) <= spec.OIP_SEQUENCE_MAX:
+                continue
+            yield _d(
+                "E122",
+                Severity.ERROR,
+                "OIP sequence is %d characters; the maximum is %d"
+                % (len(text), spec.OIP_SEQUENCE_MAX),
+                ln.number,
+                source_line=ln.source_line,
+                detail="Slashes count toward the limit. OIP validates its "
+                "sequence when the trigger fires, not when the line is "
+                "entered, so an over-long sequence shows as FAILED on the "
+                "panel and nowhere else.",
+                manual="Chapter 4, OIP",
+                suggestion="Split it across two OIP statements on separate "
+                "triggers, staggered in time so one finishes before the next "
+                "begins.",
+            )
+
+
 @rule("W121", "Statement the firmware names but no manual documents",
       Severity.WARNING)
 def firmware_only_statement(ctx):

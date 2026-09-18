@@ -680,6 +680,32 @@ def test_matched_release_is_clean():
     assert "W330" not in codes(text)
 
 
+def test_a_captured_SSTO_adjustment_is_flagged():
+    """Found in a real exported program, not invented.
+
+    Siemens: "When AST or ASP are entered as zero, the current adjustment
+    value is displayed each time the command is displayed." So a program read
+    back off a panel carries the zone's learned self-tuning offset in the slot
+    where a zero was typed, and reloading that text nails the offset down.
+    """
+    from ppcl import linter, parser
+
+    tail = ",CST,CSP,EST,LST,OST,ESP,LSP,OSP,"
+
+    def run(ast, asp):
+        text = "10\tSSTO(1,1" + tail + ast + "," + asp + ")\n20\tGOTO 10\n"
+        return [d for d in linter.lint(parser.parse(text)) if d.code == "W342"]
+
+    assert len(run("87.4416", "0")) == 1
+    assert len(run("0", "-3.5")) == 1
+    assert len(run("87.4416", "-3.5")) == 2
+    assert "AST" in run("87.4416", "0")[0].message
+    # Zero is what an engineer enters, and a point is the documented way to
+    # seed one deliberately. Neither is a finding.
+    assert run("0", "0") == []
+    assert run("ASTPT", "ASPPT") == []
+
+
 def test_E316_needs_a_known_point_type_and_says_which():
     """Declared on every restricted command since day one, enforced now.
 
@@ -703,6 +729,31 @@ def test_E316_needs_a_known_point_type_and_says_which():
     assert run({}) == []
     # A type this spec does not know is left alone rather than guessed at.
     assert run({"SF1": "LXYZ"}) == []
+
+
+def test_the_OIP_sequence_limit_is_sixty():
+    """Sixty, not eighty. Three sources say sixty and none says anything else.
+
+    125-1896 Rev. 5 Chapter 4, the Program Editor's Statement Arguments page
+    and a third-party syntax reference all use the same sentence: "The
+    sequence must not exceed 60 characters (including slashes) in length."
+    An earlier 80 here was this project confusing it with the MMI line length.
+
+    It matters because OIP validates its sequence when the trigger fires, not
+    when the line is entered -- an over-long sequence shows as FAILED on the
+    panel and nowhere else.
+    """
+    from ppcl import linter, parser, spec
+
+    assert spec.OIP_SEQUENCE_MAX == 60
+
+    def run(seq):
+        text = "10\tOIP(TRIG," + chr(34) + seq + chr(34) + ")\n20\tGOTO 10\n"
+        return [d for d in linter.lint(parser.parse(text)) if d.code == "E122"]
+
+    assert run("P/T/D/H/" * 9) != []          # 72
+    assert run("P/T/D/H/" * 7) == []          # 56, the longest seen in real code
+    assert "60" in run("P/T/D/H/" * 9)[0].message
 
 
 def test_a_firmware_only_statement_is_W121_not_E110():
