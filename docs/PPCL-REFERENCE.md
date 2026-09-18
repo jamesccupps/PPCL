@@ -494,13 +494,34 @@ They then part company:
 | `LESS` | bare cell, between `LE` and `LINK` | **absent** — `LE` to `LINK` | no enumerated list |
 
 So `EQUAL` is confirmed twice and `LESS` once, with nothing contradicting
-either. This toolkit reserves both. Over-reserving costs a `W107` on a point
+either.
+
+That they are *names* and not operators is corpus-checked, not argued. Parsing
+Siemens' 84-program shipped library finds 20 occurrences of the two words and
+**all 20 are on `Comment` statements** — zero in executable code. The reference
+site's own programs contain neither word at all. This toolkit reserves both. Over-reserving costs a `W107` on a point
 name nobody chose; under-reserving means never flagging a name a panel may
 refuse. Comparing the two enumerated lists word for word in both directions
 found `LESS` to be their **only** difference that is not a page-layout
 artifact — every other entry of either list was already reserved here.
 
-**Operand limit: 13 or 16.** 125-1896 Rev. 5 states an `IF` may test a maximum
+**`NODE0` or `NODE1` — where the node range starts. Settled 2026-09-18.**
+The Program Editor's reserved-word page prints `NODE1 through NODE99`. The
+dedicated node-points page **in the same book** states the range in prose —
+"acceptable node numbers for the NODE resident point range from 0 through 99",
+and again "between 0 and 99" — and carries `NODE0` in its own title. So do
+that book's glossary, the PPCL Debugger help, and Desigo CC's engineering
+help.
+
+Four sources say zero, one says one, and the one is contradicted by its own
+book. Node 0 is a real drop address on an RS-485 BLN besides. `RESERVED_WORDS`
+generates `NODE0`–`NODE99`, one hundred names, and a test says why.
+
+This is the second defect found in that single table — it is also the only
+place `LESS` appears. A page can be the sole source for one fact and wrong
+about another; neither observation settles the other.
+
+ 125-1896 Rev. 5 states an `IF` may test a maximum
 of **13 operands**. The Desigo CC PPCL Editor documentation states **16
 operands and 32 operators** per statement. Both are published; neither
 retracts the other. Since the Desigo editor is the compiler a modern PXC
@@ -603,10 +624,21 @@ Questions this toolkit does not answer, each with the test that would settle it:
     lexer reads it as `AHU1 .ROOT. SP`. If a panel absorbs it into the name
     instead, a program using such a name analyses wrongly here. *Test:* define
     a point whose name carries a dotted-operator segment, reference it without
-    quotes in a loaded program, and see whether the line resolves. Not urgent:
-    no corpus examined here contains one — the keyword-bearing segments that do
-    occur are functions and status words, none of them dotted operators. Until
-    it is settled, quote the name.
+    quotes in a loaded program, and see whether the line resolves.
+
+    *Measured 2026-09-18.* A P2 wire corpus enumerated **3,025 distinct point
+    names** across 960,469 occurrences: **none** contains a dotted-operator
+    segment. The reserved words that do appear as dotted name segments —
+    `MIN`, `ALARM`, `OFF` — are not dotted operators, so a tokenizer splitting
+    on them leaves those names alone. One name carries `ROOT`, and `.ROOT.`
+    *is* an operator; it survives only because `ROOT` is that name's **last**
+    segment, so the trailing dot never appears. A name one component longer
+    would be the ambiguous case.
+
+    That is a negative from one site, not a proof, and the margin is a single
+    naming decision. So it stays a documented hazard with a stated fix —
+    **quote any name with a dotted-operator segment** — rather than a lint
+    rule, which would fire zero times on every corpus anyone has.
 
 **Nothing here has been validated against a live panel** — no statement's
 *behaviour* has been observed executing. Everything is transcribed from the

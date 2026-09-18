@@ -80,7 +80,7 @@ runs on any engineering workstation with no install. Windows is the primary
 platform.
 
 ```bash
-python -m pytest tests -q          # 479 tests, ~150s
+python -m pytest tests -q          # 480 tests, ~150s
 python -m ppcl.cli serve           # the app
 python -m ppcl.cli lint samples    # exercises the CLI on real programs
 python -m ppcl.cli help            # the built-in documentation
@@ -90,7 +90,7 @@ python -m ppcl.cli help            # the built-in documentation
 
 ## 2. Current state
 
-**479 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
+**480 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
 tests. 80 lint rules, 66 commands, 99 BACnet properties, 30 block types,
 17 CLI subcommands, 11 MCP tools, 12 help pages, 20 settings, 6 firmware
 families, 29 panel error codes.
@@ -237,6 +237,7 @@ copyrighted MEC100K listing in Appendix C).
 | `LOCAL`'s sixteen | **Per statement, not per program.** The compiler chunks declarations rather than refusing |
 | Adaptive control on PXC.A | **Gone.** Inferred from a table's whitespace for four passes, then stated in words on the removed-statements page |
 | Comment length | Counts the **comment text**, not the line number or the `C` |
+| `NODE0` or `NODE1` — where the node range starts | **Zero.** The Program Editor's reserved-word page says `NODE1`; the dedicated page in the same book says "from 0 through 99" in prose and has `NODE0` in its title, as do that book's glossary, the Debugger help and Desigo CC. Four to one, and the one is contradicted by its own book. Second defect found in that one table |
 | `EQUAL` / `LESS`: reserved words, or a misread description column? | **Both reserved.** Neither has an operator syntax, but both hold bare alphabetical cells in the Program Editor's enumerated list, which contains no description column at all. `EQUAL` is in 125-1896 Ch. 5 as well; `LESS` is not, and adding it closed the only real gap either published list had against `RESERVED_WORDS` |
 
 ### The single most valuable line found

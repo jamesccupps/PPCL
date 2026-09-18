@@ -1968,3 +1968,95 @@ a client that resolves it as a resident point will read those statements wrong.
 2. `W330` fires 340 times on the Siemens library. Still unexamined.
 3. Handle the `UNKNOWN (...)` marker in the lexer.
 4. A rule for the `SET`-without-deadband idiom on PXC.A.
+
+---
+
+## 2026-09-18 (sixteenth pass) — the cross-check comes back
+
+The wire-capture project found the same reserved-word page independently, in a
+file it had held since its own CHM extraction and never read. Its parse of that
+page agrees with the transcription here down to the neighbouring cells, and it
+counted the thing that makes the shape argument mechanical rather than a matter
+of judgement: **224 cells, zero of them containing a space.** A bare enumeration
+has no cell with prose in it. That number is now the test, both directions —
+reading a description column as tokens invents words, and assuming a column is a
+description deletes real ones.
+
+Three things came back worth acting on.
+
+### `EQUAL` and `LESS` are names, and that is now measured
+
+Both earlier framings, theirs and the one implied here, filed them under
+comparison operators. Neither source supports that. Parsing Siemens' 84-program
+shipped library for both words:
+
+| Corpus | on `Comment` statements | in executable code |
+|---|---|---|
+| Siemens' 84-program library | **20** | **0** |
+| The reference site, 42 Desigo exports | 0 | 0 |
+| The reference site, 22 older programs | 0 | 0 |
+
+Every occurrence anywhere is comment prose — "`C … SETS OAL NUMBER EQUAL TO THE
+NAL NUMBER`", "`C … IF THE LOAD RATIO IS LESS THAN 0.30`". They are reserved
+**names with no documented syntax**, which is a claim both projects' sources
+support and neither of the earlier framings did.
+
+### `NODE0`, and a second defect in the same table
+
+The cross-check flagged a range endpoint, which a word-for-word diff of entries
+cannot surface: their Desigo-era source says `NODE0 through NODE99`, the
+Program Editor's reserved-word page says `NODE1 through NODE99`.
+
+It is not an edition difference. It is **internal to one book**:
+
+| Source | Says |
+|---|---|
+| Program Editor reserved-word page | `NODE1 through NODE99` |
+| Program Editor **dedicated node-points page** | `NODE0 through NODE99`, in the title, and in prose twice — "range from 0 through 99", "between 0 and 99" |
+| Program Editor glossary | `NODE0 through NODE99` |
+| PPCL Debugger help | `NODE0 through NODE99` |
+| Desigo CC engineering help | `NODE0 through NODE99` |
+
+Four to one, and the one is contradicted by a dedicated page in its own book.
+`RESERVED_WORDS` already generated `NODE0`–`NODE99` and was right; it now has a
+test saying why, because this is exactly the kind of thing a later reader
+"corrects" from the reserved-word list.
+
+Worth naming the pattern: that single table is now the sole source for `LESS`
+**and** wrong about `NODE`. A page can be uniquely right about one fact and
+wrong about another. Neither observation licenses a verdict on the other.
+
+### Open question 10, measured
+
+The cross-check answered it without needing PPCL at all — point names are on
+the wire independently of any program referencing them. **3,025 distinct names,
+960,469 occurrences, zero containing a dotted-operator segment.**
+
+The near misses are the finding. Reserved words do appear as dotted name
+segments — `MIN`, `ALARM`, `OFF` — but none of those is a dotted *operator*, so
+splitting on `DOTTED_OPS` leaves them alone, which is what the tests added last
+pass assert. One name carries `ROOT`, and `.ROOT.` **is** an operator; it
+survives only because `ROOT` is that name's last segment, so the trailing dot
+never appears. A name one component longer is the ambiguous case.
+
+So: a negative from one site rather than a proof, with a margin of one naming
+decision. It stays a documented hazard with a stated fix — quote the name —
+rather than a lint rule that would fire zero times on every corpus anyone has.
+
+### Their correction to the resident-points list, accepted back
+
+The classification sent over held, and their recount strengthened it: their
+"observed here" figures had come from a word-boundary match, and in a
+word-boundary match a dot is a boundary — so a word appearing as a dotted
+segment of a point *name* counted as a reference to the resident *value*. The
+same trap this project hit in the lexer, met in a counting script. Recounted by
+syntactic position, `LOW` fell from 28 to 4, all four inside quoted names, and
+`ALMCNT`'s eight were comment prose. Four of the twelve are neither resident
+points nor observed as values.
+
+### Still to do
+
+1. **Decide `W104`.** Unchanged, and still the user's call.
+2. `W330` fires 340 times on the Siemens library. Still unexamined.
+3. Handle the `UNKNOWN (...)` marker in the lexer.
+4. A rule for the `SET`-without-deadband idiom on PXC.A.

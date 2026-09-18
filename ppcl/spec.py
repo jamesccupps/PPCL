@@ -286,6 +286,15 @@ RESIDENT_POINTS = {
 }
 
 #: NODE0..NODE99 and SECND1..SECND7 are generated ranges.
+#:
+#: The NODE range starts at **zero**, and one Siemens table says otherwise.
+#: The Program Editor's reserved-word page prints "NODE1 through NODE99" --
+#: but the dedicated page in the same book states it in prose, "acceptable
+#: node numbers for the NODE resident point range from 0 through 99", says it
+#: again as "between 0 and 99", and carries NODE0 in its own title. The same
+#: book's glossary, the PPCL Debugger help and Desigo CC all say NODE0. Four
+#: sources to one, and the one is contradicted by its own book. Node 0 is
+#: also a real drop address on an RS-485 BLN, so the typo is in the table.
 RESIDENT_RANGES = [("NODE", 0, 99), ("SECND", 1, 7)]
 
 #: Point status indicators usable in comparisons.
@@ -2137,6 +2146,12 @@ def _build_reserved() -> frozenset:
     # ships no enumerated list at all. One Siemens source reserves it and
     # none contradicts, so it is reserved -- over-reserving costs a W107 on
     # a point name nobody chose, under-reserving misses one a panel refuses.
+    #
+    # That they are names and not operators is now corpus-checked rather
+    # than argued. Parsing Siemens' 84-program shipped library finds 20
+    # occurrences of the two words, and all 20 are on Comment statements --
+    # zero in executable code. The reference site's programs have none at
+    # all. No manual anywhere shows a statement using either.
     words |= {"EQUAL", "LESS", "NOR", "AND", "OR", "NOT"}
     for i in range(1, LOCAL_ARG_COUNT + 1):
         words |= {"$ARG%d" % i, "ARG%d" % i}

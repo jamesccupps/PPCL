@@ -673,6 +673,23 @@ def test_the_word_form_comparisons_are_reserved():
     assert ".LESS." not in spec.DOTTED_OPS
 
 
+def test_the_node_resident_points_start_at_zero():
+    """NODE0 is real, and one Siemens table says the range starts at 1.
+
+    The Program Editor's reserved-word page prints "NODE1 through NODE99".
+    The dedicated page in the same book states the range in prose -- from 0
+    through 99, twice -- and carries NODE0 in its title; so do that book's
+    glossary, the PPCL Debugger help and Desigo CC. Four to one, and the one
+    is contradicted by its own book. Node 0 is a real drop address besides.
+    """
+    from ppcl import spec
+
+    assert "NODE0" in spec.RESERVED_WORDS
+    assert "NODE99" in spec.RESERVED_WORDS
+    assert "NODE100" not in spec.RESERVED_WORDS
+    assert spec.is_resident("NODE0")
+
+
 def test_point_database_carries_slope_and_intercept():
     """Needed for panel error E12, and useful on its own.
 
