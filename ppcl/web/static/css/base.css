@@ -4,6 +4,14 @@
  * a data-theme attribute on the root so the choice survives a reload.
  */
 
+/* The UI hides things with the `hidden` attribute, which the user-agent
+ * stylesheet implements as `display: none`. Any author rule that sets a
+ * display beats it, because author styles outrank the UA sheet -- so
+ * `.modal { display: flex }` made a hidden modal render anyway. Stating it
+ * once here means an element can be given a layout display without that
+ * silently defeating `hidden`. */
+[hidden] { display: none !important; }
+
 :root {
   --bg: #12151a;
   --panel: #1a1f27;
