@@ -1987,6 +1987,64 @@ _add(
     )
 )
 
+# --------------------------------------------------------------------------
+# Statements removed from the language on PXC.A
+# --------------------------------------------------------------------------
+
+#: Transcribed from A6V10374898, "Obsolete PPCL Statements Removed from the
+#: Language": "The following statements are not supported in PXC.A devices.
+#: The PXC.A PPCL runtime will consider these statements to be invalid, and no
+#: replacements are provided."
+#:
+#: Applied below rather than written into each Command, so the list reads as
+#: one table against one source -- which is how the manual presents it, and
+#: how anyone checking it will want to compare.
+PXC_A_REMOVED = {
+    "ADAPTM": "The ADAPT application is not supported in PXC.A devices.",
+    "ADAPTS": "The ADAPT application is not supported in PXC.A devices.",
+    "DISCOV": "Programmatic COV enable/disable is not supported in PXC.A "
+              "devices.",
+    "ENCOV": "Programmatic COV enable/disable is not supported in PXC.A "
+             "devices.",
+    "DPHONE": "Dialup modems are not supported in PXC.A devices.",
+    "EPHONE": "Dialup modems are not supported in PXC.A devices.",
+    "ALARM": "Commanding into and out of alarm state is not supported in "
+             "PXC.A devices.",
+    "NORMAL": "Commanding into and out of alarm state is not supported in "
+              "PXC.A devices.",
+    "OIP": "The PRMMI, along with its menu prompt tree, is not supported in "
+           "PXC.A devices. Siemens says a limited alternative may be provided "
+           "in a future release.",
+    "ONPWRT": "PXC.A devices do not have warmstart functionality, therefore a "
+              "PPCL program will ALWAYS start at the first line after a power "
+              "failure.",
+}
+
+
+def _apply_pxc_a_removals() -> None:
+    """Drop PXC_A from every command the PXC.A runtime rejects.
+
+    ``ONPWRT`` is the one with a consequence beyond the statement itself: with
+    no warmstart, a PXC.A program always resumes at line 1 after a power
+    failure, so there is nothing for ONPWRT to do and no way to do it.
+    """
+    import dataclasses
+
+    for name, reason in PXC_A_REMOVED.items():
+        cmd = ALL.get(name)
+        if cmd is None:
+            raise AssertionError("PXC_A_REMOVED names %s, which is not a "
+                                 "command" % name)
+        families = frozenset(f for f in cmd.firmware if f is not Firmware.PXC_A)
+        notes = cmd.notes
+        if not any("PXC.A" in n for n in notes):
+            notes = notes + ("REMOVED ON PXC.A. " + reason,)
+        ALL[name] = dataclasses.replace(cmd, firmware=families, notes=notes)
+
+
+_apply_pxc_a_removals()
+
+
 #: PARAMETER is handled separately: it is an assignment-style directive that
 #: does not require a line number and is resolved at compile time.
 PARAMETER_KEYWORD = "PARAMETER"

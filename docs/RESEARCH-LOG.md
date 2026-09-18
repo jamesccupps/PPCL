@@ -540,6 +540,11 @@ APOGEE, and appears blank under BACnet and PXC.A — where `SSTO` and `DC` show
 bullets in all five. That reading rests on whitespace in a rendered table and
 could easily be wrong, so it is recorded as a question rather than a fact.
 
+> **CLOSED in the eleventh pass**, and the whitespace reading was right.
+> A6V10374898 has a page called "Obsolete PPCL Statements Removed from the
+> Language" that says it in words: "The ADAPT application is not supported in
+> PXC.A devices." It also names eight more statements. See that entry.
+
 It was thought to matter for the reference site; see the seventh pass, where that turned out to be wrong -- the site runs APOGEE BACnet ALN panels, not PXC.A. *Test:* try to compile an `ADAPTS`
 statement against a PXC.A in the Desigo CC PPCL Editor and see whether the
 compiler takes it.
@@ -1443,5 +1448,107 @@ are for the toolkit's completeness, not for that site.
 1. Read `A6V13998441` and `A6V12954388`.
 2. Lint the 84-program Siemens application library as a regression corpus.
    Licensing check first; none of it gets copied into `samples/`.
+3. The `E12` rule, once a point export with slope and intercept exists.
+4. A real `PPCL DISPLAY REPORT` to run `lint --report` against.
+
+---
+
+## 2026-09-18 (eleventh pass) — PXC.A drops ten statements, not one
+
+### How it was found, because the method is the transferable part
+
+The two remaining unread PDFs, `A6V13998441` (PXC.A Modernization, 2026-04-07 —
+the newest Siemens document on this machine) and `A6V12954388` (PXC.A
+Reference), are workflow documents. Both point at A6V10374898 for the language.
+Four and fourteen PPCL mentions respectively; neither is worth a full read.
+
+But one sentence in the modernization manual was a signpost:
+
+> "Any PPCL statements that are no longer supported in the PXC.A must be
+> re-programmed or removed. Unsupported PPCL statements must be commented out
+> using standard PPCL Comment syntax. **See Obsolete PPCL Statements Removed
+> from the Language** in the PXC.A PPCL User Guide (125-1896)."
+
+A named section, in a guide already mined four times, that had never been
+opened. Four passes over A6V10374898 found `OIP` from its own command page and
+inferred the rest from whitespace in an applicability table. The page that
+states it outright was one link away from Chapter 1 the whole time.
+
+**Lesson worth keeping: a document that cross-references another document is
+telling you what to read next.** Mine the pointers, not just the prose.
+
+### The list
+
+> "The following statements are not supported in PXC.A devices. The PXC.A PPCL
+> runtime will consider these statements to be invalid, and no replacements are
+> provided."
+
+| Statement | Siemens' reason |
+|---|---|
+| `ADAPTM`, `ADAPTS` | The ADAPT application is not supported in PXC.A devices. |
+| `DISCOV`, `ENCOV` | Programmatic COV enable/disable is not supported. |
+| `DPHONE`, `EPHONE` | Dialup modems are not supported. |
+| `ALARM`, `NORMAL` | Commanding into and out of alarm state is not supported. |
+| `OIP` | The PRMMI and its menu prompt tree are not supported. A limited alternative "may be provided in a future product release". |
+| **`ONPWRT`** | **PXC.A devices do not have warmstart functionality, therefore a PPCL program will always start at the first line after a power failure.** |
+
+**Ten, where `spec.py` had one.**
+
+### `ONPWRT` is the one that changes the execution model
+
+The others remove a capability. This one removes a capability *and* changes how
+every PXC.A program behaves on power return: there is no warmstart, so
+execution always resumes at line 1. On older firmware `ONPWRT` exists precisely
+because that is not guaranteed.
+
+Which means, on a PXC.A:
+
+- `ONPWRT` is invalid, so `W220` and `W221` (its placement, and more than one
+  of it) have nothing to act on;
+- the "resume at the first line" behaviour the reference doc describes as a
+  *consequence of good practice* is instead **the only behaviour**;
+- a program that relied on warmstart to skip re-initialisation will now
+  re-initialise every time.
+
+### Closed: adaptive control on PXC.A
+
+Recorded as an open question since the third pass, with the honest caveat that
+it rested on whitespace in a rendered table. The whitespace reading was right,
+and now there is a sentence for it. `ADAPTM` and `ADAPTS` are gone.
+
+### What changed in the toolkit
+
+`spec.PXC_A_REMOVED` holds all ten with Siemens' reason for each, applied by
+`_apply_pxc_a_removals()` after the command table is built. Deliberately one
+table against one source, rather than ten scattered `firmware=` arguments,
+because that is how the manual presents it and how anyone checking it will want
+to compare.
+
+`E119` now carries the reason rather than only the refusal. "ONPWRT is not
+available on pxc_a firmware" is true and useless; "PXC.A devices do not have
+warmstart functionality, therefore a PPCL program will always start at the
+first line after a power failure" is what changes your next move. Its
+suggestion also records what Siemens' own conversion tool does — comments the
+statement out rather than translating it, because there is nothing to translate
+it to.
+
+### Also noted
+
+- `A6V12954388` references a **PXC.A Web Interface User Guide (A6V12893115)**,
+  which is not on this machine. That is where the onboard editor -- the one
+  that replaces the Desigo PPCL Editor on PXC.A -- would be documented.
+- From the modernization manual: converting MBC/MEC to PXC Compact or PXCM
+  carries over Points, Alarms, PPCL, Trends, Schedules, Equipment, Calendar and
+  FLN Devices. **Enhanced Alarms are converted to Standard Alarms**, and
+  Schedules and Calendars must be recreated in Desigo CC.
+- "Modbus analog points with negative slopes will not convert correctly unless
+  PV1 and PV2 are manually swapped" — a second sighting of negative slopes as a
+  hazard, alongside panel error `E12`.
+
+### Still to do
+
+1. **A6V12893115**, the PXC.A Web Interface User Guide — not on this machine,
+   and the documentation for the editor PXC.A sites actually use.
+2. Lint the 84-program Siemens application library as a regression corpus.
 3. The `E12` rule, once a point export with slope and intercept exists.
 4. A real `PPCL DISPLAY REPORT` to run `lint --report` against.

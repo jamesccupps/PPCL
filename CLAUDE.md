@@ -89,8 +89,10 @@ so it runs on any engineering workstation without a package install.
 - **The MCP server never exposes a file-writing endpoint.** `/api/save`,
   `/api/open` and `/api/files` are deliberately absent from `TOOLS`; an agent
   analyses and generates, the person decides what is written. There is a test.
-- **Firmware is not cosmetic.** `pxc_a` allows 512-character lines, rejects
-  `OIP` outright, and treats a backward `GOTO` as the end of the program cycle.
+- **Firmware is not cosmetic.** `pxc_a` allows 512-character lines, treats a
+  backward `GOTO` as the end of the program cycle, and rejects the ten
+  statements in `spec.PXC_A_REMOVED` -- including `ONPWRT`, because it has no
+  warmstart at all.
   Any new `Firmware` member must be added to `MMI_LINE_LIMIT`,
   `MMI_CONTINUATION_LIMIT` and `MAX_OPERANDS` or the rules raise `KeyError` at
   lint time -- there is a test that walks every member.
@@ -115,7 +117,7 @@ on idiomatic PPCL gets turned off.
 ## Testing
 
 ```bash
-python -m pytest tests -q          # 457 tests
+python -m pytest tests -q          # 460 tests
 python -m ppcl.cli lint samples    # exercises the CLI against real programs
 ```
 

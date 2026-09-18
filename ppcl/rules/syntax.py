@@ -696,17 +696,32 @@ def command_not_on_firmware(ctx):
                 % (stmt.name, ctx.firmware.value),
                 ln.number,
                 source_line=ln.source_line,
-                detail="This command exists on %s. Selecting the wrong "
-                "firmware in Settings is the other explanation, so check that "
-                "first." % available,
+                detail=_why_unavailable(stmt.name, ctx.firmware, available),
                 suggestion=(
-                    "The PXC.A runtime rejects OIP and Siemens offers no "
-                    "replacement. Whatever it was doing -- a report, a "
-                    "priority change, an auto-dial -- has to move to the "
-                    "supervisor."
-                    if stmt.name == "OIP"
+                    "Re-program it or remove it. Siemens' own conversion tool "
+                    "comments these out rather than translating them, because "
+                    "no replacement exists."
+                    if (ctx.firmware is spec.Firmware.PXC_A
+                        and stmt.name in spec.PXC_A_REMOVED)
                     else "Use a command the target panel supports, or change "
                     "the firmware setting if the target is older."
                 ),
-                manual="A6V10374898 PXC.A PPCL User Guide, %s" % stmt.name,
+                manual="A6V10374898 PXC.A PPCL User Guide, Obsolete PPCL "
+                       "Statements Removed from the Language"
+                       if stmt.name in spec.PXC_A_REMOVED
+                       else "A6V10374898 PXC.A PPCL User Guide, %s" % stmt.name,
             )
+
+
+def _why_unavailable(name, firmware, available):
+    """Siemens' own reason, where the manual gives one."""
+    base = ("This command exists on %s. Selecting the wrong firmware in "
+            "Settings is the other explanation, so check that first."
+            % available)
+    if firmware is not spec.Firmware.PXC_A:
+        return base
+    reason = spec.PXC_A_REMOVED.get(name)
+    if not reason:
+        return base
+    return ("%s The PXC.A runtime treats the statement as invalid and no "
+            "replacement is provided. %s" % (reason, base))

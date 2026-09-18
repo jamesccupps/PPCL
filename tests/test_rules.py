@@ -839,3 +839,58 @@ def test_linting_works_on_every_firmware():
     text = '10\tLOCAL("F")\n20\tIF(MAT.LT.38.0) THEN "$F" = 1.0\n30\tGOTO 20\n'
     for firmware in spec.Firmware:
         codes(text, firmware=firmware)
+
+
+def test_every_statement_pxc_a_removed_is_rejected_there():
+    """Ten statements, one table, from A6V10374898.
+
+    Was one (OIP) until the manual's "Obsolete PPCL Statements Removed from
+    the Language" page was found. It also settles a question that sat open for
+    four research passes: ADAPTM and ADAPTS really are gone on PXC.A.
+    """
+    from ppcl import spec
+
+    for name in spec.PXC_A_REMOVED:
+        cmd = spec.ALL[name]
+        assert spec.Firmware.PXC_A not in cmd.firmware, name
+        assert spec.Firmware.APOGEE in cmd.firmware, name
+        assert any("PXC.A" in note for note in cmd.notes), name
+
+
+def test_removed_statements_fire_E119_on_pxc_a_and_not_on_apogee():
+    from ppcl import spec
+
+    src = (
+        "00010\tONPWRT(100)\n"
+        "00020\tALARM(PT)\n"
+        "00030\tNORMAL(PT)\n"
+        "00040\tEPHONE(1)\n"
+        "00050\tDPHONE(1)\n"
+        "00060\tENCOV(PT)\n"
+        "00070\tDISCOV(PT)\n"
+        "00100\tON(FAN)\n"
+        "00110\tGOTO 100\n"
+    )
+    prog = parser.parse(src, name="t")
+    on_pxc = [d for d in linter.lint(prog, firmware=spec.Firmware.PXC_A)
+              if d.code == "E119"]
+    assert len(on_pxc) == 7
+    assert not [d for d in linter.lint(prog, firmware=spec.Firmware.APOGEE)
+                if d.code == "E119"]
+
+
+def test_the_finding_carries_siemens_reason_not_just_the_refusal():
+    """"ONPWRT is unavailable" is true and useless.
+
+    Why it is unavailable is the part that changes what you do: there is no
+    warmstart, so the program always resumes at line 1 regardless.
+    """
+    from ppcl import spec
+
+    prog = parser.parse("00010\tONPWRT(100)\n00020\tON(F)\n00030\tGOTO 20\n",
+                        name="t")
+    d = next(x for x in linter.lint(prog, firmware=spec.Firmware.PXC_A)
+             if x.code == "E119")
+    assert "warmstart" in d.detail
+    assert "first line after a power failure" in d.detail
+    assert "Obsolete PPCL Statements" in d.manual

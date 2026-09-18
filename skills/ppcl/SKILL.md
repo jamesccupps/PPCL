@@ -48,8 +48,12 @@ Without the plugin, everything below is the same functionality through
 APOGEE:
 
 - line limit **512** characters, against 66 on APOGEE
-- **`OIP` is rejected outright** — the runtime treats it as invalid and Siemens
-  offers no replacement
+- **Ten statements were removed from the language** and the runtime treats
+  them as invalid, with no replacements: `ADAPTM`, `ADAPTS`, `DISCOV`, `ENCOV`,
+  `DPHONE`, `EPHONE`, `ALARM`, `NORMAL`, `OIP`, `ONPWRT`
+- **No warmstart.** That is why `ONPWRT` is gone: a PXC.A program *always*
+  resumes at its first line after a power failure, so there is nothing for it
+  to do
 - `GETVAL` and `SETVAL` exist for BACnet property access, and `LSQ2`/`LSQDAT`
   do not appear in its manual
 - a backward `GOTO` marks the **end of the program cycle** and restarts the
