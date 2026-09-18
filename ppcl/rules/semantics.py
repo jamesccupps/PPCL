@@ -829,6 +829,60 @@ def _numeric_literal(node):
     return None
 
 
+#: Still supported on PXC.A, and Siemens advises against them there.
+LINE_STATE_COMMANDS = ("ACT", "DEACT", "ENABLE", "DISABL")
+
+
+@rule("W344", "Line enable/disable statement costs resources on PXC.A",
+      Severity.INFO)
+def line_state_commands_on_pxc_a(ctx):
+    """Supported, and discouraged, which is a third category.
+
+    "These statements are still supported in PXC.A controllers, but it is
+    advised to use the new statements Goto(), Gosub(), or Return() to go
+    around the logic instead of disabling and enabling lines in new programs
+    for PXC.A controllers. Uncommenting (enabling) and commenting out
+    (disabling) statements that use ACT, DEACT, ENABL, and DISABL cause the
+    device to use more system resources." -- Desigo PXC.A Web Interface User
+    Guide (A6V12893115), Commenting Out and Uncommenting Lines of Code.
+
+    Deliberately NOT in ``spec.PXC_A_REMOVED``: these still run, and treating
+    them as removed would reject working programs. ``E119`` is for a statement
+    the runtime rejects; this is for one it accepts and charges for.
+
+    INFO, and only on ``pxc_a``. An existing program converted from an older
+    panel will be full of them and that is not a defect -- the guidance is
+    about what to write next, in Siemens' own words, "in new programs".
+    """
+    if ctx.firmware is not spec.Firmware.PXC_A:
+        return
+    seen = set()
+    for ln, call in [(ln, st) for ln in ctx.program.lines
+                     for st in substatements(ln.stmt)
+                     if isinstance(st, CommandCall)
+                     and st.name in LINE_STATE_COMMANDS]:
+        if (ln.number, call.name) in seen:
+            continue
+        seen.add((ln.number, call.name))
+        yield _d(
+            "W344",
+            Severity.INFO,
+            "%s still works on PXC.A but costs the device more system "
+            "resources than branching around the logic" % call.name,
+            ln.number,
+            detail="Siemens advises GOTO, GOSUB or RETURN to skip logic in "
+            "new PXC.A programs rather than enabling and disabling lines. "
+            "Going around the logic and switching a line's state have the "
+            "same effect on what runs; only one of them costs resources. An "
+            "existing program converted from an older panel will be full of "
+            "these and that is not a defect.",
+            manual="A6V12893115, Commenting Out and Uncommenting Lines of Code",
+            suggestion="In new code, branch past the block with GOTO or "
+            "GOSUB. To take a line out at the editor, PXC.A has its own "
+            "syntax: # and a space at the front of the line.",
+        )
+
+
 @rule("W343", "SET re-commands the same point every pass on PXC.A",
       Severity.INFO)
 def unguarded_set_on_pxc_a(ctx):

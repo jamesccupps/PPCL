@@ -18,7 +18,7 @@ so it runs on any engineering workstation without a package install.
 | `ppcl/parser.py` | Error-tolerant recursive descent. A bad line becomes `Unparsed`, never aborts the file. |
 | `ppcl/ast_nodes.py` | Flat AST — PPCL has no block structure. |
 | `ppcl/analyzer.py` | Control flow (incl. the wrap edge and Tarjan SCC for steady state) and point read/write tracking. |
-| `ppcl/linter.py` + `ppcl/rules/` | 87 rules across syntax, flow, semantics, style, performance. |
+| `ppcl/linter.py` + `ppcl/rules/` | 88 rules across syntax, flow, semantics, style, performance. |
 | `ppcl/formatter.py` | Format and renumber with exact reference rewriting. |
 | `ppcl/simulator.py` | Interpreter with real priority arbitration. |
 | `ppcl/generator.py` | `Builder` (symbolic labels) plus fixed program templates. |
@@ -125,7 +125,7 @@ on idiomatic PPCL gets turned off.
 ## Testing
 
 ```bash
-python -m pytest tests -q          # 495 tests
+python -m pytest tests -q          # 498 tests
 python -m ppcl.cli lint samples    # exercises the CLI against real programs
 ```
 

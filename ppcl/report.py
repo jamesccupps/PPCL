@@ -65,6 +65,14 @@ class LineState:
     unresolved: bool = False
     failed: bool = False
     loop_tested: bool = False
+    #: False when the state column carried neither ``E`` nor ``D``. The panel
+    #: always prints one: "Either an E or a D will always be displayed" --
+    #: Insight MMI Database Transfer help, UC PPCL Window. So a row without
+    #: one is damaged input, and ``enabled`` below is this module's default
+    #: rather than anything the panel said. Reported as R705, because the
+    #: whole point of reading a report is to learn which lines are disabled
+    #: and silently answering "enabled" is the wrong way to be wrong.
+    state_known: bool = True
     #: The raw state characters, kept so an unrecognised flag is not lost.
     raw: str = ""
 
@@ -146,6 +154,8 @@ def _apply_state(state: str, st: LineState) -> None:
         st.enabled = False
     elif "E" in letters:
         st.enabled = True
+    else:
+        st.state_known = False
     st.traced = "T" in letters
     st.unresolved = "U" in letters
     st.failed = "F" in letters
@@ -283,6 +293,20 @@ def diagnostics(report: PanelReport, program=None):
             "running.",
             manual="BACnet ALN Field Panel User's Manual 125-3020, PPCL "
                    "Status Indicator Descriptions")
+
+    for number, st in sorted(report.states.items()):
+        if st.state_known:
+            continue
+        add("R705", Severity.WARNING, number,
+            "the report row for this line carries neither E nor D",
+            detail="The panel always prints one -- \"Either an E or a D will "
+            "always be displayed\" -- so this row did not survive whatever "
+            "copied it here intact. The line is being treated as enabled "
+            "because that is this tool's default, not because the panel said "
+            "so. Anything derived from it about disabled lines is unsound.",
+            manual="Insight MMI Database Transfer help, UC PPCL Window",
+            suggestion="Re-capture the report. A column lost to text wrapping "
+            "or a trimmed leading space is the usual cause.")
 
     for number in sorted(report.never_executed):
         add("R703", Severity.WARNING, number,

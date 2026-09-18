@@ -731,6 +731,38 @@ def test_E316_needs_a_known_point_type_and_says_which():
     assert run({"SF1": "LXYZ"}) == []
 
 
+def test_line_state_commands_are_supported_and_discouraged_on_pxc_a():
+    """A third category: not removed, not fine. E119 is for removed.
+
+    "These statements are still supported in PXC.A controllers, but it is
+    advised to use the new statements Goto(), Gosub(), or Return() ...
+    ACT, DEACT, ENABL, and DISABL cause the device to use more system
+    resources." -- A6V12893115.
+    """
+    from ppcl import linter, parser, spec
+
+    prog = parser.parse(
+        "10\tIF(A.GT.1.0) THEN DEACT(100,110)\n20\tACT(200)\n30\tGOTO 10\n"
+    )
+
+    def run(fw, code):
+        return [d for d in linter.lint(prog, firmware=fw) if d.code == code]
+
+    hits = run(spec.Firmware.PXC_A, "W344")
+    assert len(hits) == 2
+    assert {"ACT", "DEACT"} == {h.message.split()[0] for h in hits}
+    assert all(h.severity is linter.Severity.INFO for h in hits)
+
+    # Older generations carry no such guidance, so neither does the rule.
+    assert run(spec.Firmware.APOGEE, "W344") == []
+
+    # And they are NOT removed: E119 must stay quiet, or a working program
+    # would be rejected.
+    assert run(spec.Firmware.PXC_A, "E119") == []
+    for name in ("ACT", "DEACT", "ENABLE", "DISABL"):
+        assert name not in spec.PXC_A_REMOVED, name
+
+
 def test_an_UNKNOWN_marker_is_a_line_the_panel_ignores():
     """The compiler writes this, and it is the only defect that reads as fine.
 

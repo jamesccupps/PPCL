@@ -123,3 +123,63 @@ def test_analysis_over_a_report_skips_the_disabled_line():
     executable = {l.number for l in prog.lines if l.is_executable}
     assert 200 not in executable
     assert a.reachable  # still analysable
+
+def test_a_row_with_neither_E_nor_D_is_reported_not_assumed():
+    """"Either an E or a D will always be displayed."
+
+    -- Insight MMI Database Transfer help, UC PPCL Window. So a row carrying
+    neither did not survive being copied here, and the enabled flag is this
+    module's default rather than anything the panel said. Answering "enabled"
+    silently is the wrong way to be wrong: the entire reason to read a report
+    is to learn which lines the panel is not evaluating.
+    """
+    from ppcl import report
+
+    text = (
+        "PPCL program <TEST>\n"
+        "State  Line   Statement\n"
+        "-----  -----  ---------\n"
+        "E      00010  ON(FAN)\n"
+        "D T    00020  OFF(FAN)\n"
+        "  TU   00030  ON(PUMP)\n"
+        "End of report\n"
+    )
+    r = report.parse(text)
+
+    assert r.states[10].state_known and r.states[10].enabled
+    assert r.states[20].state_known and not r.states[20].enabled
+    assert not r.states[30].state_known
+
+    codes = {d.code: d for d in report.diagnostics(r)}
+    assert "R705" in codes
+    assert codes["R705"].line == 30
+    # The other findings on that row still stand -- U is legible either way.
+    assert "R701" in codes and codes["R701"].line == 30
+
+
+def test_the_status_field_decodes_four_and_five_letter_forms():
+    """The books disagree about how many letters there are, and it does not
+    matter, because the field is decoded as a set rather than by position.
+
+    The MMI Database Transfer help says "five letters" and then lists four,
+    giving DTUF as its worked example. The controller's own PPCL_data record
+    carries five booleans, the fifth being the loop flag. Both decode.
+    """
+    from ppcl import report
+
+    text = (
+        "State  Line   Statement\n"
+        "-----  -----  ---------\n"
+        "DTUF   00010  ON(FAN)\n"
+        "E   L  00020  LOOP(A,B,C,D,E,F,G,H)\n"
+        "End of report\n"
+    )
+    r = report.parse(text)
+
+    first = r.states[10]
+    assert not first.enabled and first.traced and first.unresolved
+    assert first.failed and not first.loop_tested
+
+    second = r.states[20]
+    assert second.enabled and second.loop_tested and not second.traced
+

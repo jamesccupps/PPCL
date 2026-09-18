@@ -2543,3 +2543,104 @@ Two things worth recording that need no code:
    warnings.
 2. A rule noting `ACT`/`DEACT`/`ENABLE`/`DISABL` cost system resources on
    PXC.A — the last item from pass 12.
+
+---
+
+## 2026-09-18 (twenty-second pass) — the last PXC.A item, and a book nobody had opened
+
+### `W344` — supported, and discouraged, which is a third category
+
+The last item from pass 12, re-fetched and verified before building:
+
+> "These statements are still supported in PXC.A controllers, but it is advised
+> to use the new statements Goto(), Gosub(), or Return() to go around the logic
+> instead of disabling and enabling lines in new programs for PXC.A
+> controllers. Uncommenting (enabling) and commenting out (disabling)
+> statements that use ACT, DEACT, ENABL, and DISABL **cause the device to use
+> more system resources**."
+
+`ACT`, `DEACT`, `ENABLE` and `DISABL` are therefore **not** in `PXC_A_REMOVED`,
+and putting them there would reject working programs. `E119` is for a statement
+the runtime rejects; `W344` is for one it accepts and charges for. `INFO`, and
+only on `pxc_a`.
+
+Siemens' own framing is "in new programs", so a program converted from an older
+panel being full of them is not a defect. For scale: if the corpora were PXC.A,
+`W344` would fire **11 times on Siemens' library and zero at the reference
+site**. A quiet rule.
+
+The same page cites `A6V12954390` again. Re-checked, still 404. The verdict in
+the sources table stands and needed no more time than one navigation.
+
+### A coverage map, and a book that had never been opened
+
+Thirty Insight books were extracted in pass 6. `Proged` and `Point` were mined
+to exhaustion; the rest were searched by keyword and never read. That is how
+`LFMSSL` sat undiscovered in `Ptdetail` for fourteen passes.
+
+So: how many pages in each book mention PPCL at all?
+
+| Book | pages | mention PPCL |
+|---|---|---|
+| `Proged` | 736 | 223 |
+| `Point` | 320 | 15 |
+| `Convert` | 149 | 14 |
+| `Syspro` | 498 | 10 |
+| `Commandr` | 87 | 9 |
+| `Tod` | 162 | 8 |
+| `Ptdetail` | 180 | 8 |
+| `Globcmd` | 51 | 8 |
+| `PPCLDebug` | 7 | 7 |
+| `Eqedit` | 102 | 5 |
+| `MMIXfer` | 42 | 4 |
+
+`MMIXfer` was opened first because it bears on the one decision still
+outstanding: `W104` concerns the 66-character MMI line limit, and `MMIXfer` is
+the book about the MMI port.
+
+### What it gave: the state column, from a third direction
+
+`MMIXfer`'s **UC PPCL Window** page documents the same status field
+`report.py` reads — and documents it differently again:
+
+> "The Status Field — displays any combination of **five letters** and/or
+> spaces... **E or D** indicates that the code line is enabled or disabled...
+> **T** indicates that the line has been traced... **U** indicates that the
+> line of code is unresolved... **F** indicates that the line of code has
+> failed."
+
+It says five and lists four. The fifth is the loop flag, which this book omits,
+`Proged` carries, and the controller's own `PPCL_data` record confirms as
+`line_looped`. Three sources, one of them internally inconsistent, and they
+agree on the model.
+
+`_apply_state` decodes the field as a **set of letters rather than by
+position**, so the book's four-letter worked example `DTUF` and a five-wide
+`E   L` both decode correctly. That was luck rather than foresight, and it is
+now pinned by a test naming both forms.
+
+**`R705`, and the invariant that earned it.** The page states something no
+other source does: *"Either an E or a D will always be displayed."* So a report
+row carrying neither is damaged input — and until now this module answered
+"enabled" for it, silently, from its own default. That is the wrong way to be
+wrong: the entire reason to read a report is to learn which lines the panel is
+*not* evaluating. `LineState.state_known` records it and `R705` reports it.
+
+### Also on that page, worth knowing and needing no code
+
+- The UC PPCL view can **enable and disable line ranges and reset trace bits**
+  directly, and "although your changes are automatically loaded into the UC,
+  the view itself is not dynamic" — the display lies until refreshed.
+- A restore caution: backing up a panel on firmware 1.5 or earlier and
+  restoring under software 3.0+ **may duplicate and rename the PPCL program**
+  during a firmware upgrade to 2.0+. Siemens' own instruction is to examine the
+  programs afterwards and delete the duplicate.
+
+### Still to do
+
+1. **Decide `W104`.** Still the user's call. `MMIXfer` says what the MMI port
+   is *for* but not how often anyone uses it, so it does not settle the
+   question.
+2. Read the remaining unopened books, in the order above. `Globcmd`
+   (cross-panel commanding, which `W340` is about), `Convert` (generation
+   translation) and `Tod` (schedules) are the next three worth opening.
