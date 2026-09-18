@@ -343,6 +343,42 @@ def test_an_at_name_does_not_swallow_a_dotted_operator():
     assert prog.errors == []
 
 
+def test_a_keyword_inside_a_dotted_name_stays_part_of_the_name():
+    """Point names are dotted, and PPCL keywords turn up as segments of them.
+
+    `MIN` is a PPCL function, so `AHU1.MIN.SP` *looks* like it contains an
+    operator. It does not: only the eleven entries of `DOTTED_OPS` split a
+    name, and the lexer absorbs every other dotted word.
+
+    This is the mirror of the decimal-point problem. A tokenizer that treats
+    every dot as a decimal point mis-lexes `.ROOT.`; one that treats every
+    dotted word as an operator mis-lexes half a site's point names.
+    """
+    def toks(text):
+        return [t.text for t in tokenize(text)]
+
+    for keyword in ("MIN", "MAX", "LOW", "LOG", "ALARM", "SET", "LINK"):
+        line = "IF (AHU1.%s.SP.GT.50.0) THEN ON(SFAN)" % keyword
+        assert "AHU1.%s.SP" % keyword in toks(line), keyword
+
+
+def test_a_dotted_operator_inside_an_unquoted_name_splits_it():
+    """`.ROOT.` is genuinely ambiguous bare, and quoting is how a name keeps it.
+
+    Unquoted, the lexer reads the operator -- which is what a compiler reading
+    left to right would also do. Whether the panel agrees is open question 10;
+    until that is settled, quote any name with a dotted-operator segment.
+    """
+    def toks(text):
+        return [t.text for t in tokenize(text)]
+
+    bare = toks("IF (AHU1.ROOT.SP.GT.50.0) THEN ON(SFAN)")
+    assert ".ROOT." in bare
+    assert "AHU1.ROOT.SP" not in bare
+
+    assert "AHU1.ROOT.SP" in toks('IF ("AHU1.ROOT.SP".GT.50.0) THEN ON(SFAN)')
+
+
 def test_ordinary_at_names_still_lex_whole():
     assert parser.parse("00010\tON(@EMER,FAN)\n00020\tGOTO 10\n").errors == []
     assert parser.parse("00010\tON(@1FAN)\n00020\tGOTO 10\n").errors == []

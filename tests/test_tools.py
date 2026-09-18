@@ -480,6 +480,29 @@ def test_redaction_drops_comment_text():
     assert "Acme" not in out and "Suite" not in out
 
 
+def test_a_point_may_be_named_with_a_reserved_word():
+    """Reserved means "do not name a point this", not "this name is illegal".
+
+    Panels in the field do carry points whose names collide with PPCL
+    keywords, and they enumerate them like any other point. A tool that
+    rejected or rewrote such a name would break a program that works. So the
+    unresolved-reference check skips reserved words rather than reporting
+    them missing, and the redactor leaves them alone rather than mapping them
+    to a name the panel does not have.
+    """
+    from ppcl import points
+    from ppcl.redact import Redactor
+
+    text = '10\tIF("ALARM".EQ.ON) THEN ON("SFAN")\n'
+    prog = parser.parse(text)
+    assert prog.errors == []
+
+    db = points.load_csv("Point Name,Point Type\nSFAN,LDO\n")
+    assert [row["name"] for row in db.unresolved(prog)] == []
+
+    assert '"ALARM"' in Redactor().redact_text(text)
+
+
 def test_redacted_program_still_parses():
     from ppcl.redact import Redactor
 

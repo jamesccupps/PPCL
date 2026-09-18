@@ -652,6 +652,27 @@ def test_the_error_tables_are_well_formed():
     assert "R12" not in spec.PPCL_COMPILER_ERRORS
 
 
+def test_the_word_form_comparisons_are_reserved():
+    """``EQUAL`` and ``LESS`` are reserved names, not operators.
+
+    Neither has a documented syntax -- no manual shows ``A EQUAL B`` -- but
+    both sit in the published reserved-word lists, so neither may be a point
+    name. ``LESS`` is the harder one: it is in the Program Editor's shipped
+    list, alphabetically between ``LE`` and ``LINK``, and missing from
+    125-1896 Rev. 5 Chapter 5, which goes straight from ``LE`` to ``LINK``.
+    One source reserves it and none contradicts, so it is reserved here.
+    """
+    from ppcl import spec
+
+    assert "EQUAL" in spec.RESERVED_WORDS
+    assert "LESS" in spec.RESERVED_WORDS
+    for word in ("EQ", "NE", "LT", "LE", "GT", "GE"):
+        assert word in spec.RESERVED_WORDS, word
+    # Reserved, but not operators: the parser must not accept them as one.
+    assert "LESS" not in spec.DOTTED_OPS
+    assert ".LESS." not in spec.DOTTED_OPS
+
+
 def test_point_database_carries_slope_and_intercept():
     """Needed for panel error E12, and useful on its own.
 

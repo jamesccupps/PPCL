@@ -80,7 +80,7 @@ runs on any engineering workstation with no install. Windows is the primary
 platform.
 
 ```bash
-python -m pytest tests -q          # 475 tests, ~150s
+python -m pytest tests -q          # 479 tests, ~150s
 python -m ppcl.cli serve           # the app
 python -m ppcl.cli lint samples    # exercises the CLI on real programs
 python -m ppcl.cli help            # the built-in documentation
@@ -90,7 +90,7 @@ python -m ppcl.cli help            # the built-in documentation
 
 ## 2. Current state
 
-**475 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
+**479 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
 tests. 80 lint rules, 66 commands, 99 BACnet properties, 30 block types,
 17 CLI subcommands, 11 MCP tools, 12 help pages, 20 settings, 6 firmware
 families, 29 panel error codes.
@@ -170,7 +170,7 @@ Editor · Builder · Blocks · Bench (Simulate / Debug) · Settings · Help
 ## 4. Research provenance
 
 Everything below is on this machine or public. `docs/RESEARCH-LOG.md` has the
-full sweep across fourteen passes, every source URL, and what is deliberately
+full sweep across fifteen passes, every source URL, and what is deliberately
 not copied. **Nothing licensed or site-confidential is reproduced in this
 repository** -- findings from those corpora are described, not quoted.
 
@@ -189,6 +189,7 @@ repository** -- findings from those corpora are described, not quoted.
 | **A6V13998441** PXC.A Modernization, 2026-04 | 23 pages | Newest document here. Its cross-reference is what led to the removed-statements page |
 | **Siemens' shipped application library** | 84 programs, 15,726 lines | *The regression corpus.* Found three parser bugs and one undocumented command |
 | **The reference site's own programs** | 42 from Desigo, 22 older | What every severity decision is tuned against |
+| **An independent P2 wire corpus** | 2,644 lines | *A cross-check, not a source.* Programs running on panels at a working site, recovered from upload responses by a separate project with no source in common with this one. The parser met all 2,644 without a failure. Nothing in it is reproducible from this repository, so its findings are tiered below the rest |
 
 **Not obtainable:** `A6V12954390`, "PPCL User Manual", named in Siemens' 2026
 datasheets but 404 at every public URL. Either partner-restricted or a typo --
@@ -236,6 +237,7 @@ copyrighted MEC100K listing in Appendix C).
 | `LOCAL`'s sixteen | **Per statement, not per program.** The compiler chunks declarations rather than refusing |
 | Adaptive control on PXC.A | **Gone.** Inferred from a table's whitespace for four passes, then stated in words on the removed-statements page |
 | Comment length | Counts the **comment text**, not the line number or the `C` |
+| `EQUAL` / `LESS`: reserved words, or a misread description column? | **Both reserved.** Neither has an operator syntax, but both hold bare alphabetical cells in the Program Editor's enumerated list, which contains no description column at all. `EQUAL` is in 125-1896 Ch. 5 as well; `LESS` is not, and adding it closed the only real gap either published list had against `RESERVED_WORDS` |
 
 ### The single most valuable line found
 
@@ -267,13 +269,15 @@ editor.** The Sublime package's feature set is now fully covered by
 | Claim | Status |
 |---|---|
 | Command signatures, point types, priorities, precedence, reserved words, Command Assist categories | **Manual-verified**, cited in `spec.py` |
-| Parser | **Empirically tested** — 5 real programs, zero errors, plus unit tests |
+| Parser | **Empirically tested at scale.** 42 programs from a live Desigo CC and 15,716 of 15,726 lines of Siemens' shipped library (the other ten are that library's own syntax errors). Separately, an independent P2 wire corpus ran it over **2,644 lines recovered from programs running on panels: all 2,644 parsed** |
 | `TABLE`, `DBSWIT`, `MIN`/`MAX`, `TOD`, `WAIT`, `SAMPLE`, priority arbitration | **Manual-verified**, behaviour fully specified |
 | `LOOP` **output values** | **APPROXIMATED.** Siemens does not publish the PID form. Timing/inputs/outputs are exact; the computed `cv` is indicative and says so at runtime. **Never present it as tuning guidance.** |
 | Equipment models (`ppcl/plant/`) | **First-order lumped approximations** in IP units. Not a load calculation, no dehumidification |
 | `SSTO`, `PDL*`, `OIP`, `DC`/`DCR` execution | **Not simulated** — traced as no-ops |
 
-**Nothing has been validated against a live panel.**
+**No statement's *behaviour* has been validated against a live panel.** The
+grammar has now met code that panels are executing (above) and handled all of
+it; nothing has watched a statement execute. Keep the two claims apart.
 
 ### Open questions, each with the test that settles it
 
@@ -296,6 +300,10 @@ editor.** The Sublime package's feature set is now fully covered by
 9. **New:** whether a disabled statement has any representation in an exported
    text file. The workbench uses a `C [DISABLED] ` comment marker as its own
    convention and warns about it; if Desigo has a real one, adopt it.
+10. **New:** does a panel absorb a dotted-operator segment into an *unquoted*
+    point name? `AHU1.MIN.SP` is unambiguous — `.MIN.` is not an operator — but
+    `AHU1.ROOT.SP` is not, and this lexer splits it. No corpus examined
+    contains one, which is why it is a question and not a rule.
 
 ---
 
@@ -423,6 +431,17 @@ disabled line out of the control-flow graph exactly as the panel drops it.
 (LSQ2 rows), `W339` (RELEAS storm), `W340` (device-local across the network),
 `E119` (firmware availability), `E120` (parenthesis in a point name),
 `R701`-`R704` (panel report findings).
+
+**Cross-checked against a wire corpus (fifteenth pass).** An independent
+project reading APOGEE P2 traffic ran this parser over 2,644 lines recovered
+from running panels -- all 2,644 parsed, including two dozen carrying a PPCL
+keyword as a dotted segment of a point name. It also proposed removing `EQUAL`
+and `LESS` from `RESERVED_WORDS` on the theory that both came from misreading a
+description column. Tested and excluded: the Program Editor's enumerated list
+has no description column, and both words hold their own alphabetical cell.
+`EQUAL` is confirmed in 125-1896 Ch. 5 too. **`LESS` was missing here and has
+been added** -- the only real gap either published list had. Four tests came out
+of the pass, and open question 10.
 
 **Spec additions:** the ten PXC.A removals with Siemens' reason for each, 29
 panel error codes (compiler `R` and runtime `E`, and the distinction between

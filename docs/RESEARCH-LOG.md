@@ -1831,3 +1831,140 @@ regrading it is no longer a hunch.
    library genuinely commands without releasing.
 3. Handle the `UNKNOWN (...)` marker in the lexer.
 4. A rule for the `SET`-without-deadband idiom on PXC.A.
+
+---
+
+## 2026-09-18 (fifteenth pass) — cross-checked against a wire corpus
+
+An independent project that reads APOGEE P2 traffic recovered **2,644 lines of
+PPCL** from panels' program-upload responses — programs actually running at a
+working site — and ran this toolkit against them. The two have no source in
+common: everything here is built from published Siemens documentation, that
+corpus from bytes on the wire. Where they agree, that is two readings
+converging. Where they differ, one of them has something to fix.
+
+Both happened.
+
+### 2,644 of 2,644 lines parse
+
+No failures. This parser had been tested against 42 programs exported from a
+live Desigo CC and 15,716 of 15,726 lines of Siemens' shipped library, but
+never against code recovered from panels while they were executing it.
+
+Be precise about what that establishes. It says the **grammar** is right: a
+manual-derived tokenizer and parser handle real, current, vendor-and-site
+authored PPCL without a single refusal. It says nothing about whether any
+statement's modelled *behaviour* matches a panel's. §8's verification table now
+carries it as its own tier, below everything else, for one reason: a reader of
+this repository cannot reproduce it. The programs are a working site's and stay
+there.
+
+The sentence "Nothing here has been validated against a live panel" was true
+when written and is now too broad. It has been narrowed to what it should
+always have said — no statement's behaviour has been observed executing.
+
+### The dot problem, from the other side
+
+Point names at that site are dotted, so the wire carries name fragments shaped
+exactly like operators. Some of those fragments **are** PPCL keywords — `MIN`
+and `LOW` among them — and two dozen lines contain one. All of them parse.
+
+That is worth pinning, because it is the mirror of the failure this project
+already knows about. A tokenizer that treats every dot as a decimal point
+mis-lexes `.ROOT.`; one that treats every dotted word as an operator mis-lexes
+half a site's point names. Two tests now hold both ends:
+
+- `.MIN.`, `.MAX.`, `.LOW.`, `.LOG.`, `.ALARM.`, `.SET.`, `.LINK.` inside an
+  unquoted name stay part of the name. Only the eleven entries of `DOTTED_OPS`
+  split one.
+- A dotted segment that **is** a dotted operator does split it, and quoting is
+  how a name keeps it.
+
+The second case is genuinely ambiguous and no corpus examined contains one, so
+it became **open question 10** rather than a lint rule. A rule that fires zero
+times on every program anyone has is a rule nobody can evaluate.
+
+### `EQUAL` and `LESS`, and how a reserved word gets invented
+
+The cross-check proposed that **both** be removed, with a good argument:
+Desigo CC's PPCL glossary titles its topics `Equal To - EQ` and `Less Than -
+LT`, description first and token second. Read that column as tokens and you
+manufacture `EQUAL` and `LESS` out of nothing. Their corpus has zero bare
+occurrences of either.
+
+This is exactly the failure mode worth taking seriously, and it is wrong here.
+The Program Editor ships an enumerated reserved-word page, and that page has
+**no description column anywhere in it** — the strings "Equal To" and "Less
+Than" do not occur on it. It is two columns of bare tokens, and both words hold
+their own alphabetical cell: `EQ, EQUAL, EXP` in one column, `INITTO, LE, LESS,
+LINK, LLIMIT` in the other.
+
+125-1896 Rev. 5 Chapter 5 — the source the cross-check did not have, and named
+as the one that would settle it — lists `EQUAL` in the same position, also
+bare. So `EQUAL` is confirmed twice and stays, by the cross-check's own stated
+criterion.
+
+`LESS` is the genuine gap, in the opposite direction from the one proposed. It
+is in the Program Editor list and **not** in Chapter 5, which goes straight
+from `LE` to `LINK`. One Siemens source reserves it, none contradicts, and the
+asymmetry of the mistake is one-sided: over-reserving costs a `W107` on a point
+name nobody chose, under-reserving means never flagging a name a panel may
+refuse. It has been added.
+
+Both published lists were then compared word for word in both directions
+against `RESERVED_WORDS`. `LESS` was the only difference that is not a
+page-layout artifact — 289 of 290 entries of one list and 278 of 279 of the
+other were already reserved here.
+
+### A point may be named with a reserved word
+
+The cross-check records a wire fact worth keeping: a point genuinely **named
+`ALARM`** exists at that site and the panel enumerates it in ordinary traffic.
+Reserved means "do not name a point this", not "this name is illegal" — a tool
+that rejected or rewrote such a name would break a program that works.
+
+This toolkit already behaved correctly: `points.unresolved` skips reserved
+words rather than reporting them missing, and `redact` preserves them rather
+than mapping them to a name the panel does not have. Neither behaviour had a
+test. Both do now.
+
+### Twelve names, and what kind of thing each one is
+
+The cross-check listed twelve names its corpus sees programs reference that are
+**not** point-database entries, as evidence for a resident-points section. All
+twelve are already in `RESERVED_WORDS` — but they are not all resident points,
+and the difference matters to anything that resolves them:
+
+| | |
+|---|---|
+| Resident points | `DAY`, `CRTIME`, `TIME`, `ALMCNT`, `SECND1`–`SECND4` |
+| Status indicators — values, not points | `LOW`, `FAILED` |
+| Special function | `TOTAL` |
+| Declaration keyword, not a value at all | `LOCAL` |
+
+`LOCAL` is the one to flag back. It introduces a `LOCAL` declaration statement;
+a client that resolves it as a resident point will read those statements wrong.
+
+### Confirmed from the other direction
+
+- **`ARC` vs `ATN`.** The cross-check reached the same Desigo precedence table
+  independently and found the same erroneous `ARC(value1)`. Open question 9
+  stands resolved, now from two directions.
+- **13 vs 16 operands.** The cross-check had only the 16/32 figures, and has
+  adopted the 13 documented here for the older families — which is the
+  generation its own corpus comes from.
+
+### What the corpus could not answer
+
+- **Open question 2, line-evaluation rate.** Offered: a timing census puts a
+  panel's whole-program *upload* at about 10.5 ms. That bounds retrieval, not
+  execution, and does not answer it. Recorded so nobody re-derives it.
+- **Open question 7, BACnet property referencing on PXC.A.** No PXC.A appears
+  in that corpus, or in any corpus examined here.
+
+### Still to do
+
+1. **Decide `W104`.** Unchanged, and still the user's call.
+2. `W330` fires 340 times on the Siemens library. Still unexamined.
+3. Handle the `UNKNOWN (...)` marker in the lexer.
+4. A rule for the `SET`-without-deadband idiom on PXC.A.

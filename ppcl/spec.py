@@ -2116,7 +2116,28 @@ def _build_reserved() -> frozenset:
     words |= set(PRIORITY_ORDER)
     words |= {op.strip(".") for op in DOTTED_OPS}
     words |= DOTTED_OPS
-    words |= {"EQUAL", "NOR", "AND", "OR", "NOT"}
+    # Word forms that are reserved names without a documented operator
+    # syntax: no manual shows a statement using EQUAL or LESS, and outside
+    # the reserved-word lists they appear only inside comment prose in
+    # worked examples ("C IF THE ROOM TEMP IS LESS THAN 80,").
+    #
+    # Both have an obvious failure mode that has to be ruled out, because
+    # another project reading the same language fell into it: Desigo CC's
+    # glossary titles topics "Equal To - EQ" and "Less Than - LT", so a
+    # description column read as tokens manufactures EQUAL and LESS out of
+    # nothing. Ruled out here. The Program Editor's shipped reserved-word
+    # page is a two-column table of bare tokens with no description column
+    # anywhere in it -- the strings "Equal To" and "Less Than" do not occur
+    # on the page -- and EQUAL and LESS each occupy their own alphabetical
+    # cell, EQUAL between EQ and EXP, LESS between LE and LINK.
+    #
+    # EQUAL is then confirmed twice: 125-1896 Rev. 5 Chapter 5's list has
+    # it in the same position, also bare. LESS is in the Program Editor
+    # list only; Chapter 5 goes straight from LE to LINK, and Desigo CC
+    # ships no enumerated list at all. One Siemens source reserves it and
+    # none contradicts, so it is reserved -- over-reserving costs a W107 on
+    # a point name nobody chose, under-reserving misses one a panel refuses.
+    words |= {"EQUAL", "LESS", "NOR", "AND", "OR", "NOT"}
     for i in range(1, LOCAL_ARG_COUNT + 1):
         words |= {"$ARG%d" % i, "ARG%d" % i}
     for i in range(1, LOCAL_LOC_COUNT + 1):

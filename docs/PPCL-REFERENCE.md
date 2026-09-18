@@ -435,8 +435,8 @@ failure scenarios such as a failed sensor or motor. That is precisely what
 
 ## 7. Known discrepancies
 
-Places where the manual disagrees with itself. Both were found by testing this
-toolkit's implementation against it.
+Places where the manual disagrees with itself, or with another manual. Most
+were found by testing this toolkit's implementation against them.
 
 **`DC` pattern encoding — settled 2026-09-18.** Table 4-1 of the 2000 manual
 gives the mapping — first 5 minutes = 1, second = 2, third = 4, so `OFF/ON/ON`
@@ -468,6 +468,38 @@ priority of a *command* versus the reach of a bare `RELEAS` — but the wording
 invites confusion. This toolkit treats a bare `RELEAS` as clearing any priority
 it is capable of clearing, and warns when a program relies on it.
 
+**`EQUAL` and `LESS` — are they reserved words or a misread description
+column? Settled 2026-09-18.** Neither has a documented *syntax*: no manual
+anywhere shows a statement using either as an operator, and outside the
+reserved-word lists they occur only inside comment prose in worked examples
+("`C IF THE ROOM TEMP IS LESS THAN 80,`"). They are reserved **names**.
+
+There is an obvious way to invent them by accident, and it had to be ruled
+out. Desigo CC's PPCL glossary titles its topics `Equal To - EQ` and `Less
+Than - LT` — description first, token second. Read that column as tokens and
+you manufacture `EQUAL` and `LESS` out of nothing.
+
+Ruled out. The Program Editor's shipped reserved-word page is a two-column
+table of bare tokens with **no description column anywhere in it** — the
+strings "Equal To" and "Less Than" do not appear on the page — and both words
+occupy their own alphabetical cell: `EQUAL` between `EQ` and `EXP`, `LESS`
+between `LE` and `LINK`, in a column that runs `…INITTO, LE, LESS, LINK,
+LLIMIT, LOC1 through LOC15, LOG, LOOP, LT…`.
+
+They then part company:
+
+| | Program Editor list | 125-1896 Rev. 5 Ch. 5 | Desigo CC |
+|---|---|---|---|
+| `EQUAL` | bare cell, between `EQ` and `EXP` | bare cell, same position | no enumerated list |
+| `LESS` | bare cell, between `LE` and `LINK` | **absent** — `LE` to `LINK` | no enumerated list |
+
+So `EQUAL` is confirmed twice and `LESS` once, with nothing contradicting
+either. This toolkit reserves both. Over-reserving costs a `W107` on a point
+name nobody chose; under-reserving means never flagging a name a panel may
+refuse. Comparing the two enumerated lists word for word in both directions
+found `LESS` to be their **only** difference that is not a page-layout
+artifact — every other entry of either list was already reserved here.
+
 **Operand limit: 13 or 16.** 125-1896 Rev. 5 states an `IF` may test a maximum
 of **13 operands**. The Desigo CC PPCL Editor documentation states **16
 operands and 32 operators** per statement. Both are published; neither
@@ -476,6 +508,10 @@ program is actually checked by, the linter applies 16 to APOGEE firmware and
 the conservative 13 to the older families. Rule `E314` says which figure it
 used and why. If you are near either limit, split the statement — a 14-operand
 `IF` is unreadable regardless of which number is right.
+
+*Independently adopted.* A separate P2 wire-capture project had recorded only
+the 16/32 figures, took the 13 from here, and applied it to the older families
+— which is the generation its own corpus came from.
 
 ---
 
@@ -489,9 +525,9 @@ Following the discipline of tagging each claim by how it was established:
 | Point types and their addresses | **Manual-verified** — Table 3-2 |
 | Priority hierarchy and arbitration rule | **Manual-verified** — Table 3-1, Chapter 3 |
 | Operator precedence | **Manual-verified** — Table 2-6 |
-| Reserved word list | **Manual-verified** — Chapter 5 |
+| Reserved word list | **Manual-verified twice, then diffed.** 125-1896 Rev. 5 Chapter 5 and the Program Editor's shipped list, compared entry by entry in both directions. They differ by exactly one word — `LESS`, §7 — and every other entry of either list was already reserved here |
 | Execution model, wrap, line limits | **Manual-verified** — Chapter 2 |
-| Parser correctness | **Empirically tested at scale.** Parses 42 programs exported from a live Desigo CC with zero failures, and 15,716 of 15,726 lines of Siemens' own 84-program application library. The ten remaining are genuine syntax errors in that library as shipped -- a stray parenthesis, three missing commas, a statement fragment. Three parser bugs were found and fixed this way and could not have been found any other way |
+| Parser correctness | **Empirically tested at scale.** Parses 42 programs exported from a live Desigo CC with zero failures, and 15,716 of 15,726 lines of Siemens' own 84-program application library. The ten remaining are genuine syntax errors in that library as shipped -- a stray parenthesis, three missing commas, a statement fragment. Three parser bugs were found and fixed this way and could not have been found any other way. Separately, an independent APOGEE P2 wire-capture corpus ran this parser over **2,644 PPCL lines recovered from programs running on panels at a working site: 2,644 parsed, none failed**, including 24 lines carrying a PPCL keyword as a dotted fragment of a point name. That evidence is not reproducible from this repository — see the note below the table |
 | `TABLE`, `DBSWIT`, `MIN`/`MAX`, `TOD`, `WAIT`, `SAMPLE` simulation | **Manual-verified**, behaviour fully specified |
 | Priority arbitration in the simulator | **Manual-verified** against the Chapter 3 rule |
 | `LOOP` output values | **Approximated, NOT verified.** Siemens does not publish the internal PID form. Timing, inputs and outputs are exact; the computed value is indicative only. The gain scaling follows the manual's own `pg = (output span / throttling range) x 1000`, so `pg/1000` is the gain in percent per degree |
@@ -528,6 +564,8 @@ Questions this toolkit does not answer, each with the test that would settle it:
 2. **Line-evaluation rate on current PXC hardware.** The manual's 350/500
    lines/sec figures predate the modular PXC line. *Test:* a counter program on
    an isolated panel, timed over a known interval, with FLN device count varied.
+   Wire capture cannot substitute: a P2 timing census puts a panel's whole-
+   program *upload* at about 10.5 ms, which bounds retrieval, not execution.
 3. **Whether a bare `RELEAS` clears `@SMOKE`.** The manual is silent. *Test:*
    command to `@SMOKE`, issue a bare `RELEAS`, read the resulting priority.
 4. ~~**`DC` example vs Table 4-1.**~~ **Closed 2026-09-18** from
@@ -543,6 +581,9 @@ Questions this toolkit does not answer, each with the test that would settle it:
    property-names appendix. The Desigo help documents object *referencing*
    (`BAC_10_MO_1`) but not how a *property* of an object is named. *Test:*
    read the appendix, then confirm against a PXC.A with a known BACnet object.
+   The appendix has since been read — 99 properties, in the table above — so
+   what is left is hardware confirmation, and nothing available here can give
+   it: no PXC.A appears in any corpus examined, wire capture included.
 8. ~~Signatures for ADAPTM, ADAPTS, LSQ2 and LSQDAT~~ — **RESOLVED** from the
    PPCL Editor's Command Assist: `ADAPTM(pt1,...,pt14)`,
    `ADAPTS(pt1,...,pt14)` (both firmware 2.7+),
@@ -552,10 +593,38 @@ Questions this toolkit does not answer, each with the test that would settle it:
 9. ~~ARC or ATN for arc-tangent~~ — **RESOLVED. It is `ATN`.** The PPCL
    Editor's Command Assist lists ATN and describes it as calculating the
    arc-tangent in degrees. The `ARC(value1)` in the Desigo precedence table is
-   a documentation error. Rule `E118` rejects ARC and says so.
+   a documentation error. Rule `E118` rejects ARC and says so. *Independently
+   confirmed* by a P2 wire-capture project that reached the same table from the
+   other direction and found the same `ARC(value1)` in it.
+10. **Does a panel absorb a dotted-operator segment into an unquoted point
+    name?** Point names are dotted, and PPCL keywords turn up as segments of
+    them — `AHU1.MIN.SP` is an ordinary name, because `.MIN.` is not an
+    operator. But `AHU1.ROOT.SP` written bare is genuinely ambiguous, and this
+    lexer reads it as `AHU1 .ROOT. SP`. If a panel absorbs it into the name
+    instead, a program using such a name analyses wrongly here. *Test:* define
+    a point whose name carries a dotted-operator segment, reference it without
+    quotes in a loaded program, and see whether the line resolves. Not urgent:
+    no corpus examined here contains one — the keyword-bearing segments that do
+    occur are functions and status words, none of them dotted operators. Until
+    it is settled, quote the name.
 
-Nothing here has been validated against a live panel. Everything is either
-transcribed from the manual or tested against real program text.
+**Nothing here has been validated against a live panel** — no statement's
+*behaviour* has been observed executing. Everything is transcribed from the
+manual or tested against real program text.
+
+The one result that comes closer is the wire-capture line in the table above.
+A separate project reading APOGEE P2 traffic recovered 2,644 lines of PPCL
+from programs running on panels and ran this parser over all of them without a
+failure. That is the strongest statement either project can make about the
+other — a manual-derived parser handling code that panels are executing — and
+neither could make it alone, because the two have no source in common: this
+toolkit is built from published Siemens documentation, that corpus from bytes
+on the wire.
+
+It is recorded here at a lower tier than everything else in the table, for one
+reason: **a reader of this repository cannot reproduce it.** The programs are
+a working site's and stay there. Treat it as a claim with a named method and
+an unpublishable input, not as a citation.
 
 ---
 
