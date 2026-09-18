@@ -70,7 +70,9 @@ MMI_CONTINUATION_LIMIT = {
 LINE_MIN = 1
 LINE_MAX = 32767
 
-#: Valid length for an APOGEE PPCL *program* name.
+#: Valid length for a PPCL *program* name. Desigo CC engineering help,
+#: "Program Naming" -- not generation-specific, and the same 30 across every
+#: firmware family here.
 PROGRAM_NAME_MAX = 30
 
 #: A point name may appear unquoted only if it is <= 6 characters and uses
@@ -2148,8 +2150,8 @@ def _build_reserved() -> frozenset:
     # a point name nobody chose, under-reserving misses one a panel refuses.
     #
     # That they are names and not operators is now corpus-checked rather
-    # than argued. Parsing Siemens' 84-program shipped library finds 20
-    # occurrences of the two words, and all 20 are on Comment statements --
+    # than argued. Parsing Siemens' 42-program shipped library finds 10
+    # occurrences of the two words, and all 10 are on Comment statements --
     # zero in executable code. The reference site's programs have none at
     # all. No manual anywhere shows a statement using either.
     words |= {"EQUAL", "LESS", "NOR", "AND", "OR", "NOT"}

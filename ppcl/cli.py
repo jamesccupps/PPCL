@@ -1203,7 +1203,7 @@ def build_parser():
     p = argparse.ArgumentParser(
         prog="ppcl",
         description="Read, inspect, lint, debug, optimise and write Siemens "
-                    "APOGEE PPCL.",
+                    "PPCL, APOGEE through Desigo PXC.A.",
     )
     p.add_argument("--version", action="version", version="ppcl %s" % __version__)
     sub = p.add_subparsers(dest="command", required=True)

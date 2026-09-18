@@ -27,7 +27,7 @@ happens *before* the commit, every time.
 2. **The MEC100K listing** from A6V10374898 Appendix C — copyrighted Siemens
    code, used locally for interoperability testing only.
 3. **Anything out of a local Siemens or site library.** This machine holds
-   Siemens' shipped 84-program PPCL application library, an Insight database
+   Siemens' shipped 42-program PPCL application library, an Insight database
    backup, 30 books of Insight compiled help and the reference site's own
    programs. All of it is licensed or site-confidential. It is research input;
    the extracted text lives in the scratchpad and nothing from it is copied
@@ -187,7 +187,7 @@ repository** -- findings from those corpora are described, not quoted.
 | **A6V12893115** PXC.A Web Interface User Guide | HTML, public | The onboard editor PXC.A uses instead of Desigo CC. The `# ` disable syntax |
 | **A6V12954388** PXC.A Reference | 112 pages | Workflow; points at A6V10374898 for the language |
 | **A6V13998441** PXC.A Modernization, 2026-04 | 23 pages | Newest document here. Its cross-reference is what led to the removed-statements page |
-| **Siemens' shipped application library** | 84 programs, 15,726 lines | *The regression corpus.* Found three parser bugs and one undocumented command |
+| **Siemens' shipped application library** | 42 programs, 7,863 lines | *The regression corpus.* Found three parser bugs and one undocumented command. It ships in two product trees; the first collection of it took both copies, so every count taken from it before 2026-09-18 was exactly doubled |
 | **The reference site's own programs** | 42 from Desigo, 22 older | What every severity decision is tuned against |
 | **An independent P2 wire corpus** | 2,644 lines | *A cross-check, not a source.* Programs running on panels at a working site, recovered from upload responses by a separate project with no source in common with this one. The parser met all 2,644 without a failure. Nothing in it is reproducible from this repository, so its findings are tiered below the rest |
 
@@ -270,7 +270,7 @@ editor.** The Sublime package's feature set is now fully covered by
 | Claim | Status |
 |---|---|
 | Command signatures, point types, priorities, precedence, reserved words, Command Assist categories | **Manual-verified**, cited in `spec.py` |
-| Parser | **Empirically tested at scale.** 42 programs from a live Desigo CC and 15,716 of 15,726 lines of Siemens' shipped library (the other ten are that library's own syntax errors). Separately, an independent P2 wire corpus ran it over **2,644 lines recovered from programs running on panels: all 2,644 parsed** |
+| Parser | **Empirically tested at scale.** 42 programs from a live Desigo CC and 7,858 of 7,863 lines of Siemens' shipped library (the other five are that library's own syntax errors). Separately, an independent P2 wire corpus ran it over **2,644 lines recovered from programs running on panels: all 2,644 parsed** |
 | `TABLE`, `DBSWIT`, `MIN`/`MAX`, `TOD`, `WAIT`, `SAMPLE`, priority arbitration | **Manual-verified**, behaviour fully specified |
 | `LOOP` **output values** | **APPROXIMATED.** Siemens does not publish the PID form. Timing/inputs/outputs are exact; the computed `cv` is indicative and says so at runtime. **Never present it as tuning guidance.** |
 | Equipment models (`ppcl/plant/`) | **First-order lumped approximations** in IP units. Not a load calculation, no dehumidification |
@@ -356,7 +356,7 @@ two independent corpora and dominates both:
 | Corpus | `W104` share of all warnings |
 |---|---|
 | The reference site's 22 programs | 65% |
-| Siemens' own 84-program library | **70%** (2,134 of 3,040) |
+| Siemens' own 42-program library | **70%** (1,067 of 1,520) |
 
 Seventy per cent of the linter's output on Siemens' reference code concerns a
 port nobody enters programs through, and the rule's own detail text admits it
@@ -364,10 +364,14 @@ port nobody enters programs through, and the rule's own detail text admits it
 spends two thirds of its voice on that gets turned off. This is a judgement
 call for the user, not a unilateral change — but it should be *made*, not left.
 
-**2. Check `W330`.** It fires 340 times on the Siemens library, the largest
-count of any rule that is not `W104`. Either the library genuinely commands
-above NONE without releasing 340 times, or there is a false-positive pattern in
-it. Find out before trusting the count.
+**2. ~~Check `W330`.~~ Done 2026-09-18 — and it found a counting error first.**
+The 340 was 170; the library ships in two product trees and the corpus held
+both copies. Of the 170, **every one is `@OPER`**, and by write coverage they
+split 79% written unconditionally every pass, 12% written on both branches of
+one `IF`, 9% conditional only. So it is not a false positive and not one
+finding: 91% of them are *continuously driven*, which cannot strand but does
+overwrite an operator's own command on the next pass, and 9% are the
+strandable case the rule's text describes. **Next: split the message.**
 
 ### Keep doing — it has paid every time
 

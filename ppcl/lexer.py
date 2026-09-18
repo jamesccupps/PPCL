@@ -188,7 +188,7 @@ def tokenize(text: str) -> list:
             # A DEFINE abbreviation is a name PREFIX, so what follows it with
             # no space belongs to the same point name: DEFINE(X,"BLD1.AHU1.")
             # then %X%AAA is one object, not two tokens. Siemens' own shipped
-            # application library writes these unquoted throughout, and 146
+            # application library writes these unquoted throughout, and 73
             # lines of it failed to parse until this joined them.
             # The tail may start with a digit -- a digit-leading tail is real in
             # Siemens' own library -- so this is a plain character run rather

@@ -13,6 +13,16 @@ this toolkit.
 | *Desigo PXC.A Web Interface User Guide*, **A6V12893115** | The onboard editor PXC.A sites use instead of Desigo CC | Public, no login, at <https://sid.siemens.com/r/A6V12893115>. Documents the `# ` disable syntax, the SAVE ERROR bar, the `UNKNOWN (...)` marker, per-program cycle-time metrics, and the SET-deadband idiom. |
 | **Desigo CC engineering help**, "APOGEE PPCL Editor" topics | The compiler you are actually checked by | PPCL Editor Overview, PPCL Guidelines, PPCL Programs, PPCL Program Plans, Editor Workspace, Glossary. This is where the current operand/operator limits are published. |
 
+> **On the name.** It is "PPCL", not "APOGEE PPCL". Even the expansion has
+> changed twice — *Powers* Process Control Language in 125-1896, *Proprietary*
+> Program Control Language in A6V10374898 — and "APOGEE PPCL Editor" is the
+> name Desigo CC gives its *editor module*, not the language. What has not
+> changed is the language or its reference: the 2025 *PXC.A Reference Manual*
+> sends a Desigo PXC4/5/7.A engineer to 125-1896, and the 2026 modernization
+> guide converts PPCL **forward** onto PXC.A from MBC/MEC and BACnet PXC
+> panels. "APOGEE" here is a firmware family — which is how `spec.Firmware`
+> treats it — not a qualifier on the language.
+
 Where sources disagree, that is called out rather than smoothed over — see
 [Known discrepancies](#known-discrepancies). Everything the toolkit enforces
 carries a citation to whichever source it came from.
@@ -497,7 +507,7 @@ So `EQUAL` is confirmed twice and `LESS` once, with nothing contradicting
 either.
 
 That they are *names* and not operators is corpus-checked, not argued. Parsing
-Siemens' 84-program shipped library finds 20 occurrences of the two words and
+Siemens' 42-program shipped library finds 10 occurrences of the two words and
 **all 20 are on `Comment` statements** — zero in executable code. The reference
 site's own programs contain neither word at all. This toolkit reserves both. Over-reserving costs a `W107` on a point
 name nobody chose; under-reserving means never flagging a name a panel may
@@ -548,7 +558,7 @@ Following the discipline of tagging each claim by how it was established:
 | Operator precedence | **Manual-verified** — Table 2-6 |
 | Reserved word list | **Manual-verified twice, then diffed.** 125-1896 Rev. 5 Chapter 5 and the Program Editor's shipped list, compared entry by entry in both directions. They differ by exactly one word — `LESS`, §7 — and every other entry of either list was already reserved here |
 | Execution model, wrap, line limits | **Manual-verified** — Chapter 2 |
-| Parser correctness | **Empirically tested at scale.** Parses 42 programs exported from a live Desigo CC with zero failures, and 15,716 of 15,726 lines of Siemens' own 84-program application library. The ten remaining are genuine syntax errors in that library as shipped -- a stray parenthesis, three missing commas, a statement fragment. Three parser bugs were found and fixed this way and could not have been found any other way. Separately, an independent APOGEE P2 wire-capture corpus ran this parser over **2,644 PPCL lines recovered from programs running on panels at a working site: 2,644 parsed, none failed**, including 24 lines carrying a PPCL keyword as a dotted fragment of a point name. That evidence is not reproducible from this repository — see the note below the table |
+| Parser correctness | **Empirically tested at scale.** Parses 42 programs exported from a live Desigo CC with zero failures, and 7,858 of 7,863 lines of Siemens' own 42-program application library. The five remaining are genuine syntax errors in that library as shipped -- a stray parenthesis, three missing commas, a statement fragment. Three parser bugs were found and fixed this way and could not have been found any other way. Separately, an independent APOGEE P2 wire-capture corpus ran this parser over **2,644 PPCL lines recovered from programs running on panels at a working site: 2,644 parsed, none failed**, including 24 lines carrying a PPCL keyword as a dotted fragment of a point name. That evidence is not reproducible from this repository — see the note below the table |
 | `TABLE`, `DBSWIT`, `MIN`/`MAX`, `TOD`, `WAIT`, `SAMPLE` simulation | **Manual-verified**, behaviour fully specified |
 | Priority arbitration in the simulator | **Manual-verified** against the Chapter 3 rule |
 | `LOOP` output values | **Approximated, NOT verified.** Siemens does not publish the internal PID form. Timing, inputs and outputs are exact; the computed value is indicative only. The gain scaling follows the manual's own `pg = (output span / throttling range) x 1000`, so `pg/1000` is the gain in percent per degree |

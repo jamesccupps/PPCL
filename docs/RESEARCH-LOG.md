@@ -1728,6 +1728,15 @@ executable lines is a defect.
 
 ## 2026-09-18 (fourteenth pass) — the Siemens application library, and what it broke
 
+> **Correction, 2026-09-18 (pass 17).** Every absolute count in this pass is
+> exactly twice the truth. The library ships in two product trees and the
+> collection took both copies, so the corpus was 42 programs seen twice. Read
+> 42 for 84, 7,863 lines for 15,726, 73 failures for 146, 5 remaining for 10,
+> 1,067 of 1,520 for 2,134 of 3,040, 170 for 340. **Every ratio and every
+> conclusion in this pass is unaffected** — a doubled corpus doubles both sides
+> of a fraction. The entry is left as written; the numbers below are wrong and
+> this is the record of how.
+
 84 programs, **15,726 lines**, shipped by Siemens with Insight. The largest body
 of idiomatic, vendor-authored PPCL available, and never once parsed until now.
 It is kept out of this repository -- it is licensed Siemens material, used here
@@ -2058,5 +2067,99 @@ points nor observed as values.
 
 1. **Decide `W104`.** Unchanged, and still the user's call.
 2. `W330` fires 340 times on the Siemens library. Still unexamined.
+3. Handle the `UNKNOWN (...)` marker in the lexer.
+4. A rule for the `SET`-without-deadband idiom on PXC.A.
+
+---
+
+## 2026-09-18 (seventeenth pass) — what "PPCL" is called, and a corpus counted twice
+
+Two corrections, both from the user and both mine.
+
+### It is not "APOGEE PPCL"
+
+The repository described itself as tooling for "Siemens APOGEE PPCL" — in the
+README, the skill description, the CLI's own `--help`, and the public repository
+description. The user pushed back: PPCL runs on their newer panels too.
+
+They are right, and Siemens' own documents say so plainly:
+
+| Document | Year | What it calls the language |
+|---|---|---|
+| *APOGEE Powers Process Control Language (PPCL) User's Manual*, 125-1896 | 2000 | "APOGEE **Powers** Process Control Language" |
+| *Proprietary Program Control Language (PPCL) User Manual*, A6V10374898 | PXC.A era | "**Proprietary** Program Control Language" — the expansion itself changed |
+| *PXC.A Reference Manual*, A6V12954388 | 04/2025 | plain **PPCL**, and sends a Desigo PXC4/5/7.A engineer to "the **PPCL Users Manual (125-1896)**" — dropping APOGEE from the citation |
+| PXC.A Modernization guide, A6V13998441 | 2026 | plain **PPCL**, describing conversion of PPCL *forward* onto PXC.A from MBC/MEC and BACnet PXC panels |
+| Desigo CC engineering help | current | "**APOGEE PPCL Editor**" — 420 occurrences, but this is the name of an *editor module* under "APOGEE BACnet Applications", not of the language |
+
+So the only name stable across twenty-five years of Siemens documentation is
+**PPCL**. A 2025 manual for current Desigo hardware cites the 2000 manual as
+the language reference, and the 2026 modernization guide moves PPCL *onto* the
+newest panels rather than off them. Calling the language "APOGEE PPCL" reads it
+as legacy, which is wrong in a way that matters to anyone deciding whether the
+tool applies to their site.
+
+Corrected in the README, `CLAUDE.md`, the skill, `cli.py --help`,
+`spec.PROGRAM_NAME_MAX`'s comment (which also mis-cited the source — the
+30-character limit is from the Desigo help and is not generation-specific), and
+the public repository description. **Left alone** where the phrase is a proper
+noun: the manual's own title, and Desigo CC's "APOGEE PPCL Editor". `apogee`
+stays a `Firmware` member, because there it names a firmware family correctly.
+
+### The Siemens library is 42 programs, not 84
+
+Going after `W330`'s "340 hits" found the count before it found the rule.
+
+The library ships in **two product trees** — one under the Insight tree, one
+under the Datamate Advanced product tree — and the first collection of it took
+both, naming the second copy of each file `__dup1`. All 42 pairs are
+byte-identical. So the regression corpus was 42 programs counted twice, and
+every absolute figure taken from it was exactly doubled.
+
+| Published | Actual |
+|---|---|
+| 84 programs | **42** |
+| 15,726 lines | **7,863** |
+| 15,716 parsed / 10 failures | **7,858 / 5** |
+| 146 lines failed before the parser fixes | **73** |
+| `W104` 2,134 of 3,040 warnings | **1,067 of 1,520** |
+| `W330` 340 | **170** |
+
+**Every ratio is unchanged** — 99.94% parse rate, 70% `W104` share — because
+doubling a corpus doubles both sides of a fraction. No conclusion drawn from
+this corpus moves. Only the counts were wrong, and they were wrong in the
+public repository, which is the part that matters.
+
+Pass 14 is left as written with a correction note at its head. Rewriting it
+would erase the record of the mistake, which is the more useful artifact.
+
+### `W330`, now that the count is real
+
+Not a false positive, and not one finding. All **170** hits are `@OPER` — the
+operator's own priority — and by write coverage they fall into three groups:
+
+| | | |
+|---|---|---|
+| Written **unconditionally** every pass | 134 | 79% |
+| Written on **both branches** of one `IF` | 21 | 12% |
+| **Conditional only** — can strand | 15 | 9% |
+
+The 91% are programs that drive a point at `@OPER` continuously: a lamp-test
+utility that turns on every FLN indicator and is meant to be left that way, and
+`IF(c) THEN ON(@OPER,X) ELSE OFF(@OPER,X)` pairs that cover both states. Those
+cannot strand a point — something writes it every pass — but they do mean an
+operator's own command is overwritten on the next pass, which the rule's
+current text does not say.
+
+Only the 9% match what `W330` actually claims: commanded above `NONE` on a path
+that ends, with nothing to release it.
+
+One rule, two conditions, one message. **Next: split it.**
+
+### Still to do
+
+1. **Decide `W104`.** Unchanged, and still the user's call. The count moved;
+   the 70% did not.
+2. Split `W330` by write coverage.
 3. Handle the `UNKNOWN (...)` marker in the lexer.
 4. A rule for the `SET`-without-deadband idiom on PXC.A.

@@ -291,8 +291,8 @@ def test_a_C_comment_is_still_a_comment_not_a_disabled_line():
 
 # -- the dot problem, in the places it was still unguarded ------------------
 #
-# All three found by parsing Siemens' own 84-program application library, where
-# 146 of 15,726 lines failed. Ten still do, and those are real syntax errors in
+# All three found by parsing Siemens' own 42-program application library, where
+# 73 of 7,863 lines failed. Five still do, and those are real syntax errors in
 # the library itself.
 
 
@@ -300,8 +300,8 @@ def test_an_unquoted_DEFINE_substitution_is_one_name():
     """%X%AAA is a name prefix plus a name, not two tokens.
 
     The documented example quotes it -- ON("%A01%.RAF") -- and quoted always
-    worked. Siemens' shipped library writes it bare throughout, which is 116
-    of the 146 failures.
+    worked. Siemens' shipped library writes it bare throughout, which is 58
+    of the 73 failures.
     """
     prog = parser.parse("00010\tON(%X%AAA)\n00020\tGOTO 10\n")
     assert prog.errors == []

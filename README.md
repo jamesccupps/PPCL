@@ -1,7 +1,12 @@
 # PPCL Workbench
 
-Read, inspect, lint, debug, optimise and **write** Siemens APOGEE PPCL (Powers
-Process Control Language).
+Read, inspect, lint, debug, optimise and **write** Siemens **PPCL**.
+
+PPCL is not a legacy language. Siemens' own *PXC.A Reference Manual*
+(A6V12954388, 04/2025) sends you to the same *PPCL User's Manual* (125-1896)
+for a current Desigo PXC4/5/7.A, and the 2026 modernization guide converts
+PPCL *forward* onto PXC.A from MBC/MEC and BACnet PXC panels. This toolkit
+covers six firmware families, APOGEE through PXC.A.
 
 Zero dependencies, Python 3.10+, stdlib only. Everything runs locally — no
 program text ever leaves the machine.
