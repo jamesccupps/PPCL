@@ -2644,3 +2644,87 @@ wrong: the entire reason to read a report is to learn which lines the panel is
 2. Read the remaining unopened books, in the order above. `Globcmd`
    (cross-panel commanding, which `W340` is about), `Convert` (generation
    translation) and `Tod` (schedules) are the next three worth opening.
+
+---
+
+## 2026-09-18 (twenty-third pass) — reading the unopened books
+
+Three of the books from the coverage map, in the order the map suggested.
+
+### `Globcmd` — the priority model, confirmed from the commanding side
+
+Fifty-one pages about the Global Commander, with a page per priority. It
+states the arbitration rule in one sentence:
+
+> "To command a point, you ... must have a command priority **greater than, or
+> equal to**, the current command priority of the point."
+
+and the hierarchy OPER > SMOKE > EMER > PDL > NONE, with `@NONE` described as
+"commanded by the standard PPCL control program" — the same reading this
+project settled on from the other direction. Nothing to change; a confirmation
+from a book whose subject is commanding rather than programming.
+
+It does **not** settle open question 3. Its "release" is the operator tool's,
+not PPCL's `RELEAS` statement.
+
+Two things it adds:
+
+- **`BN16` confirmed a third time.** "For P1 FLN devices, the default initial
+  value priority is BN16", and releasing a subpoint's *command* is a separate
+  operation from releasing its *initial value* — the tooling makes them
+  separate checkboxes. The APOGEE-to-BACnet slot map has been in the research
+  log since pass 8 and was never carried into `PPCL-REFERENCE`, which is the
+  distilled artifact anyone actually reads. **Now in §2**, where the priority
+  model is.
+- **Five priorities are not universal.** SMOKE, EMER and PDL "do not apply to
+  Staefa points", where only Manual (→ `@OPER`) and Automatic (→ `@NONE`)
+  exist; and command priority does not affect Fire points at all in a
+  fire-alarm network integrated through the Life Safety Option.
+
+### `Convert` — one sentence, and it found a defect here
+
+The database-conversion book has a **PPCL Conversion Guidelines** page, and one
+sentence on it is worth the whole pass:
+
+> "Point names in comments or **OIP statements are not modified** and must be
+> modified manually."
+
+Siemens' own converter renames points across a whole database and gives up on
+OIP. So: what does `redact` do with one?
+
+It did not leak — but it mangled it, and the mangling hid two real defects.
+
+**One.** An OIP sequence is keystrokes, not a name. `_redact_statement` passed
+every quoted string through the point-name mapper, so
+`"P/T/D/H///SITE.TOWER.AHU01.SFAN/1/"` was split on `.` and came out as three
+tokens — `P/T/D/H///SITE` mapped as if it were a single name. The same point
+named on the next line mapped to something else entirely. A redacted program
+was safe and unusable, and the mapping file could not reverse it.
+
+**Two, and worse because it was not about OIP at all.** The bare-name pass runs
+after the quoted pass and its lookbehind excludes a name preceded by a quote or
+a dot — which covers an ordinary `"A.B.C"`, and does not cover one preceded by
+the `/` inside an OIP sequence. So it walked back into its own output and
+re-redacted tokens the first pass had just written: `PT001` became `PT007`, and
+the sequence's single-letter menu keystrokes were mapped as if they were point
+names. Every existing redaction test passed throughout, because none of them
+contained a `/`.
+
+Fixed both. `keystroke_sequence` splits on `/` and redacts a component only
+when it **cannot** be a menu keystroke or a typed number — erring toward
+redacting, since the dangerous direction is leaving something in. And the
+quoted spans are now held out of the bare pass entirely rather than relying on
+a lookbehind to keep it away from them.
+
+Result: `OIP(PT003,"P/T/D/H///PT001.PT002.AHU01.SFAN/1/")` beside
+`ON("PT001.PT002.AHU01.SFAN")` — same point, same token, menu structure
+intact, four mapping entries instead of six.
+
+`Convert` also confirms `LCTLR` is real and application-numbered, defaulting to
+application 65535 when no descriptor exists; and that conversion preserves
+enabled/disabled attributes and line numbers unchanged.
+
+### Still to do
+
+1. **Decide `W104`.** Still the user's call.
+2. `Tod`, `Syspro`, `Commandr` and `Eqedit` remain unopened.

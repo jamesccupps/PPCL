@@ -123,6 +123,34 @@ class Redactor:
         redacted = ".".join(self.segment(part) for part in body.split("."))
         return sigil + redacted
 
+    def keystroke_sequence(self, seq: str) -> str:
+        """Redact an OIP keystroke sequence without destroying its structure.
+
+        An OIP sequence is not a point name. It is what an operator would type
+        at a terminal, with ``/`` acting as a carriage return and one ``/`` per
+        menu level -- and a point name appears in it as one component among
+        menu letters and typed numbers. Passing the whole string through
+        :meth:`name` folds the menu keystrokes into the first segment, so
+        ``"P/T/D/H///BLD.TOWER.SFAN/1/"`` came out as three tokens that mean
+        nothing, mapped inconsistently with the same point named anywhere else
+        in the program.
+
+        Siemens' own database converter does not even attempt this: "Point
+        names in comments or OIP statements are not modified and must be
+        modified manually" (Insight Database Conversion help, PPCL Conversion
+        Guidelines). This does attempt it, and errs the safe way -- a
+        component is kept only when it **cannot** carry a site name.
+        """
+        out = []
+        for part in seq.split("/"):
+            if len(part) <= 1:
+                out.append(part)          # empty, or one menu keystroke
+            elif part.isdigit():
+                out.append(part)          # a typed number
+            else:
+                out.append(self.name(part))
+        return "/".join(out)
+
     # -- text rewriting ----------------------------------------------------
 
     _QUOTED = re.compile(r'"([^"]*)"')
@@ -152,11 +180,33 @@ class Redactor:
                                    self._redact_statement(body)))
         return "\n".join(out) + "\n"
 
-    def _redact_statement(self, body: str) -> str:
-        def quoted(m):
-            return '"%s"' % self.name(m.group(1))
+    _OIP_CALL = re.compile(r"\bOIP\s*\(", re.I)
 
-        body = self._QUOTED.sub(quoted, body)
+    def _redact_statement(self, body: str) -> str:
+        # An OIP sequence is keystrokes, not a name, and must be split on its
+        # own separator before anything else touches the quotes.
+        is_oip = bool(self._OIP_CALL.search(body))
+
+        def quoted(m):
+            inner = m.group(1)
+            if is_oip and "/" in inner:
+                return '"%s"' % self.keystroke_sequence(inner)
+            return '"%s"' % self.name(inner)
+
+        # Substitute quoted names first, then HOLD THEM OUT of the bare pass.
+        # Without this the bare pass walks back into the result: its lookbehind
+        # excludes a name preceded by a quote or a dot, which covers an ordinary
+        # "A.B.C", but not one preceded by the "/" of an OIP sequence. That
+        # re-redacted tokens this pass had just written -- PT001 became PT007 --
+        # and mapped the sequence's single-letter menu keystrokes as if they
+        # were point names.
+        held = []
+
+        def hold(m):
+            held.append(quoted(m))
+            return '"' + chr(0) + str(len(held) - 1) + chr(0) + '"'
+
+        body = self._QUOTED.sub(hold, body)
 
         def bare(m):
             word = m.group(1)
@@ -167,7 +217,12 @@ class Redactor:
                 return word
             return self.name(word)
 
-        return self._BARE.sub(bare, body)
+        body = self._BARE.sub(bare, body)
+
+        def restore(m):
+            return held[int(m.group(1))]
+
+        return re.sub('"' + chr(0) + r"(\d+)" + chr(0) + '"', restore, body)
 
 
 def redact_files(paths, keep_generic: bool = True) -> Redaction:

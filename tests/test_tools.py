@@ -480,6 +480,57 @@ def test_redaction_drops_comment_text():
     assert "Acme" not in out and "Suite" not in out
 
 
+def test_redaction_keeps_an_OIP_keystroke_sequence_intact():
+    """An OIP sequence is keystrokes, not a point name.
+
+    Siemens' own database converter gives up here -- "Point names in comments
+    or OIP statements are not modified and must be modified manually" -- so
+    the sequence has to be split on its own separator before anything treats
+    it as a name. Folding the whole string through the name mapper turned
+    "P/T/D/H///SITE.TOWER.AHU01.SFAN/1/" into three meaningless tokens that
+    did not match the same point named anywhere else in the program.
+    """
+    from ppcl.redact import Redactor
+
+    r = Redactor()
+    out = r.redact_text(
+        '10\tOIP(TRIG,"P/T/D/H///SITEX.TOWER.AHU01.SFAN/1/")\n'
+        '20\tON("SITEX.TOWER.AHU01.SFAN")\n30\tGOTO 10\n'
+    )
+
+    assert "SITEX" not in out and "TOWER" not in out
+    # The menu structure survives: single keystrokes, the empty levels, the
+    # typed number.
+    assert "P/T/D/H///" in out and "/1/" in out
+    # And the point is the SAME redacted name in both places.
+    inside = out.splitlines()[0].split('"')[1].split("///")[1].split("/")[0]
+    outside = out.splitlines()[1].split('"')[1]
+    assert inside == outside, (inside, outside)
+    # Generic vocabulary is preserved in both, not just one.
+    assert inside.endswith(".AHU01.SFAN")
+    # No junk keys: the mapper saw three real names and nothing else.
+    assert set(r.mapping) == {"SITEX", "TOWER", "AHU01", "TRIG"}
+
+
+def test_the_bare_pass_does_not_walk_back_into_a_quoted_name():
+    """A pre-existing hole that only an OIP sequence was wide enough to show.
+
+    The bare-name pass excludes a name preceded by a quote or a dot, which
+    covers an ordinary "A.B.C" -- but not one preceded by the "/" inside an
+    OIP sequence. So it re-redacted tokens the quoted pass had just written,
+    and PT001 became PT007.
+    """
+    from ppcl.redact import Redactor
+
+    out = Redactor().redact_text(
+        '10\tOIP(TRIG,"A/SITEX.PUMP/B")\n20\tGOTO 10\n'
+    )
+    quoted = out.splitlines()[0].split('"')[1]
+    # Exactly one redaction per component, no PTnnn wrapped in another PTnnn.
+    assert quoted.count("PT") == 1, quoted
+    assert quoted.startswith("A/") and quoted.endswith("/B")
+
+
 def test_a_point_may_be_named_with_a_reserved_word():
     """Reserved means "do not name a point this", not "this name is illegal".
 

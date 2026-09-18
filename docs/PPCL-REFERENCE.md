@@ -142,6 +142,37 @@ Older firmware notes: physical firmware has only `NONE` and `EMER`, set with
 them directly — you need flag points. Revision 9.2+ adds `SMOKE` and direct
 `@priority` testing.
 
+### The same five priorities, seen from BACnet
+
+On a BACnet ALN the five map onto slots of the BACnet priority array, and
+knowing which is the difference between reading a Desigo priority column and
+guessing at it. `BN01` is highest.
+
+| BACnet slot | APOGEE priority | BACnet name |
+|---|---|---|
+| `BN01` | | Manual Life Safety |
+| `BN02` | | Automatic Life Safety |
+| `BN05` | | Critical Equipment Control |
+| `BN06` | | Minimum On/Off |
+| **`BN08`** | **`@OPER`** | Manual Operator |
+| **`BN10`** | **`@SMOKE`** | |
+| **`BN12`** | **`@EMER`** | |
+| **`BN14`** | **`@PDL`** | |
+| `BN16` | | Initial value of the point; TEC application |
+| **Relinquish Default** | **`@NONE`** | |
+
+Three independent sources agree on the four middle rows. `BN16` matters more
+than it looks: it is where a P1 FLN subpoint's *initial value* lives —
+"for P1 FLN devices, the default initial value priority is BN16" — and
+releasing a subpoint's command is a different operation from releasing its
+initial value. The tooling makes them separate checkboxes for that reason.
+
+Also worth knowing before assuming five priorities exist everywhere: the four
+above `@NONE` **do not apply to Staefa points**, where only two exist —
+Manual, which maps to `@OPER`, and Automatic, which maps to `@NONE`. And
+command priority does not affect Fire points at all in a fire-alarm network
+integrated through the Life Safety Option.
+
 ---
 
 ## 3. Point types
