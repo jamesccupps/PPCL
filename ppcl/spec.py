@@ -96,6 +96,12 @@ class PointType:
     kind: str  # "analog" | "digital" | "bundled" | "counter" | "controller"
     addresses: tuple
     description: str
+    #: Whether the proof DI is optional. Documented as optional on every
+    #: bundled type EXCEPT L2SL, whose definition states the proof without
+    #: qualification. Matters because PRFON on a point with no proof wired can
+    #: never be true, and nothing in the program says so.
+    proof_optional: bool = False
+    notes: tuple = ()
 
 
 POINT_TYPES = {
@@ -110,33 +116,53 @@ POINT_TYPES = {
             "bundled",
             ("DO(OFF/FAST)", "DO(OFF/SLOW)", "DI(PROOF)"),
             "Fast/Slow/Stop, latched",
+            proof_optional=True,
+            notes=("Commands two LATCHED digital outputs, Fast/Stop and "
+                   "Slow/Stop, and reads one optional latched proof DI.",),
         ),
         PointType(
             "LFSSP",
             "bundled",
             ("DO(OFF)", "DO(FAST)", "DO(SLOW)", "DI(PROOF)"),
             "Fast/Slow/Stop, pulsed",
+            proof_optional=True,
+            notes=("Commands THREE pulsed digital outputs -- Fast, Slow and "
+                   "Stop -- and reads one optional latched proof DI.",),
         ),
         PointType(
             "LOOAL",
             "bundled",
             ("DO(ON/OFF)", "DO(AUTO)", "DI(PROOF)"),
             "On/Off/Auto, latched",
+            proof_optional=True,
+            notes=("Commands two LATCHED digital outputs, On/Off and Auto, "
+                   "and reads one optional latched proof DI.",),
         ),
         PointType(
             "LOOAP",
             "bundled",
             ("DO(ON)", "DO(OFF)", "DO(AUTO)", "DI(PROOF)"),
             "On/Off/Auto, pulsed",
+            proof_optional=True,
+            notes=("MIXED: On and Off are PULSED digital outputs, Auto is a "
+                   "LATCHED one. Reads one optional latched proof DI.",),
         ),
         PointType(
             "LPACI", "counter", ("DI(COUNT)",), "Pulsed accumulator counter input"
         ),
         PointType(
-            "L2SL", "bundled", ("DO(ON/OFF)", "DI(PROOF)"), "Two-state, latched"
+            "L2SL", "bundled", ("DO(ON/OFF)", "DI(PROOF)"),
+            "Two-state, latched",
+            notes=("Commands one latched digital output and reads one latched "
+                   "proof DI. The only bundled type whose proof is documented "
+                   "WITHOUT being called optional.",),
         ),
         PointType(
-            "L2SP", "bundled", ("DO(ON)", "DO(OFF)", "DI(PROOF)"), "Two-state, pulsed"
+            "L2SP", "bundled", ("DO(ON)", "DO(OFF)", "DI(PROOF)"),
+            "Two-state, pulsed",
+            proof_optional=True,
+            notes=("Commands two PULSED digital outputs, On and Off, and "
+                   "reads one optional latched proof DI.",),
         ),
         # Not in Table 3-2 but referenced by the DAY/NIGHT commands.
         PointType("LCTLR", "controller", ("CTLR",), "Logical controller (DAY/NIGHT)"),
@@ -2146,6 +2172,22 @@ _check_categories()
 #: Only the codes that bear on writing PPCL are transcribed. The manual's full
 #: E-code list runs into the thousands and covers cassette tapes, report
 #: printers and FLN drops.
+
+#: Peak Demand Limiting is five commands, and the manual states an order they
+#: must be defined in: "Distributed PDL uses five PPCL commands that must be
+#: defined in the following order" -- Insight Program Editor, Peak Demand
+#: Limiting. Not every program has all five; see PDL_ROLES.
+PDL_COMMAND_ORDER = ("PDLMTR", "PDLSET", "PDLDPG", "PDL", "PDLDAT")
+
+#: Which panel carries which of them. "The predictor field panel must have the
+#: PDLMTR, PDLSET, and PDLDPG commands defined in its PPCL program. Each
+#: load-handler field panel must have the PDL and PDLDAT statements defined in
+#: its PPCL program." A predictor that also controls loads carries all five.
+PDL_ROLES = {
+    "predictor": ("PDLMTR", "PDLSET", "PDLDPG"),
+    "load_handler": ("PDL", "PDLDAT"),
+}
+
 
 #: ``{code: (text, explanation)}`` -- the PPCL compiler's own errors.
 PPCL_COMPILER_ERRORS = {

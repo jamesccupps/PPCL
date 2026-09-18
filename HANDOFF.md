@@ -80,7 +80,7 @@ runs on any engineering workstation with no install. Windows is the primary
 platform.
 
 ```bash
-python -m pytest tests -q          # 447 tests, ~150s
+python -m pytest tests -q          # 457 tests, ~150s
 python -m ppcl.cli serve           # the app
 python -m ppcl.cli lint samples    # exercises the CLI on real programs
 python -m ppcl.cli help            # the built-in documentation
@@ -90,8 +90,8 @@ python -m ppcl.cli help            # the built-in documentation
 
 ## 2. Current state
 
-**447 tests passing.** ~18,600 lines Python, ~4,900 lines UI, ~3,800 lines
-tests. 79 lint rules, 65 commands, 99 BACnet properties, 30 block types,
+**457 tests passing.** ~18,600 lines Python, ~4,900 lines UI, ~3,800 lines
+tests. 80 lint rules, 65 commands, 99 BACnet properties, 30 block types,
 16 CLI subcommands, 11 MCP tools, 12 help pages, 20 settings, 6 firmware
 families.
 
@@ -100,7 +100,7 @@ families.
 | Language spec | `ppcl/spec.py` | Complete, manual-derived, cited. Now also carries Siemens' own Command Assist categories |
 | Lexer / parser | `ppcl/lexer.py`, `parser.py` | Solid. Parses every real program seen so far with zero errors |
 | Analysis | `ppcl/analyzer.py` | Control flow with wrap edge + Tarjan SCC; point read/write tracking |
-| Linter | `ppcl/linter.py`, `rules/` | 79 rules, each citing its source |
+| Linter | `ppcl/linter.py`, `rules/` | 80 rules, each citing its source |
 | Formatter | `ppcl/formatter.py` | Format + renumber with exact reference rewriting |
 | Simulator | `ppcl/simulator.py` | Interpreter with real priority arbitration, panel-faithful line budget |
 | **Debugger** | `ppcl/debug.py` | Line / write / condition breakpoints, step, step over, step out, run to cursor, watch with priority, mid-run override, coverage |
@@ -359,7 +359,7 @@ on PXC.A, the line limit being 512 not 66, `LOCAL`'s sixteen being per
 statement, the `W202` severity, this site not being PXC.A at all). Until a pass
 produces no corrections, the language is not known well enough to condense.
 
-The material already exists and is cited -- `spec.py`, the 79 rules,
+The material already exists and is cited -- `spec.py`, the 80 rules,
 `PPCL-REFERENCE.md`, `helpdocs.py`, the panel error tables. The work is
 selection and layout, not discovery. Likely shape:
 

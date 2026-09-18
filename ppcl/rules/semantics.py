@@ -1140,3 +1140,55 @@ def device_local_across_network(ctx):
                                            "resident point")
                             if found:
                                 yield found
+
+
+@rule("W313", "PDL family statements are not in the required order",
+      Severity.WARNING)
+def pdl_command_order(ctx):
+    """Peak Demand Limiting is five commands with a stated order.
+
+    "Distributed PDL uses five PPCL commands that must be defined in the
+    following order: PDLMTR ... PDLSET ... PDLDPG ... PDL ... PDLDAT."
+    -- Insight Program Editor, Peak Demand Limiting.
+
+    Only the commands actually present are checked, because the five are split
+    across panels by design: a predictor panel carries PDLMTR, PDLSET and
+    PDLDPG, and each load-handler panel carries PDL and PDLDAT. A panel doing
+    both carries all five.
+
+    A warning rather than an error: the manual says "must", but so did the
+    integer/decimal rule that field code turned out to break with impunity.
+    """
+    first = {}
+    for ln in ctx.program.lines:
+        for stmt in substatements(ln.stmt):
+            if not isinstance(stmt, CommandCall):
+                continue
+            if stmt.name in spec.PDL_COMMAND_ORDER:
+                first.setdefault(stmt.name, ln)
+
+    present = [n for n in spec.PDL_COMMAND_ORDER if n in first]
+    if len(present) < 2:
+        return
+
+    for earlier, later in zip(present, present[1:]):
+        a, b = first[earlier], first[later]
+        if a.number <= b.number:
+            continue
+        yield _d(
+            "W313",
+            Severity.WARNING,
+            "%s at line %d comes after %s at line %d; the PDL commands are "
+            "defined in the order %s"
+            % (earlier, a.number, later, b.number,
+               " then ".join(spec.PDL_COMMAND_ORDER)),
+            a.number,
+            source_line=a.source_line,
+            detail="Peak Demand Limiting builds on itself: the meter feeds "
+            "the setpoints, the setpoints feed the distribution, and only "
+            "then do the load-shedding statements have a target to work "
+            "against. This program defines them out of that order.",
+            suggestion="Move %s above %s." % (earlier, later),
+            manual="Insight Program Editor, Peak Demand Limiting",
+        )
+        return  # one finding is enough; the whole block wants reordering

@@ -811,6 +811,20 @@ def cmd_explain(args):
         pt = spec.POINT_TYPES[topic]
         print("%s -- %s (%s)" % (pt.name, pt.description, pt.kind))
         print("  addresses: %s" % ", ".join(pt.addresses))
+        for note in pt.notes:
+            print()
+            for line in textwrap.wrap(note, 74):
+                print("  " + line)
+        if pt.proof_optional:
+            print("\n  The proof DI is optional on this type. If none is "
+                  "wired, PRFON can never")
+            print("  be true and nothing in the program will say why.")
+        commands = sorted(
+            name for name, c in spec.ALL.items()
+            if c.point_types and pt.name in c.point_types
+        )
+        if commands:
+            print("\n  commanded by: %s" % ", ".join(commands))
         return 0
 
     if topic in spec.PRIORITY_RANK or "@" + topic in spec.PRIORITY_RANK:

@@ -678,3 +678,33 @@ def test_slope_and_intercept_accept_the_usual_column_names():
     db = points.load_csv("name,type,gain,offset\nX,LAO,2.5,10\n")
     assert db.lookup("X").slope == 2.5
     assert db.lookup("X").intercept == 10.0
+
+
+def test_bundled_point_types_record_the_proof_being_optional():
+    """Every bundled type except L2SL documents its proof DI as optional.
+
+    It matters because PRFON on a point with no proof wired can never be true,
+    and nothing in the program text says so.
+    """
+    from ppcl import spec
+
+    for name in ("L2SP", "LOOAL", "LOOAP", "LFSSL", "LFSSP"):
+        assert spec.POINT_TYPES[name].proof_optional, name
+    assert not spec.POINT_TYPES["L2SL"].proof_optional
+
+
+def test_LOOAP_records_that_it_mixes_pulsed_and_latched_outputs():
+    from ppcl import spec
+
+    note = " ".join(spec.POINT_TYPES["LOOAP"].notes)
+    assert "PULSED" in note and "LATCHED" in note
+
+
+def test_pdl_order_and_roles_are_declared():
+    from ppcl import spec
+
+    assert spec.PDL_COMMAND_ORDER == ("PDLMTR", "PDLSET", "PDLDPG", "PDL",
+                                      "PDLDAT")
+    everything = set(spec.PDL_ROLES["predictor"]) | set(
+        spec.PDL_ROLES["load_handler"])
+    assert everything == set(spec.PDL_COMMAND_ORDER)

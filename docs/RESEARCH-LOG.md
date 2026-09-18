@@ -1351,3 +1351,97 @@ would be exactly the speculative tuning the immediate roadmap item warns about.
 4. `A6V12954388` -- still unread.
 5. See the roadmap's Tier 3.5 and 3.6: the quick reference deliverable, and a
    deliberate Insight-versus-Desigo comparison.
+
+---
+
+## 2026-09-18 (tenth pass) — the Insight corpus is close to exhausted
+
+### Method: find what is missing, rather than re-reading what is not
+
+Re-reading 736 pages a second time finds nothing. Instead
+`scratchpad/findnew.py` pulls every sentence in a corpus that states a limit or
+a prohibition, then discards the ones whose distinctive words already appear in
+`spec.py`, the rules, `helpdocs.py` or `PPCL-REFERENCE.md`. What survives is the
+reading list.
+
+The result is the useful finding:
+
+| Corpus | Pages | Constraint sentences not already reflected |
+|---|---|---|
+| `Proged.chm` (Program Editor) | 736 | **7** |
+| `Point.chm` | 320 | **8** |
+
+And of those fifteen, **one** was a PPCL language fact. The rest are workstation
+matters -- alarm printing options, Staefa point editing, supervised-object
+passwords, BACnet Event Enrollment configuration -- none of which can be
+checked from program text.
+
+A spot check confirmed it from the other direction: every constraint the
+scanner *did* find on the command pages (`DPHONE`/`EPHONE` not usable over a
+network, `GOSUB` not inside `IF`, `INITTO` not resetting `LPACI`, `OIP` unable
+to perform a `LOOP`, one `PDLMTR` per meter area, the priority slot costing a
+parameter) was **already in `spec.py`**, most of them verbatim.
+
+**Conclusion: these two books are done.** Further passes over them are not a
+good use of anyone's time.
+
+### The one thing that was missing — PDL has a required order
+
+> "Distributed PDL uses five PPCL commands that must be defined in the
+> following order: PDLMTR ... PDLSET ... PDLDPG ... PDL ... PDLDAT."
+
+And the reason the five are rarely all present:
+
+> "The predictor field panel must have the PDLMTR, PDLSET, and PDLDPG commands
+> defined in its PPCL program. Each load-handler field panel must have the PDL
+> and PDLDAT statements defined in its PPCL program."
+
+`spec.PDL_COMMAND_ORDER` and `spec.PDL_ROLES` record both. **New rule `W313`**
+checks the order of whatever is present, so a load-handler panel carrying only
+`PDL` and `PDLDAT` is not flagged for the three it is not supposed to have. One
+finding per program -- five would be five ways of saying the same thing.
+
+Warning rather than error, for the reason that is becoming a habit here: the
+manual says "must", and so did the integer/decimal rule that field code turned
+out to break with impunity.
+
+### Bundled points, finished off
+
+From `Point.chm`, and phrased too gently for the scanner to catch:
+
+- **The proof DI is optional on every bundled type except `L2SL`.** Every other
+  definition says "one **optional** latched digital input point (proof)";
+  L2SL's says it without the qualifier. This matters: `PRFON` on a point with
+  no proof wired can never be true, and nothing in the program says why.
+- **`LOOAP` mixes the two.** "Commands two pulsed digital output points (On and
+  Off) and one **latched** digital output point (Auto)." Every other bundled
+  type is uniformly pulsed or uniformly latched.
+
+`PointType` gained `proof_optional` and `notes`, and `ppcl explain LOOAP` now
+prints the mixed-output warning, the optional-proof caveat, and which commands
+can drive the type.
+
+### What is actually left to read
+
+| Source | Status |
+|---|---|
+| `Proged.chm`, `Point.chm` | **exhausted** |
+| Desigo CC Engineering help | mined; its PPCL section is a glossary and is thinner than Insight's |
+| Desigo CC Operating help | **strict subset of Engineering** -- nothing to do |
+| A6V10374898 (PXC.A PPCL) | mined across passes 1-4 |
+| A6V10324350 (BACnet ALN, 125-3020) | Chapter 10 and Appendix C mined; the rest is workstation procedure |
+| **A6V12954388** (PXC.A Reference) | **unread** |
+| **A6V13998441** (PXC.A Modernization, 2026-04) | **unread, and the most recent Siemens document on this machine** |
+| 84-program Siemens application library | **unlinted** |
+
+The last three are the remaining vein. Note that the first two are PXC.A
+documents and so describe a generation the reference site does not run -- they
+are for the toolkit's completeness, not for that site.
+
+### Still to do
+
+1. Read `A6V13998441` and `A6V12954388`.
+2. Lint the 84-program Siemens application library as a regression corpus.
+   Licensing check first; none of it gets copied into `samples/`.
+3. The `E12` rule, once a point export with slope and intercept exists.
+4. A real `PPCL DISPLAY REPORT` to run `lint --report` against.

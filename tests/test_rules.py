@@ -444,6 +444,50 @@ def test_lsq2_signature_and_line_references():
     assert "E201" in codes("10\tLSQ2(1,A,900,910)\n20\tGOTO 10\n")
 
 
+def test_pdl_commands_must_be_defined_in_order():
+    """PDLMTR, PDLSET, PDLDPG, PDL, PDLDAT -- in that order."""
+    good = (
+        "10\tPDLMTR(1,M,0)\n"
+        "20\tPDLSET(1,8:00,100.0)\n"
+        "30\tPDLDPG(1,KW,TGT)\n"
+        "40\tPDL(1,KW,TGT,100,199,0)\n"
+        "50\tPDLDAT(FAN,10,5,180,10)\n"
+        "60\tGOTO 10\n"
+    )
+    assert "W313" not in codes(good)
+    assert "W313" in codes("10\tPDL(1,KW,TGT,100,199,0)\n"
+                           "20\tPDLMTR(1,M,0)\n30\tGOTO 10\n")
+
+
+def test_a_load_handler_panel_is_not_flagged_for_the_missing_three():
+    """The five are split across panels by design.
+
+    A predictor panel carries PDLMTR/PDLSET/PDLDPG; each load-handler carries
+    PDL and PDLDAT. Only what is present gets ordered.
+    """
+    handler = ("10\tPDL(1,KW,TGT,100,199,0)\n"
+               "20\tPDLDAT(FAN,10,5,180,10)\n30\tGOTO 10\n")
+    assert "W313" not in codes(handler)
+    predictor = ("10\tPDLMTR(1,M,0)\n20\tPDLSET(1,8:00,100.0)\n"
+                 "30\tPDLDPG(1,KW,TGT)\n40\tGOTO 10\n")
+    assert "W313" not in codes(predictor)
+
+
+def test_only_one_ordering_finding_per_program():
+    """The whole block wants reordering; five findings would be five ways of
+    saying the same thing."""
+    scrambled = (
+        "10\tPDLDAT(FAN,10,5,180,10)\n"
+        "20\tPDL(1,KW,TGT,100,199,0)\n"
+        "30\tPDLDPG(1,KW,TGT)\n"
+        "40\tPDLSET(1,8:00,100.0)\n"
+        "50\tPDLMTR(1,M,0)\n"
+        "60\tGOTO 10\n"
+    )
+    prog = parser.parse(scrambled, name="t")
+    assert len([d for d in linter.lint(prog) if d.code == "W313"]) == 1
+
+
 def test_device_local_constructs_do_not_cross_the_network():
     """Resident points, status indicators and special functions are per panel."""
     assert "W340" in codes('10\tIF("PANEL2:TIME" .GT. 8:00) THEN ON(FAN)\n20\tGOTO 10\n')
