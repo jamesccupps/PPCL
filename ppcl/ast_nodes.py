@@ -251,6 +251,12 @@ class Line:
     #: is not evaluating it. Nothing in a text export records this, so it is
     #: False unless a PPCL DISPLAY REPORT said otherwise. See ``ppcl.report``.
     disabled: bool = False
+    #: The compiler did not recognise this line's command and wrapped it in an
+    #: ``UNKNOWN (...)`` marker. Unlike ``disabled``, this one IS in the text:
+    #: "Any unknown PPCL commands will be added with an UNKNOWN (...) marker
+    #: and ignored by the compiler upon saving a program." -- Desigo PXC.A Web
+    #: Interface User Guide (A6V12893115), PPCL Diagnostics.
+    unknown: bool = False
 
     @property
     def is_comment(self) -> bool:
@@ -264,7 +270,7 @@ class Line:
         exactly like a comment -- control passes over it, and a branch aimed
         at it lands on the next line the panel will actually run.
         """
-        if self.disabled:
+        if self.disabled or self.unknown:
             return False
         return not isinstance(self.stmt, (Comment, ParameterDecl))
 

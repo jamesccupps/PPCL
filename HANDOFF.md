@@ -80,7 +80,7 @@ runs on any engineering workstation with no install. Windows is the primary
 platform.
 
 ```bash
-python -m pytest tests -q          # 493 tests, ~150s
+python -m pytest tests -q          # 495 tests, ~150s
 python -m ppcl.cli serve           # the app
 python -m ppcl.cli lint samples    # exercises the CLI on real programs
 python -m ppcl.cli help            # the built-in documentation
@@ -90,8 +90,8 @@ python -m ppcl.cli help            # the built-in documentation
 
 ## 2. Current state
 
-**493 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
-tests. 85 lint rules, 66 commands, 99 BACnet properties, 30 block types,
+**495 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
+tests. 87 lint rules, 66 commands, 99 BACnet properties, 30 block types,
 17 CLI subcommands, 11 MCP tools, 12 help pages, 20 settings, 6 firmware
 families, 29 panel error codes.
 
@@ -100,7 +100,7 @@ families, 29 panel error codes.
 | Language spec | `ppcl/spec.py` | Complete, manual-derived, cited. Now also carries Siemens' own Command Assist categories |
 | Lexer / parser | `ppcl/lexer.py`, `parser.py` | Solid. Parses every real program seen so far with zero errors |
 | Analysis | `ppcl/analyzer.py` | Control flow with wrap edge + Tarjan SCC; point read/write tracking |
-| Linter | `ppcl/linter.py`, `rules/` | 85 rules, each citing its source |
+| Linter | `ppcl/linter.py`, `rules/` | 87 rules, each citing its source |
 | Formatter | `ppcl/formatter.py` | Format + renumber with exact reference rewriting |
 | Simulator | `ppcl/simulator.py` | Interpreter with real priority arbitration, panel-faithful line budget |
 | **Debugger** | `ppcl/debug.py` | Line / write / condition breakpoints, step, step over, step out, run to cursor, watch with priority, mid-run override, coverage |
@@ -284,7 +284,11 @@ it; nothing has watched a statement execute. Keep the two claims apart.
 ### Open questions, each with the test that settles it
 
 1. Exact `LOOP` PID form — drive a known `pv` step on an isolated PXC, log `cv`, fit.
-2. Line-evaluation rate on current PXC hardware — counter program, timed, FLN count varied.
+2. Line-evaluation rate on current PXC hardware — and **PXC.A already
+   reports it**. The Web Interface exposes per-program cycle time (average over
+   the last ten cycles, highest, lowest, in ms) and those metrics are mappable
+   to virtual points and trendable. Cheapest open question here to close, and
+   it needs no lab: map the three to virtual points on a panel in service.
 3. Does a bare `RELEAS` clear `@SMOKE`? Manual is silent.
 4. ~~`DC` example vs Table 4-1~~ — **CLOSED 2026-09-18.** A6V10374898 Table 3-1
    confirms Table 4-1, with a worked example that agrees with it this time.
@@ -475,7 +479,7 @@ on PXC.A, the line limit being 512 not 66, `LOCAL`'s sixteen being per
 statement, the `W202` severity, this site not being PXC.A at all). Until a pass
 produces no corrections, the language is not known well enough to condense.
 
-The material already exists and is cited -- `spec.py`, the 85 rules,
+The material already exists and is cited -- `spec.py`, the 87 rules,
 `PPCL-REFERENCE.md`, `helpdocs.py`, the panel error tables. The work is
 selection and layout, not discovery. Likely shape:
 

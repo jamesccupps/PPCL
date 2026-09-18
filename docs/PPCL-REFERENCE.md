@@ -652,6 +652,10 @@ Questions this toolkit does not answer, each with the test that would settle it:
    an isolated panel, timed over a known interval, with FLN device count varied.
    Wire capture cannot substitute: a P2 timing census puts a panel's whole-
    program *upload* at about 10.5 ms, which bounds retrieval, not execution.
+   **PXC.A already answers this and nobody has read it off.** Its Web
+   Interface reports per-program cycle time — average over the last ten
+   cycles, highest, lowest, in milliseconds — and those metrics map to virtual
+   points and trend. No lab panel required; map them on a panel in service.
 3. **Whether a bare `RELEAS` clears `@SMOKE`.** The manual is silent. *Test:*
    command to `@SMOKE`, issue a bare `RELEAS`, read the resulting priority.
 4. ~~**`DC` example vs Table 4-1.**~~ **Closed 2026-09-18** from

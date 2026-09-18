@@ -308,6 +308,43 @@ def unknown_command(ctx):
             )
 
 
+@rule("E123", "Compiler wrapped this line in UNKNOWN and ignores it",
+      Severity.ERROR)
+def unknown_marker(ctx):
+    """The panel has already told you this line does nothing.
+
+    "Any unknown PPCL commands will be added with an UNKNOWN (...) marker and
+    ignored by the compiler upon saving a program." -- Desigo PXC.A Web
+    Interface User Guide (A6V12893115), PPCL Diagnostics.
+
+    So a line in this shape is a statement the engineer wrote, the panel kept,
+    and nothing executes. It is the rarest kind of defect and the easiest to
+    miss reading a program, because the text of the original command is still
+    right there on the line.
+    """
+    for ln in ctx.program.lines:
+        if not getattr(ln, "unknown", False):
+            continue
+        inner = getattr(ln.stmt, "text", "") or ""
+        shown = inner if len(inner) <= 40 else inner[:37] + "..."
+        yield _d(
+            "E123",
+            Severity.ERROR,
+            "the compiler did not recognise this command and ignores the "
+            "line%s" % (": %s" % shown if shown else ""),
+            ln.number,
+            source_line=ln.source_line,
+            detail="An UNKNOWN (...) wrapper is written by the compiler when "
+            "it saves a program containing a command it cannot resolve. The "
+            "line stays in the program and never runs, and nothing else "
+            "reports it -- the original text is still visible on the line, "
+            "which is what makes it easy to read straight past.",
+            manual="A6V12893115, PPCL Diagnostics (UNKNOWN Marker)",
+            suggestion="Correct the command or delete the line, then save "
+            "again. A wrapper left in place is re-wrapped on the next save.",
+        )
+
+
 @rule("E122", "OIP keystroke sequence is too long", Severity.ERROR)
 def oip_sequence_length(ctx):
     """Sixty characters including the slashes, and it fails at run time.

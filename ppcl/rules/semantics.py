@@ -829,6 +829,60 @@ def _numeric_literal(node):
     return None
 
 
+@rule("W343", "SET re-commands the same point every pass on PXC.A",
+      Severity.INFO)
+def unguarded_set_on_pxc_a(ctx):
+    """PXC.A's own guidance, and the analogue of W339 a generation later.
+
+    "The SET command is not always resolved to the actual value, which may
+    result in points being continuously commanded. To prevent unnecessary
+    MS/TP traffic, use a deadband." -- Desigo PXC.A Web Interface User Guide
+    (A6V12893115), PPCL Diagnostics.
+
+    SET does not read the point back, so an unconditional SET issues a command
+    on every pass whether or not the point already holds the value. Over an
+    MS/TP trunk that is real traffic for no change in state.
+
+    Deliberately narrow. It fires only on a SET with **no** conditional guard
+    at all, on a line the main loop reaches every pass. A SET already inside
+    an IF is left alone even when the condition is not a deadband, because at
+    that point the engineer has thought about when it should run and this rule
+    cannot read the thought. INFO, for the same reason W339 is: it is a cost,
+    not a defect, and on a small trunk the cost may not matter.
+    """
+    if ctx.firmware is not spec.Firmware.PXC_A:
+        return
+    a = ctx.analysis
+    for ln in ctx.program.lines:
+        stmt = ln.stmt
+        if not isinstance(stmt, CommandCall) or stmt.name != "SET":
+            continue
+        if ln.number not in a.steady_state or ln.number in a.subroutine_lines:
+            continue
+        target = None
+        for arg in reversed(stmt.args):
+            if isinstance(arg, Ref):
+                target = arg.name
+                break
+        yield _d(
+            "W343",
+            Severity.INFO,
+            "SET %sruns every pass with no guard, so the point is commanded "
+            "again whether or not it has changed"
+            % ("on %s " % target if target else ""),
+            ln.number,
+            detail="SET does not resolve against the point's current value, "
+            "so an unguarded one issues a command on every cycle. Siemens' "
+            "own remedy is a deadband: compute the difference between the "
+            "point and the value you want, and SET only when that difference "
+            "leaves the band.",
+            manual="A6V12893115, PPCL Diagnostics (Continuously re-commanded "
+            "points)",
+            suggestion="Guard it: LOCAL a deadband and a difference, then "
+            "IF the difference is outside the band THEN SET.",
+        )
+
+
 @rule("W342", "SSTO adjustment looks like a captured value, not an entered one",
       Severity.WARNING)
 def ssto_adjustment_literal(ctx):

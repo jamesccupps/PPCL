@@ -18,7 +18,7 @@ so it runs on any engineering workstation without a package install.
 | `ppcl/parser.py` | Error-tolerant recursive descent. A bad line becomes `Unparsed`, never aborts the file. |
 | `ppcl/ast_nodes.py` | Flat AST — PPCL has no block structure. |
 | `ppcl/analyzer.py` | Control flow (incl. the wrap edge and Tarjan SCC for steady state) and point read/write tracking. |
-| `ppcl/linter.py` + `ppcl/rules/` | 85 rules across syntax, flow, semantics, style, performance. |
+| `ppcl/linter.py` + `ppcl/rules/` | 87 rules across syntax, flow, semantics, style, performance. |
 | `ppcl/formatter.py` | Format and renumber with exact reference rewriting. |
 | `ppcl/simulator.py` | Interpreter with real priority arbitration. |
 | `ppcl/generator.py` | `Builder` (symbolic labels) plus fixed program templates. |
@@ -102,7 +102,10 @@ so it runs on any engineering workstation without a package install.
   carrying a marker and warns that loading it to a panel removes the statement.
   On **PXC.A it is in the text**: Siemens defines `# ` at the front of a line
   as the disable, and `parser` reads it, keeps the statement, and sets
-  `Line.disabled`. The statement is kept rather than flattened to prose so the
+  `Line.disabled`. A third case is written by the compiler rather than the
+  engineer: an unrecognised command is saved wrapped in `UNKNOWN (...)` and
+  ignored, so `parser` sets `Line.unknown`, does **not** parse what is inside
+  (the compiler already rejected it), and `E123` reports the line as inert. The statement is kept rather than flattened to prose so the
   linter still sees defects that would bite the moment someone re-enables it.
 
 ## Rule authoring
@@ -122,7 +125,7 @@ on idiomatic PPCL gets turned off.
 ## Testing
 
 ```bash
-python -m pytest tests -q          # 493 tests
+python -m pytest tests -q          # 495 tests
 python -m ppcl.cli lint samples    # exercises the CLI against real programs
 ```
 

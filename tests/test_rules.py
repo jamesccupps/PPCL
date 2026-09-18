@@ -731,6 +731,60 @@ def test_E316_needs_a_known_point_type_and_says_which():
     assert run({"SF1": "LXYZ"}) == []
 
 
+def test_an_UNKNOWN_marker_is_a_line_the_panel_ignores():
+    """The compiler writes this, and it is the only defect that reads as fine.
+
+    "Any unknown PPCL commands will be added with an UNKNOWN (...) marker and
+    ignored by the compiler upon saving a program." -- A6V12893115. The
+    original text stays visible on the line, so nothing about reading the
+    program suggests it is inert.
+    """
+    from ppcl import linter, parser
+
+    for body in ("UNKNOWN (SETPT(ZNTEMP,72.0))", "UNKNOWN(SETPT)"):
+        prog = parser.parse("10\t" + body + "\n20\tON(FAN)\n30\tGOTO 10\n")
+        # The wrapped text is NOT parsed: it is whatever the compiler gave up
+        # on, and parsing it would report errors about text already rejected.
+        assert prog.errors == [], body
+        assert prog.lines[0].unknown, body
+        assert not prog.lines[0].is_executable, body
+        found = {d.code for d in linter.lint(prog)}
+        assert "E123" in found, body
+        assert "E110" not in found and "E100" not in found, body
+
+    clean = parser.parse("10\tON(FAN)\n20\tGOTO 10\n")
+    assert not [d for d in linter.lint(clean) if d.code == "E123"]
+
+
+def test_SET_without_a_deadband_is_INFO_and_only_on_pxc_a():
+    """Siemens' own PXC.A guidance, and the analogue of W339.
+
+    "The SET command is not always resolved to the actual value, which may
+    result in points being continuously commanded. To prevent unnecessary
+    MS/TP traffic, use a deadband." -- A6V12893115.
+    """
+    from ppcl import linter, parser, spec
+
+    bare = parser.parse("10\tSET(72.0,ZNSP)\n20\tGOTO 10\n")
+
+    def run(prog, fw):
+        return [d for d in linter.lint(prog, firmware=fw) if d.code == "W343"]
+
+    hit = run(bare, spec.Firmware.PXC_A)
+    assert len(hit) == 1
+    assert hit[0].severity is linter.Severity.INFO
+    # Older generations do not carry the warning, so neither does the rule.
+    assert run(bare, spec.Firmware.APOGEE) == []
+
+    # Any conditional guard silences it: past that point the engineer has
+    # decided when it should run and this rule cannot read the decision.
+    guarded = parser.parse(
+        "10\tLOCAL(DIFF,DB)\n20\t$DB = 0.3\n30\t$DIFF = ZNT - 72.0\n"
+        "40\tIF($DIFF.GT.$DB) THEN SET(72.0,ZNSP)\n50\tGOTO 10\n"
+    )
+    assert run(guarded, spec.Firmware.PXC_A) == []
+
+
 def test_the_OIP_sequence_limit_is_sixty():
     """Sixty, not eighty. Three sources say sixty and none says anything else.
 

@@ -2466,3 +2466,80 @@ from one means nothing by itself. Same lesson as `NODE0`, from the other side.
 1. **Decide `W104`.** Still the user's call.
 2. Handle the `UNKNOWN (...)` marker in the lexer.
 3. A rule for the `SET`-without-deadband idiom on PXC.A.
+
+---
+
+## 2026-09-18 (twenty-first pass) — clearing the PXC.A queue
+
+Two items had been on the "still to do" list since pass 12, both from
+A6V12893115. Both were re-fetched and verified word for word before anything
+was built, because the first is a token and the second is a rule.
+
+### `E123` — the compiler writes a defect into your program and it reads as fine
+
+> **UNKNOWN Marker.** "Any unknown PPCL commands will be added with an
+> UNKNOWN (...) marker and ignored by the compiler upon saving a program.
+> Correct or discard unknown commands and save the program again."
+
+This is the rarest thing in the language and the easiest to read past. The
+engineer's original command is **still visible on the line**. Nothing about the
+text says the panel has given up on it. The statement is in the program, and
+nothing executes it.
+
+The parser now recognises `UNKNOWN (...)` — with or without the space, since
+the guide prints one and an editor may not keep it — and **does not parse what
+is inside.** Whatever is in there is text the compiler already rejected;
+parsing it produces a cascade of syntax errors about a line that has already
+failed. Before this change, `UNKNOWN (SETPT(ZNTEMP,72.0))` produced `E100`
+about a misplaced comma, and `UNKNOWN(FOO)` produced `E110` saying UNKNOWN is
+not a PPCL command. Both true and both useless.
+
+`Line.unknown` joins `Line.disabled`, and `is_executable` is False for either
+— so the line drops out of the control-flow graph exactly as the panel drops
+it. `E123` reports it at ERROR and shows the wrapped text.
+
+### `W343` — SET is the RELEAS storm, a generation later
+
+> **Continuously re-commanded points.** "The SET command is not always
+> resolved to the actual value, which may result in points being continuously
+> commanded. To prevent unnecessary MS/TP traffic, use a deadband."
+
+with a worked example that computes the difference between a point and the
+wanted value into a local, and `SET`s only when that difference leaves a
+deadband local.
+
+This is `W339` one generation on: a command that is logically a no-op and costs
+network traffic every pass. `W343` is `INFO` for the same reason `W339` is — it
+is a cost, not a defect, and on a small trunk it may not matter.
+
+**Deliberately narrow.** It fires only on a `SET` with *no* conditional guard
+at all, on a line the main loop reaches every pass, and only on `pxc_a`. A
+`SET` already inside an `IF` is left alone even when the condition is not a
+deadband, because past that point the engineer has decided when it should run
+and the rule cannot read the decision.
+
+For scale, if the gate did not exist: 27 unconditional every-pass `SET`s in
+Siemens' library, 18 in the reference site's Desigo exports, 138 in its older
+programs. All of those are APOGEE, so all of them stay quiet — which is the
+point of gating it.
+
+### What the same page also gives
+
+Two things worth recording that need no code:
+
+- **"DEFINE and LOCAL statements are always traced."** Already honoured by
+  `R703`, which must never conclude dead code from a cleared trace bit on one.
+- **Per-program cycle time** — average over the last ten cycles, highest and
+  lowest, in milliseconds, **mappable to virtual points and trendable**. This
+  makes open question 2, the real line-evaluation rate on current hardware,
+  answerable from a live panel rather than from the manual's twenty-five-year
+  -old averages. It is the cheapest of the open questions to close and needs
+  no lab: map the three metrics to virtual points on a panel in service and
+  trend them.
+
+### Still to do
+
+1. **Decide `W104`.** Still the user's call, and now 78% of the library's
+   warnings.
+2. A rule noting `ACT`/`DEACT`/`ENABLE`/`DISABL` cost system resources on
+   PXC.A — the last item from pass 12.

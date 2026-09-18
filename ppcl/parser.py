@@ -99,6 +99,30 @@ def _is_hash_disabled(body: str):
     return body[2:].strip()
 
 
+def _is_unknown_marker(body: str):
+    """The text inside a compiler ``UNKNOWN (...)`` wrapper, or None.
+
+    "Any unknown PPCL commands will be added with an UNKNOWN (...) marker and
+    ignored by the compiler upon saving a program. Correct or discard unknown
+    commands and save the program again." -- Desigo PXC.A Web Interface User
+    Guide (A6V12893115), PPCL Diagnostics.
+
+    The guide prints it with a space, and an editor may or may not keep one,
+    so both spellings are accepted. What is inside is whatever the engineer
+    wrote that the compiler could not make sense of, so it is NOT parsed --
+    trying would produce a cascade of syntax errors about text the panel has
+    already given up on.
+    """
+    stripped = body.strip()
+    upper = stripped.upper()
+    if not upper.startswith("UNKNOWN"):
+        return None
+    rest = stripped[len("UNKNOWN"):].lstrip()
+    if not rest.startswith("(") or not rest.endswith(")"):
+        return None
+    return rest[1:-1].strip()
+
+
 # --------------------------------------------------------------------------
 # Statement parser
 # --------------------------------------------------------------------------
@@ -438,6 +462,17 @@ def parse(text: str, name: str = "", path: str = "") -> Program:
                 prog.errors.append(
                     (src_no, None, "statement has no line number: %r" % body)
                 )
+            continue
+
+        wrapped = _is_unknown_marker(body)
+        if wrapped is not None:
+            # The compiler could not recognise the command and wrapped it.
+            # The line is in the program and the panel ignores it, so it is
+            # kept -- with its text -- and reported by E123 rather than parsed.
+            prog.lines.append(
+                Line(number, Comment(wrapped), logical, src_no, body=body,
+                     continued=continued, unknown=True)
+            )
             continue
 
         hashed = _is_hash_disabled(body)

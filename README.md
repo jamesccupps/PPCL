@@ -41,7 +41,7 @@ with the same keys so muscle memory transfers: `Ctrl+G` go to statement,
 numbering on Enter, and **Command Assist** using Siemens' own eight command
 categories, with the signature and the argument you are on shown as you type.
 
-It adds what Desigo has nowhere to put: 85 lint rules, each citing the manual
+It adds what Desigo has nowhere to put: 87 lint rules, each citing the manual
 page it comes from, and a set of source transforms that are exact by machine
 and tedious by hand — DEFINE expand and collapse, point-name separator swap,
 clone a block of statements with renames and retargeted branches, and
@@ -183,7 +183,7 @@ python -m ppcl.cli lint programs/ --firmware logical --disable W104 --strict
   Several rules differ by firmware — `SET` accepts integers on APOGEE only.
 - `--strict` exits non-zero on warnings, for CI.
 
-85 rules across five groups: `E1xx` syntax, `E2xx`/`W2xx` control flow,
+87 rules across five groups: `E1xx` syntax, `E2xx`/`W2xx` control flow,
 `E3xx`/`W3xx` semantics and priority, `S6xx` style, `P7xx` optimisation.
 `python -m ppcl.cli rules` lists them all.
 
