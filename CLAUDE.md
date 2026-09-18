@@ -28,6 +28,7 @@ so it runs on any engineering workstation without a package install.
 | `ppcl/debug.py` | Breakpoints (line, write, condition), stepping, watch, mid-run override, over the same simulator. |
 | `ppcl/transforms.py` | Source edits at the token level: DEFINE expand/collapse, separator swap, clone with rename, enable/disable, comment. |
 | `ppcl/points.py` | The panel point database, and the unresolved-reference check that produces Desigo's `U`. |
+| `ppcl/report.py` | Reads a panel's `PPCL DISPLAY REPORT`: which lines are disabled, which have an unresolved point, which have ever executed. Exported program text carries none of that. |
 | `ppcl/settings.py` | Declared settings with types, ranges and help. Unknown keys are preserved and reported. |
 | `ppcl/helpdocs.py` | The in-app documentation, as data. |
 | `ppcl/plant/` | Equipment models and the test bench. |
@@ -114,7 +115,7 @@ on idiomatic PPCL gets turned off.
 ## Testing
 
 ```bash
-python -m pytest tests -q          # 434 tests
+python -m pytest tests -q          # 447 tests
 python -m ppcl.cli lint samples    # exercises the CLI against real programs
 ```
 

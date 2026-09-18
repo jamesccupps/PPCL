@@ -247,6 +247,10 @@ class Line:
     body: str = ""
     #: True if this line's text was assembled from ``&`` continuations.
     continued: bool = False
+    #: Set from a panel report: the line exists in the program but the panel
+    #: is not evaluating it. Nothing in a text export records this, so it is
+    #: False unless a PPCL DISPLAY REPORT said otherwise. See ``ppcl.report``.
+    disabled: bool = False
 
     @property
     def is_comment(self) -> bool:
@@ -254,6 +258,14 @@ class Line:
 
     @property
     def is_executable(self) -> bool:
+        """Whether the panel evaluates this line.
+
+        A disabled line is not executed, so for flow analysis it behaves
+        exactly like a comment -- control passes over it, and a branch aimed
+        at it lands on the next line the panel will actually run.
+        """
+        if self.disabled:
+            return False
         return not isinstance(self.stmt, (Comment, ParameterDecl))
 
 

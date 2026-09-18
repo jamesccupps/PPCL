@@ -8,6 +8,7 @@ import os
 import sys
 
 from . import __version__, analyzer, formatter, generator, linter, parser as ppcl_parser
+from . import report as report_mod
 from . import spec
 from .diagnostics import Severity
 
@@ -74,10 +75,20 @@ def cmd_lint(args):
     firmware = spec.Firmware(args.firmware)
     disabled = set(args.disable or [])
 
+    panel_report = None
+    if getattr(args, "report", None):
+        panel_report = report_mod.parse_file(args.report)
+        if not panel_report.states:
+            print("no program lines found in %s -- is it a PPCL DISPLAY "
+                  "REPORT?" % args.report, file=sys.stderr)
+            return 2
+
     sizes = {}
     programs = {}
     for path in files:
         prog = ppcl_parser.parse_file(path)
+        if panel_report is not None:
+            report_mod.apply_to(panel_report, prog)
         programs[path] = prog
         sizes[path] = len(prog.executable_lines())
 
@@ -96,6 +107,10 @@ def cmd_lint(args):
             disabled=disabled,
             analysis=analysis,
         )
+        if panel_report is not None:
+            diags = list(diags) + report_mod.diagnostics(panel_report, prog)
+            diags = [d for d in diags if d.code not in disabled]
+            diags.sort(key=lambda d: (d.line or 0, d.code))
         diags = [d for d in diags if _min_rank(d.severity.value) <= threshold]
         for d in diags:
             worst = min(worst, _min_rank(d.severity.value))
@@ -1171,6 +1186,10 @@ def build_parser():
     sp.add_argument("--min-severity", default="style", choices=SEVERITY_ORDER)
     sp.add_argument("--disable", action="append", metavar="CODE",
                     help="suppress a rule code; repeatable")
+    sp.add_argument("--report", metavar="FILE",
+                    help="a PPCL DISPLAY REPORT from the panel. Supplies the "
+                         "enable/disable state, unresolved points and trace "
+                         "bits that exported program text does not carry")
     sp.add_argument("--format", default="text", choices=["text", "json"])
     sp.add_argument("--strict", action="store_true",
                     help="exit non-zero on warnings as well as errors")

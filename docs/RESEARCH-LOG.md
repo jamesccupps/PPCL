@@ -540,7 +540,7 @@ APOGEE, and appears blank under BACnet and PXC.A — where `SSTO` and `DC` show
 bullets in all five. That reading rests on whitespace in a rendered table and
 could easily be wrong, so it is recorded as a question rather than a fact.
 
-It matters for the reference site, which is largely PXC.A. *Test:* try to compile an `ADAPTS`
+It was thought to matter for the reference site; see the seventh pass, where that turned out to be wrong -- the site runs APOGEE BACnet ALN panels, not PXC.A. *Test:* try to compile an `ADAPTS`
 statement against a PXC.A in the Desigo CC PPCL Editor and see whether the
 compiler takes it.
 
@@ -565,7 +565,7 @@ compiler takes it.
 > runtime will consider this statement invalid, and no replacements have been
 > provided."
 
-This matters directly for the reference site, which is largely PXC.A. Any inherited program
+This matters for PXC.A sites. It does NOT apply to the reference site, which runs APOGEE BACnet ALN panels -- see the seventh pass. Any inherited program
 carrying `OIP` — a report trigger, a priority change, an auto-dial — will not
 run, and whatever it was doing has to move to the supervisor.
 
@@ -993,3 +993,205 @@ priority with point status. Nothing to add to `spec.py`; the note was wrong.
 5. Lint the 84-program Siemens application library as a regression corpus.
    Licensing check first; none of it gets copied into `samples/`.
 6. `A6V12954388` — still unread.
+
+---
+
+## 2026-09-18 (seventh pass) — the panel's own report, and the Desigo help
+
+Two sources this pass. Neither had been read before, and the first produced a
+feature rather than a fact.
+
+### Correction: passes five and six were not reading Desigo documentation
+
+They were reading **Insight 3.15** help — `Proged.chm` and friends out of the
+Insight install trees. That is the APOGEE-era workstation, not Desigo CC. The
+entries are still sound, because the language they document is the same
+language, but "the Desigo CHM files" was the wrong name for them throughout and
+is corrected here rather than in place.
+
+There are no Desigo CC CHM files. Desigo ships its help as a tree of numbered
+HTML pages, and its manuals as A6V-numbered PDFs.
+
+### A new authority: the BACnet ALN Field Panel User's Manual
+
+`A6V10324350` / **125-3020**, 415 pages, 2020-03-30. It carries a whole
+*Chapter 10: PPCL Editor* and two appendices of error codes.
+
+#### The APOGEE-to-BACnet priority slot map — now recorded
+
+The PPCL Debugger's priority column hinted at this; 125-3020 prints the table:
+
+| APOGEE priority | BACnet slot | BACnet name |
+|---|---|---|
+| | BN01 | Manual Life Safety |
+| | BN02 | Automatic Life Safety |
+| | BN05 | Critical Equipment Control |
+| | BN06 | Minimum On/Off |
+| **OPER** | **BN08** | Manual Operator |
+| **SMOKE** | **BN10** | |
+| **EMER** | **BN12** | |
+| **PDL** | **BN14** | |
+| | BN16 | Initial value of the point; TEC Application |
+| **NONE** | **Relinquish Default** | |
+
+Sixteen slots plus Relinquish Default; BN01 is highest. Two independent sources
+now agree on OPER/SMOKE/EMER/PDL → 08/10/12/14.
+
+> "The TEC Tool can command Priority slot 16 only if it is not being commanded
+> by PPCL."
+
+One inconsistency recorded rather than acted on: a procedure page lists the
+modifiable priorities as "Operator, Smoke, Emergency, **Schedule**, PDL, or
+PPCL", but the HMI prompt on the same page offers only `Oper, Smoke, Emer, PDL`,
+and the priority table has five levels with no Schedule. **No `@SCHEDULE`
+priority has been added to `spec.py`** on the strength of one prose list.
+
+#### PPCL line status indicators — and a feature fell out of it
+
+This is the piece that mattered. A program exported as text is only the source.
+The panel knows four more things about every line, and they are exactly the
+things that explain a program which looks right and does nothing:
+
+| Col | Char | Meaning |
+|---|---|---|
+| 1 | `E` / `D` | enabled / **disabled, will not execute** |
+| 2 | `T` / blank | executed since the trace bits were cleared / never attempted |
+| 3 | `U` / blank | **a point on this line is not in the database** |
+| 4 | `F` / blank | the panel tried to execute it and **failed** |
+| 5 | `L` | being tested by loop tuning |
+
+They appear in a `PPCL DISPLAY REPORT`:
+
+```
+State  Line  Statement
+ET     100   IF(SECND4 .LT. 7) THEN GOTO 300
+D      200   ON("dead")
+ETU    300   IF(...) THEN ON("greenlight") ELSE
+             OFF("greenlight")
+```
+
+**New module `ppcl/report.py`.** It parses that format, rejoins wrapped
+statements, reconstructs plain PPCL the existing parser accepts, and returns a
+`LineState` per line. `apply_to()` marks disabled lines on the parsed program,
+and `Line.is_executable` now returns False for them — so a disabled line drops
+out of the control-flow graph exactly like a comment, which is what the panel
+does with it.
+
+Without that, every "runs every pass" finding about a disabled block is wrong.
+
+Four codes in their own `R7xx` range, deliberately outside the rule space
+because they are not inferences from source — they are observations from the
+running system:
+
+| Code | |
+|---|---|
+| `R701` | the panel reports an unresolved point on this line (ERROR) |
+| `R702` | the panel tried to execute this line and failed (ERROR) |
+| `R703` | the panel has never executed this line (WARNING) |
+| `R704` | this line is disabled in the panel (INFO) |
+
+`R703` is worth singling out. `W206` *infers* unreachable code from the control
+flow graph. A cleared-then-observed trace bit is **evidence from the panel** that
+a line has not run. Guarded so it stays silent when a report carries no trace
+bits at all, which is what a report taken right after a clear looks like.
+
+`ppcl lint --report FILE` folds all of this in. Eleven tests in
+`tests/test_report.py`.
+
+### The Desigo CC Engineering help
+
+4,462 HTML pages, 436 of which mention PPCL, plus an Operating help tree of 844.
+
+#### Operating versus Engineering mode — the answer
+
+- **Operating mode gets the PPCL *Viewer***: view, go to line, search, clear
+  trace bits, refresh. No editing.
+- **Engineering mode gets the PPCL *Editor***: all of that plus new, save,
+  save-as, delete, quick numbering, adjust statement numbers, compile, Command
+  Assist, and **Enable/Disable Program Statements**.
+
+The Viewer is also what Engineering mode falls back to when the station is set
+not to allow panel configuration.
+
+#### How Desigo actually shows the state
+
+> "Disabled lines of code display in **gray**, executed lines of code display in
+> **black**, syntax displays in **blue**, and comments display in **green**."
+>
+> "Status Column: Displays **T** for trace bits and a **red U** for unresolved
+> lines of code. The Status Column only displays when the PPCL Program is not in
+> Edit Program mode."
+
+So Desigo shows two indicator characters, not the panel report's six, and
+signals disabled by colour instead. Both are now understood; the report format
+is the one that can be parsed.
+
+Also: "Clear Program Trace Bits clears trace bits **and unresolved lines of
+code**" — one button resets both, so a `U` that has just been cleared is not
+evidence the name now resolves.
+
+#### PXC.A does not use the Desigo PPCL editor -- but that is not this site
+
+> "Point Editing and PPCL Editing are done using the **PXC.A onboard editor
+> instead of Desigo CC**. To facilitate navigation to the onboard PXC.A editors,
+> a link is provided in Related Items which opens the editor in a Desigo CC
+> secondary pane."
+
+Everything in the Desigo help's PPCL Editor pages therefore describes APOGEE
+BACnet and P2 panels. For a PXC.A the editor is the panel's own web UI -- which
+also explains the PXC.A guide's separate 512-character line limit "for the web
+UI and as the general rule".
+
+**And that is how the reference site was found not to be PXC.A at all.** The
+engineer reported editing every program in Desigo CC without opening anything
+separately, which the paragraph above says should be impossible on a PXC.A. The
+42 programs settle it by themselves:
+
+| Evidence | Count | Means |
+|---|---|---|
+| `GETVAL` / `SETVAL` -- PXC.A only | **0** | not PXC.A |
+| `[NodeName]PointName` -- the PXC.A same-ALN form | **0** | not PXC.A |
+| `OIP` -- rejected outright by the PXC.A runtime | **25**, in 4 programs | not PXC.A |
+| `BAC_<device>_<type>_<instance>` encoded names | **52 distinct** | APOGEE BACnet ALN |
+
+So the site runs **APOGEE BACnet ALN** panels, and `A6V10324350` / 125-3020 --
+found earlier this same pass -- is *the* manual for them. Which makes the
+`PPCL DISPLAY REPORT` format above not a general curiosity but the exact report
+this site's panels produce.
+
+**This corrects passes one and four**, which both asserted "OCC, which is mostly
+PXC.A". That claim came from the supervisor being Desigo CC and was never
+checked against a program. Everything built on it is still true *about PXC.A* --
+`Firmware.PXC_A`, rule `E119`, the 512-character limit, `OIP` being dead -- it
+simply does not describe this site. The two earlier statements are corrected in
+place.
+
+Two practical consequences:
+
+- **`apogee` is the right firmware for linting these programs**, which is the
+  default, so the lint runs in passes five and six were correctly configured by
+  accident rather than by judgement.
+- **Per-file firmware is not needed here.** It was listed as a gap on the
+  assumption of a mixed estate. The estate is one generation.
+
+#### Third and fourth confirmations
+
+The operand and operator accounting — 16 operands, 32 operators, point
+references and constants counting toward both — appears again, identically. And
+the precedence table again spells the arc-tangent `ARC` while the command pages
+spell it `ATN`. Four document sets now, same split, same direction.
+
+### Still to do
+
+1. **`A6V10324350` Appendix C, "PPCL (R-code) Error Codes"** — located, not yet
+   transcribed. These are runtime errors, a different class from the compiler
+   errors already in `spec.py`.
+2. Get a real `PPCL DISPLAY REPORT` out of a panel and run `lint --report`
+   against it. Everything so far is tested against the manual's example.
+3. **Per-file firmware**, for a genuinely mixed estate. Not needed at the
+   reference site, which turned out to be one generation throughout -- see
+   above. Still real for anyone running SCU/MBC alongside PXC.A.
+4. `Point.chm` bundled-point detail: the proof DI is documented as *optional*
+   on every bundled type except `L2SL`, and `LOOAP` mixes pulsed On/Off with a
+   latched Auto. Neither is in `spec.py`.
+5. `A6V12954388` — still unread.

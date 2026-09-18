@@ -49,9 +49,11 @@ APOGEE and PXC field panels.
 
 Development is driven by a **reference site**: a Class A office building of
 roughly a quarter of a million square feet, thirteen air handlers, a Desigo CC
-supervisor, and a panel estate that spans both generations — APOGEE-era SCU
-and MBC panels alongside newer BACnet PXC controllers. That mix is the point:
-the firmware differences in `spec.py` are not academic there.
+supervisor, and **APOGEE BACnet ALN** field panels — SCU, MBC and PXC-BACnet,
+edited through Desigo CC's own PPCL Editor. Determined from the programs, not
+assumed: no `GETVAL`/`SETVAL`, no `[Node]Point` references, 25 uses of `OIP`
+(which a PXC.A rejects outright), and 52 distinct `BAC_<device>_<type>_<instance>`
+encoded names. `A6V10324350` / 125-3020 is the manual that applies.
 
 The site is deliberately not named, and no program text, point name or panel
 name from it appears anywhere in this repository. Findings from it are
@@ -65,7 +67,7 @@ runs on any engineering workstation with no install. Windows is the primary
 platform.
 
 ```bash
-python -m pytest tests -q          # 434 tests, ~150s
+python -m pytest tests -q          # 447 tests, ~150s
 python -m ppcl.cli serve           # the app
 python -m ppcl.cli lint samples    # exercises the CLI on real programs
 python -m ppcl.cli help            # the built-in documentation
@@ -75,7 +77,7 @@ python -m ppcl.cli help            # the built-in documentation
 
 ## 2. Current state
 
-**434 tests passing.** ~18,200 lines Python, ~4,900 lines UI, ~3,600 lines
+**447 tests passing.** ~18,600 lines Python, ~4,900 lines UI, ~3,800 lines
 tests. 79 lint rules, 65 commands, 99 BACnet properties, 30 block types,
 16 CLI subcommands, 11 MCP tools, 12 help pages, 20 settings, 6 firmware
 families.
@@ -94,6 +96,7 @@ families.
 | **Blocks** | `ppcl/blocks/` | 30 block types; expression-first compiler with feedback handling |
 | **Transforms** | `ppcl/transforms.py` | DEFINE expand/collapse, separator swap, clone with rename, enable/disable, comment |
 | **Points** | `ppcl/points.py` | CSV/JSON import, alias column mapping, unresolved-reference check |
+| **Panel report** | `ppcl/report.py` | Reads a `PPCL DISPLAY REPORT`: disabled lines, unresolved points, trace bits. Folded into `lint --report` |
 | **Settings** | `ppcl/settings.py` | 20 declared settings with types, ranges, help |
 | **Help** | `ppcl/helpdocs.py` | 11 pages, served to the UI and the CLI |
 | Plant | `ppcl/plant/` | Equipment models + test bench with faults and checks |
