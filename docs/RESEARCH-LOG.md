@@ -1195,3 +1195,78 @@ spell it `ATN`. Four document sets now, same split, same direction.
    on every bundled type except `L2SL`, and `LOOAP` mixes pulsed On/Off with a
    latched Auto. Neither is in `spec.py`.
 5. `A6V12954388` — still unread.
+
+---
+
+## 2026-09-18 (eighth pass) — the panel inventory, and a finding withdrawn
+
+The engineer supplied Desigo CC device screenshots for the whole estate. This
+is the first time the hardware has been looked at rather than inferred, and it
+retires one finding and confirms another.
+
+### What the estate actually is
+
+Two networks, and **no SCU and no MBC anywhere on either**.
+
+**BACnet field network** — every device reports Model Name "Siemens BACnet
+Field Panel", Vendor Identifier 7, Protocol Revision 7:
+
+| Firmware Revision | Application Software |
+|---|---|
+| `PXME V3.5.3 BACnet 4.3g` | `BME1300_0017` |
+| `PXME V3.5.5 BACnet 4.3g` | `BME1320_0003` |
+| `EPXC V3.5.2 BACnet 4.3g` | `BXE1290_0049` |
+
+**P2 network** — PXC panels on the APOGEE side:
+
+| Firmware Revision | Hardware Revision |
+|---|---|
+| `PME1252` | `PXME V2.8.10 APOGEE` |
+| `PME1300` | `PXME V2.8.10 APOGEE` |
+
+Panel object names follow `<site>PXC[CM]<n>` — PXC **C**ompact and PXC
+**M**odular.
+
+### `W339` does not apply here, and the rule now says how to tell
+
+The `RELEAS` change-of-value storm is specific to **SCU firmware 9.1 and 10.1
+through 12.1, and MBC 1.1**. Those are SCU and MBC firmware families. This site
+has neither: every panel is a PXC reporting `PME12xx`/`PME1300` on the P2 side
+or `EPXC`/`PXME V3.5.x` on the BACnet side.
+
+So the 22 `W339` findings are all dismissible here. That is the right outcome —
+the rule was written at INFO precisely because it says "check your panel
+revisions", and the check has now been done. Its detail text has been sharpened
+to name the affected families explicitly and to say that a PXC reporting those
+revision strings is not affected, so the next person can dismiss it in seconds
+instead of reading a manual.
+
+**A rule that tells you how to rule it out is worth more than a rule that is
+merely correct.**
+
+### `PPCL_SCU1` and `PPCL_MBC10` are program names, not hardware
+
+Several programs are named after SCU and MBC panels. No such panel exists on
+the site. The names were carried forward from equipment that was replaced, and
+reading hardware generation out of a program's *filename* would have been
+wrong — as it nearly was in the seventh pass.
+
+### Confirms the seventh pass
+
+"Siemens BACnet Field Panel", Protocol Revision 7, PXC Compact and Modular
+hardware: APOGEE BACnet ALN, exactly as the program evidence said. `apogee` is
+the right lint firmware and `125-3020` is the right manual.
+
+### Noted for the engineer, outside this project's scope
+
+One P2 node reports **Telnet Enabled: TRUE**. Not a PPCL matter and not
+something this toolkit touches, but worth knowing it is on.
+
+### Still to do
+
+1. `A6V10324350` Appendix C, "PPCL (R-code) Error Codes" — runtime errors,
+   still untranscribed.
+2. A real `PPCL DISPLAY REPORT` to run `lint --report` against.
+3. `Point.chm` bundled-point detail: the proof DI is optional on every bundled
+   type except `L2SL`, and `LOOAP` mixes pulsed On/Off with a latched Auto.
+4. `A6V12954388` — still unread.

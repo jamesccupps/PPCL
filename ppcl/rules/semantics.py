@@ -1025,11 +1025,14 @@ def unguarded_releas_in_the_main_loop(ctx):
             "current priority" % shown,
             ln.number,
             source_line=ln.source_line,
-            detail="SCU firmware 9.1 and 10.1 through 12.1, and MBC 1.1, "
-            "issue the release regardless of whether the point is already at "
-            "NONE, putting a priority change-of-value on the network every "
-            "pass. Later revisions suppress it. Check what this panel is "
-            "running before deciding whether it matters.",
+            detail="This matters on SCU firmware 9.1 and 10.1 through 12.1, "
+            "and MBC 1.1, which issue the release regardless of whether the "
+            "point is already at NONE and put a priority change-of-value on "
+            "the network every pass. Later SCU and MBC revisions suppress it, "
+            "and the defect is specific to those two families -- a PXC panel "
+            "reporting a PME12xx/PME1300 or EPXC/PXME firmware revision is "
+            "not affected. Check the panel's Firmware Revision before acting "
+            "on this.",
             suggestion="Guard it the way the manual does: "
             "IF(%s .NE. @NONE) THEN RELEAS(...)." % points[0],
             manual="Insight Program Editor, RELEAS (Remarks and Example 3)",
