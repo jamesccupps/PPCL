@@ -547,6 +547,49 @@ def read_before_write(ctx):
 # --------------------------------------------------------------------------
 
 
+def _elevated_writes(stmt):
+    """{NAME: priority} written above @NONE by this one statement."""
+    out = {}
+    if isinstance(stmt, CommandCall) and stmt.priority is not None:
+        prio = stmt.priority.name
+        if spec.PRIORITY_RANK.get(prio, 0) > spec.PRIORITY_RANK["@NONE"]:
+            for arg in stmt.args:
+                if isinstance(arg, Ref):
+                    out[arg.name.upper()] = prio
+    return out
+
+
+def _driven_every_pass(ctx):
+    """Names written above @NONE on every pass of the main loop.
+
+    Such a point is not *stranded* by the absence of a RELEAS -- something
+    writes it again next pass -- so it is a different finding from one
+    commanded on a path that ends. Two shapes count:
+
+    * an unconditional command, and
+    * a command in **both** the THEN and the ELSE of one IF,
+
+    on a line that lies on a cycle of the control-flow graph and is not part
+    of a subroutine body. A SAMPLE-wrapped statement does not count: that is
+    the point of SAMPLE.
+    """
+    a = ctx.analysis
+    names = set()
+    for ln in ctx.program.lines:
+        if ln.number not in a.steady_state or ln.number in a.subroutine_lines:
+            continue
+        stmt = ln.stmt
+        if isinstance(stmt, Sampled):
+            continue
+        if isinstance(stmt, If):
+            then_w = _elevated_writes(stmt.then_stmt)
+            else_w = _elevated_writes(stmt.else_stmt) if stmt.else_stmt else {}
+            names |= set(then_w) & set(else_w)
+        else:
+            names |= set(_elevated_writes(stmt))
+    return names
+
+
 @rule("W330", "Point commanded above PPCL priority is never released", Severity.WARNING)
 def unreleased_priority(ctx):
     a = ctx.analysis
@@ -565,10 +608,31 @@ def unreleased_priority(ctx):
             if isinstance(arg, Ref):
                 releases.setdefault(arg.name.upper(), []).append((ln.number, prio))
 
+    driven = _driven_every_pass(ctx)
+
     for name, uses in sorted(elevated.items()):
         rel = releases.get(name, [])
         highest = max(spec.PRIORITY_RANK[u.priority] for u in uses)
         prio_name = spec.PRIORITY_ORDER[highest]
+        if not rel and name in driven:
+            yield _d(
+                "W341",
+                Severity.INFO,
+                "%s is held at %s every pass, so an operator cannot keep it"
+                % (uses[0].name, prio_name),
+                uses[0].line,
+                detail="Written at %s on every pass of the main loop and never "
+                "released, so the point cannot strand -- but a command from an "
+                "operator, a schedule or another program is overwritten on the "
+                "next pass, within a second or two, with nothing to say why. "
+                "Deliberate for a lamp test or a hard interlock; a surprise "
+                "otherwise. Written at line(s) %s."
+                % (prio_name, ", ".join(str(u.line) for u in uses)),
+                manual="Chapter 3, Point priority",
+                suggestion="If an operator should be able to take this point, "
+                "command it at @NONE and let priority do its job.",
+            )
+            continue
         if not rel:
             yield _d(
                 "W330",
@@ -610,6 +674,11 @@ def unreleased_priority(ctx):
 
 @rule("W331", "Point released at a lower priority than it was commanded", Severity.WARNING)
 def _w331_placeholder(ctx):
+    return ()
+
+
+@rule("W341", "Point held above PPCL priority on every pass", Severity.INFO)
+def _w341_placeholder(ctx):
     return ()
 
 

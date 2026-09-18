@@ -42,7 +42,7 @@ sources and cited.
 And the thing that matters most — *does this program actually work?* — no
 amount of training gives you. Only execution does.
 
-So the knowledge lives in `spec.py` and 80 rules rather than in weights, which
+So the knowledge lives in `spec.py` and 81 rules rather than in weights, which
 is strictly better: it is inspectable, it is citable, and a wrong fact is a
 one-line fix instead of a retraining run.
 

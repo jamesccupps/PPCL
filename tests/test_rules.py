@@ -680,6 +680,60 @@ def test_matched_release_is_clean():
     assert "W330" not in codes(text)
 
 
+def test_a_point_driven_at_priority_every_pass_is_W341_not_W330():
+    """Both branches covered means the point cannot strand -- but an operator
+    cannot hold it either.
+
+    Siemens' own library is full of this: 148 of the 170 elevated-priority
+    writes in it are driven every pass rather than left behind. Calling that
+    "never released" told the engineer the wrong thing, because nothing is
+    stuck; what is true is that a command from an operator or a schedule is
+    overwritten within a second or two, silently.
+    """
+    text = (
+        "10\tIF(OAT.GT.60.0) THEN ON(@OPER,SFAN) ELSE OFF(@OPER,SFAN)\n"
+        "20\tGOTO 10\n"
+    )
+    found = codes(text)
+    assert "W341" in found
+    assert "W330" not in found
+
+
+def test_an_unconditional_command_at_priority_is_W341():
+    text = "10\tON(@OPER,SFAN)\n20\tGOTO 10\n"
+    found = codes(text)
+    assert "W341" in found
+    assert "W330" not in found
+
+
+def test_only_one_branch_covered_is_still_W330():
+    """The strandable case. When the condition clears, nothing rewrites it."""
+    text = (
+        "10\tIF(OAT.GT.90.0) THEN ON(@OPER,CHLR)\n"
+        "20\tGOTO 10\n"
+    )
+    found = codes(text)
+    assert "W330" in found
+    assert "W341" not in found
+
+
+def test_a_sampled_command_is_not_driven_every_pass():
+    """SAMPLE exists to make a statement run less often than every pass."""
+    text = "10\tSAMPLE(60) ON(@OPER,SFAN)\n20\tGOTO 10\n"
+    found = codes(text)
+    assert "W330" in found
+    assert "W341" not in found
+
+
+def test_a_released_point_raises_neither():
+    text = (
+        "10\tIF(OAT.GT.60.0) THEN ON(@OPER,SFAN) ELSE RELEAS(@OPER,SFAN)\n"
+        "20\tGOTO 10\n"
+    )
+    found = codes(text)
+    assert "W330" not in found and "W341" not in found
+
+
 def test_release_at_too_low_a_priority():
     text = (
         "10\tIF(A.LT.1) THEN OFF(@OPER,SFAN)\n"

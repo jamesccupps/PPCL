@@ -2163,3 +2163,69 @@ One rule, two conditions, one message. **Next: split it.**
 2. Split `W330` by write coverage.
 3. Handle the `UNKNOWN (...)` marker in the lexer.
 4. A rule for the `SET`-without-deadband idiom on PXC.A.
+
+---
+
+## 2026-09-18 (eighteenth pass) — splitting `W330`
+
+`W330` said one thing about two different situations, and the library made that
+obvious once the count was right.
+
+### The two shapes
+
+A point commanded above `@NONE` with no `RELEAS` anywhere is either:
+
+1. **written on a path that ends** — the condition clears, nothing rewrites the
+   point, and it sits at that priority until a person finds it. This is what
+   `W330`'s text describes and it is a genuine defect; or
+2. **written on every pass** — unconditionally, or on both branches of one
+   `IF`, on a line that lies on a cycle of the control-flow graph. The point
+   cannot strand, because something writes it again in a second or two.
+
+Shape 2 is not harmless, but the harm is different: an operator's own command,
+a schedule, or another program is **overwritten on the next pass**, silently.
+That is deliberate for a lamp test or a hard interlock and a nasty surprise
+otherwise. Telling an engineer their point "is never released" when the real
+problem is "you cannot take this point at the head end" sends them looking for
+the wrong thing.
+
+### `W341`
+
+New rule, `INFO`: *point held above PPCL priority on every pass*. Message says
+what is actually true — the point cannot be kept by an operator — and the
+suggestion is the real fix, command it at `@NONE` and let priority arbitration
+do its job. `INFO` rather than `WARNING` because both legitimate uses are
+common and the rule cannot tell them apart.
+
+`W330` keeps shape 1 as a `WARNING`, with its original text, which is now
+accurate for every case it fires on.
+
+The every-pass test is deliberately narrow. It requires the line to be in
+`analysis.steady_state` and not in `analysis.subroutine_lines`, and it excludes
+`SAMPLE`-wrapped statements, because making a statement run *less* often than
+every pass is the entire purpose of `SAMPLE`. A write that only happens inside
+a subroutine, or only once at startup, stays a `W330` — it can strand.
+
+### What it does to the two corpora
+
+| Corpus | was `W330` | now `W330` | now `W341` |
+|---|---|---|---|
+| Siemens' 42-program library | 170 | **22** | **148** |
+| The reference site | 11 | **4** | **7** |
+
+The narrow test moved 148 rather than the 155 a rough by-hand pass predicted;
+the seven-hit difference is writes that look unconditional but sit in a
+subroutine body or a run-once region, which the rule correctly leaves as
+strandable.
+
+### And it moved decision 1
+
+Taking 148 findings out of `WARNING` raises `W104`'s share of the library's
+warnings from 70% to **78%**. The argument for regrading `W104` did not weaken
+when a competing rule was thinned out — it got stronger.
+
+### Still to do
+
+1. **Decide `W104`.** Now 78% of the library's warnings. Still the user's call.
+2. Handle the `UNKNOWN (...)` marker in the lexer.
+3. A rule for the `SET`-without-deadband idiom on PXC.A.

@@ -80,7 +80,7 @@ runs on any engineering workstation with no install. Windows is the primary
 platform.
 
 ```bash
-python -m pytest tests -q          # 480 tests, ~150s
+python -m pytest tests -q          # 485 tests, ~150s
 python -m ppcl.cli serve           # the app
 python -m ppcl.cli lint samples    # exercises the CLI on real programs
 python -m ppcl.cli help            # the built-in documentation
@@ -90,8 +90,8 @@ python -m ppcl.cli help            # the built-in documentation
 
 ## 2. Current state
 
-**480 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
-tests. 80 lint rules, 66 commands, 99 BACnet properties, 30 block types,
+**485 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
+tests. 81 lint rules, 66 commands, 99 BACnet properties, 30 block types,
 17 CLI subcommands, 11 MCP tools, 12 help pages, 20 settings, 6 firmware
 families, 29 panel error codes.
 
@@ -100,7 +100,7 @@ families, 29 panel error codes.
 | Language spec | `ppcl/spec.py` | Complete, manual-derived, cited. Now also carries Siemens' own Command Assist categories |
 | Lexer / parser | `ppcl/lexer.py`, `parser.py` | Solid. Parses every real program seen so far with zero errors |
 | Analysis | `ppcl/analyzer.py` | Control flow with wrap edge + Tarjan SCC; point read/write tracking |
-| Linter | `ppcl/linter.py`, `rules/` | 80 rules, each citing its source |
+| Linter | `ppcl/linter.py`, `rules/` | 81 rules, each citing its source |
 | Formatter | `ppcl/formatter.py` | Format + renumber with exact reference rewriting |
 | Simulator | `ppcl/simulator.py` | Interpreter with real priority arbitration, panel-faithful line budget |
 | **Debugger** | `ppcl/debug.py` | Line / write / condition breakpoints, step, step over, step out, run to cursor, watch with priority, mid-run override, coverage |
@@ -364,14 +364,20 @@ port nobody enters programs through, and the rule's own detail text admits it
 spends two thirds of its voice on that gets turned off. This is a judgement
 call for the user, not a unilateral change — but it should be *made*, not left.
 
-**2. ~~Check `W330`.~~ Done 2026-09-18 — and it found a counting error first.**
-The 340 was 170; the library ships in two product trees and the corpus held
-both copies. Of the 170, **every one is `@OPER`**, and by write coverage they
-split 79% written unconditionally every pass, 12% written on both branches of
-one `IF`, 9% conditional only. So it is not a false positive and not one
-finding: 91% of them are *continuously driven*, which cannot strand but does
-overwrite an operator's own command on the next pass, and 9% are the
-strandable case the rule's text describes. **Next: split the message.**
+**2. ~~Check `W330`.~~ Closed 2026-09-18 — and it found a counting error
+first.** The 340 was 170; the library ships in two product trees and the corpus
+held both copies. Of the 170, **every one is `@OPER`**. Not a false positive
+and not one finding: most are points *driven every pass*, which cannot strand
+but does overwrite an operator's own command within a second or two, and the
+rest are the strandable case the rule's text actually describes.
+
+`W341` now carries the first — INFO, because a lamp test and a hard interlock
+are both legitimate — and `W330` keeps the second as a WARNING. On the library
+the 170 become **22 `W330` + 148 `W341`**; on the reference site, 4 + 7.
+
+One consequence for decision 1: moving 148 findings out of WARNING raises
+`W104`'s share of the library's warnings from 70% to **78%**. The case for
+regrading it got stronger, not weaker.
 
 ### Keep doing — it has paid every time
 
@@ -468,7 +474,7 @@ on PXC.A, the line limit being 512 not 66, `LOCAL`'s sixteen being per
 statement, the `W202` severity, this site not being PXC.A at all). Until a pass
 produces no corrections, the language is not known well enough to condense.
 
-The material already exists and is cited -- `spec.py`, the 80 rules,
+The material already exists and is cited -- `spec.py`, the 81 rules,
 `PPCL-REFERENCE.md`, `helpdocs.py`, the panel error tables. The work is
 selection and layout, not discovery. Likely shape:
 
