@@ -4,7 +4,7 @@
 otherwise be lost: what exists, what is verified versus assumed, which
 decisions were deliberate, and what to build next.
 
-Last updated: 2026-09-18.
+Last updated: 2026-09-18. Fourteen research passes; see docs/RESEARCH-LOG.md.
 
 ---
 
@@ -90,10 +90,10 @@ python -m ppcl.cli help            # the built-in documentation
 
 ## 2. Current state
 
-**475 tests passing.** ~18,600 lines Python, ~4,900 lines UI, ~3,800 lines
+**475 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
 tests. 80 lint rules, 66 commands, 99 BACnet properties, 30 block types,
-16 CLI subcommands, 11 MCP tools, 12 help pages, 20 settings, 6 firmware
-families.
+17 CLI subcommands, 11 MCP tools, 12 help pages, 20 settings, 6 firmware
+families, 29 panel error codes.
 
 | Layer | Module | State |
 |---|---|---|
@@ -108,7 +108,7 @@ families.
 | Sequence | `ppcl/sequence/` | Document model, text DSL, compiler with hard guarantees |
 | **Blocks** | `ppcl/blocks/` | 30 block types; expression-first compiler with feedback handling |
 | **Transforms** | `ppcl/transforms.py` | DEFINE expand/collapse, separator swap, clone with rename, enable/disable, comment |
-| **Points** | `ppcl/points.py` | CSV/JSON import, alias column mapping, unresolved-reference check |
+| **Points** | `ppcl/points.py` | CSV/JSON import, alias column mapping, unresolved-reference check, slope/intercept for panel error E12 |
 | **Panel report** | `ppcl/report.py` | Reads a `PPCL DISPLAY REPORT`: disabled lines, unresolved points, trace bits. Folded into `lint --report` |
 | **Settings** | `ppcl/settings.py` | 20 declared settings with types, ranges, help |
 | **Help** | `ppcl/helpdocs.py` | 11 pages, served to the UI and the CLI |
@@ -169,7 +169,32 @@ Editor · Builder · Blocks · Bench (Simulate / Debug) · Settings · Help
 
 ## 4. Research provenance
 
-Four sources, in decreasing authority for a modern PXC:
+Everything below is on this machine or public. `docs/RESEARCH-LOG.md` has the
+full sweep across fourteen passes, every source URL, and what is deliberately
+not copied. **Nothing licensed or site-confidential is reproduced in this
+repository** -- findings from those corpora are described, not quoted.
+
+### The corpora, and what each is good for
+
+| Source | Size | Verdict |
+|---|---|---|
+| **Insight 3.15 `Proged.chm`** | 736 pages | *Exhausted.* The deepest source on the language itself: a page per command with worked examples, the compiler error list, the decision-table method |
+| **Insight 3.15 `Point.chm`** | 320 pages | *Exhausted.* Point-type taxonomy, bundled-point decomposition |
+| **Desigo CC Engineering help** | 3,618 pages, 436 mentioning PPCL | Mined. Its PPCL section is a glossary and is thinner than Insight's |
+| **Desigo CC Operating help** | 844 pages | *Strict subset of Engineering* -- 733 shared titles, zero unique, 702 identical. Nothing to do |
+| **A6V10374898** PXC.A PPCL User Guide, rev `_j` | HTML, public | Mined across five passes. `GETVAL`/`SETVAL`, the property appendix, `[Node]Point`, the ten removed statements |
+| **A6V10324350** BACnet ALN Field Panel, 125-3020 | 415 pages | Ch.10 and App.C mined. **The manual that applies to the reference site** |
+| **A6V12893115** PXC.A Web Interface User Guide | HTML, public | The onboard editor PXC.A uses instead of Desigo CC. The `# ` disable syntax |
+| **A6V12954388** PXC.A Reference | 112 pages | Workflow; points at A6V10374898 for the language |
+| **A6V13998441** PXC.A Modernization, 2026-04 | 23 pages | Newest document here. Its cross-reference is what led to the removed-statements page |
+| **Siemens' shipped application library** | 84 programs, 15,726 lines | *The regression corpus.* Found three parser bugs and one undocumented command |
+| **The reference site's own programs** | 42 from Desigo, 22 older | What every severity decision is tuned against |
+
+**Not obtainable:** `A6V12954390`, "PPCL User Manual", named in Siemens' 2026
+datasheets but 404 at every public URL. Either partner-restricted or a typo --
+their own docs misprint document numbers. Do not spend more time on it.
+
+### Original four, in decreasing authority for a modern PXC:
 
 1. **Desigo CC PPCL Editor Command Assist** — read from the user's live system
    via screenshots. The only source for `ADAPTM`, `ADAPTS`, `LSQ2`, `LSQDAT`
@@ -191,8 +216,8 @@ as needing a Siemens rep. It is **public** at
 `SETVAL`, the 99-entry BACnet property appendix, the `[NodeName]PointName`
 reference form, PXC.A program capacities, and the `DC` pattern table.
 
-**`A6V12954388` PXC.A Reference Manual** — 112-page PDF, downloaded from
-Siemens' public support cache. **Not yet read.**
+**`A6V12954388` PXC.A Reference Manual** — read. It is a workflow document and
+points at `A6V10374898` for the language.
 
 See `docs/RESEARCH-LOG.md` for the full sweep, every source URL, and what is
 deliberately *not* copied (Siemens' SSTO coefficient formulas, and the
@@ -206,7 +231,11 @@ copyrighted MEC100K listing in Appendix C).
 | Arc-tangent: `ATN` vs `ARC` | **ATN.** Confirmed twice from the same Desigo page — its command list says ATN while its precedence table says ARC. `E118` rejects ARC and says so |
 | `DC` pattern: Table 4-1 vs the worked example | **Table 4-1** |
 | Program name characters | The explicit exclusion list |
-| `GOTO` to a missing line | Error on APOGEE, warning on older firmware |
+| `GOTO` to a missing line | **Warning everywhere.** Was an error on the belief Desigo CC refuses to save it; 36 came out of a live Desigo CC in running programs |
+| Integer where a decimal is documented | **Warning.** 125-1896 forbids it, later docs do not, and shipped code uses integers |
+| `LOCAL`'s sixteen | **Per statement, not per program.** The compiler chunks declarations rather than refusing |
+| Adaptive control on PXC.A | **Gone.** Inferred from a table's whitespace for four passes, then stated in words on the removed-statements page |
+| Comment length | Counts the **comment text**, not the line number or the `C` |
 
 ### The single most valuable line found
 
@@ -306,12 +335,38 @@ The engine is deep and the UI now covers it. What remains:
 
 ## 7. Roadmap, in priority order
 
-### Immediate — driven by real programs
-**Keep running real site programs through `lint`, `bench` and `db --check`.**
-Every pass so far has produced rule tuning — severity levels that overstated
-what a compiler actually rejects, false positives on site idioms, and point
-reference forms the parser had not seen. Do not tune rules speculatively;
-tune them against programs that are running in a building.
+### Immediate — two decisions that real corpora have now earned
+
+Running real programs is no longer the pending item; it has happened, twice,
+and it is what produced most of the recent work. What is pending is acting on
+what it measured.
+
+**1. Decide `W104`'s severity.** The 66-character MMI limit is now measured on
+two independent corpora and dominates both:
+
+| Corpus | `W104` share of all warnings |
+|---|---|
+| The reference site's 22 programs | 65% |
+| Siemens' own 84-program library | **70%** (2,134 of 3,040) |
+
+Seventy per cent of the linter's output on Siemens' reference code concerns a
+port nobody enters programs through, and the rule's own detail text admits it
+"only matters if the program is re-entered through the MMI port". A linter that
+spends two thirds of its voice on that gets turned off. This is a judgement
+call for the user, not a unilateral change — but it should be *made*, not left.
+
+**2. Check `W330`.** It fires 340 times on the Siemens library, the largest
+count of any rule that is not `W104`. Either the library genuinely commands
+above NONE without releasing 340 times, or there is a false-positive pattern in
+it. Find out before trusting the count.
+
+### Keep doing — it has paid every time
+
+Run real programs through `lint` before believing anything. Every pass has
+produced a correction: severity levels that overstated what a compiler
+rejects, false positives on site idioms, point reference forms the parser had
+not seen, and three parser bugs that only Siemens' own code exercised. Do not
+tune rules speculatively; tune them against programs that run in a building.
 
 ### Tier 1 — the things a daily user hits first
 1. **Undo/redo as an application concern**, so a transform, a renumber and a
@@ -337,13 +392,43 @@ tune them against programs that are running in a building.
 
 ### Done since this list was written (2026-09-18)
 
-- **The plugin.** Skill + MCP server + slash commands; the repo is installable.
-- **A6V10374898 mined** — `GETVAL`/`SETVAL`, the property appendix,
-  `[Node]Point`, the `DC` pattern, SSTO, ADAPTM/ADAPTS, PXC.A rules.
-- **PXC.A firmware** added, with its own limits and `E119` enforcing
-  availability. `OIP` is rejected there and the linter now says so.
-- Rules added: `W336` (SETVAL to a behaviour-changing property), `W337`
-  (SSTO whose times nothing reads), `E119` (firmware availability).
+**Published.** <https://github.com/jamesccupps/PPCL>, MIT.
+
+**The plugin.** Skill + MCP server + slash commands; the repo is installable.
+
+**Read the panel, not just the file.** `ppcl/report.py` parses a `PPCL DISPLAY
+REPORT` -- which lines are disabled, which have an unresolved point, which have
+ever executed -- and `lint --report` folds it in. `Line.disabled` drops a
+disabled line out of the control-flow graph exactly as the panel drops it.
+
+**Parser fixes, all found by real code:**
+
+- unquoted `%X%NAME` DEFINE substitutions (116 lines of Siemens' library)
+- substitution tails starting with a digit
+- `@NONE.AND.` -- the `@`-name branch was missing the `_DOTOPS` guard
+- PXC.A's `# ` disable syntax, which used to be a parse error
+- `[NodeName]PointName` references
+
+**Corrections to things previously believed:**
+
+- the reference site is **APOGEE BACnet ALN, not PXC.A** -- inferred from the
+  supervisor and never checked against a program until the seventh pass
+- `W202` is a warning, not an error
+- `E113` became `W113`
+- `LOCAL`'s sixteen is per statement
+- comment length excludes the line number and the `C`
+- PXC.A removes **ten** statements, not one
+
+**Rules added:** `W113` (regraded), `W313` (PDL order), `W336`, `W337`, `W338`
+(LSQ2 rows), `W339` (RELEAS storm), `W340` (device-local across the network),
+`E119` (firmware availability), `E120` (parenthesis in a point name),
+`R701`-`R704` (panel report findings).
+
+**Spec additions:** the ten PXC.A removals with Siemens' reason for each, 29
+panel error codes (compiler `R` and runtime `E`, and the distinction between
+them), the PDL command order and panel roles, bundled-point proof optionality,
+slope/intercept on points, and `LSTSQR` -- a command that appears in no manual
+anywhere, recovered from Siemens' own shipped library.
 
 ### Tier 3.5 — the reference deliverable (the user has asked for this)
 

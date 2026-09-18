@@ -187,15 +187,15 @@ def tokenize(text: str) -> list:
             end = m.end()
             # A DEFINE abbreviation is a name PREFIX, so what follows it with
             # no space belongs to the same point name: DEFINE(X,"BLD1.AHU1.")
-            # then %X%RDP is one object, not two tokens. Siemens' own shipped
+            # then %X%AAA is one object, not two tokens. Siemens' own shipped
             # application library writes these unquoted throughout, and 146
             # lines of it failed to parse until this joined them.
-            # The tail may start with a digit -- %X%1AL is a real name in
+            # The tail may start with a digit -- a digit-leading tail is real in
             # Siemens' own library -- so this is a plain character run rather
             # than _IDENT_RE, which requires a leading letter.
             while end < n and (text[end].isalnum() or text[end] in "_$"):
                 end += 1
-            # The same dot problem as everywhere else: %X%NAL.GT.%X%OAL is a
+            # The same dot problem as everywhere else: %X%AAA.GT.%X%BBB is a
             # name, a dotted operator and another name -- not one long name.
             # Guarded exactly as the [NodeName] branch above guards it.
             while end < n and text[end] == ".":

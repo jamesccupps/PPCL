@@ -491,7 +491,7 @@ Following the discipline of tagging each claim by how it was established:
 | Operator precedence | **Manual-verified** — Table 2-6 |
 | Reserved word list | **Manual-verified** — Chapter 5 |
 | Execution model, wrap, line limits | **Manual-verified** — Chapter 2 |
-| Parser correctness | **Empirically tested** — parses four independent real-world programs with zero errors, plus 135 unit tests |
+| Parser correctness | **Empirically tested at scale.** Parses 42 programs exported from a live Desigo CC with zero failures, and 15,716 of 15,726 lines of Siemens' own 84-program application library. The ten remaining are genuine syntax errors in that library as shipped -- a stray parenthesis, three missing commas, a statement fragment. Three parser bugs were found and fixed this way and could not have been found any other way |
 | `TABLE`, `DBSWIT`, `MIN`/`MAX`, `TOD`, `WAIT`, `SAMPLE` simulation | **Manual-verified**, behaviour fully specified |
 | Priority arbitration in the simulator | **Manual-verified** against the Chapter 3 rule |
 | `LOOP` output values | **Approximated, NOT verified.** Siemens does not publish the internal PID form. Timing, inputs and outputs are exact; the computed value is indicative only. The gain scaling follows the manual's own `pg = (output span / throttling range) x 1000`, so `pg/1000` is the gain in percent per degree |
@@ -499,6 +499,9 @@ Following the discipline of tagging each claim by how it was established:
 | `DC` pattern encoding | **Verified twice.** Table 4-1 (2000) and Table 3-1 (A6V10374898) agree; the newer manual's worked example `DC(HFAN,7001)` is reproduced exactly by `duty_cycle_pattern` and pinned by a test |
 | BACnet property referencing | **Manual-verified** — A6V10374898 Appendix B, 99 properties, reached with `GETVAL`/`SETVAL` as `@ShortName` or a numeric id |
 | `SSTO`, `PDL`, `OIP`, `DC`/`DCR` execution | **Not modelled** — traced as no-ops |
+| PXC.A statement availability | **Manual-verified** — A6V10374898, "Obsolete PPCL Statements Removed from the Language". Ten statements, each with Siemens' stated reason |
+| Panel error codes | **Manual-verified** — A6V10324350 Appendix C. R-codes are compiler refusals, E-codes are runtime failures on a line that loaded |
+| `LSTSQR` | **Inferred from code, not documented anywhere.** Recovered from Siemens' shipped chiller programs; argument order deduced from what those programs compute from the results. Argument count is deliberately NOT enforced |
 
 **Program planning method.** Siemens' recommended process, which is also a
 good specification for a sequence-authoring tool: (1) read the sequence of

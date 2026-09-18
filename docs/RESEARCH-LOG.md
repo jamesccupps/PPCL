@@ -1742,7 +1742,7 @@ had never been reached by any program seen before.
 | Defect | Lines | What it is |
 |---|---|---|
 | Unquoted `%X%NAME` | ~116 | A DEFINE abbreviation used bare rather than quoted |
-| `%X%1AL` | ~6 | A substitution whose tail starts with a digit |
+| `%X%1AA` | ~6 | A substitution whose tail starts with a digit |
 | `@NONE.AND.` | ~20 | The `@`-name branch swallowing a dotted operator |
 
 **The first is the significant one.** Every documented example quotes the
@@ -1757,7 +1757,7 @@ against an `@priority` without spaces failed, which is how every one of
 Siemens' optimum-start-stop programs is written.
 
 A fourth was self-inflicted and caught immediately: the first cut of the
-substitution fix absorbed `.` unconditionally, so `%X%NAL.GT.%X%OAL` became one
+substitution fix absorbed `.` unconditionally, so `%X%AAA.GT.%X%BBB` became one
 name. Guarded the same way the bracket branch already guards it.
 
 **146 to 10.** Five tests pin the three fixes and the two forms that must keep
