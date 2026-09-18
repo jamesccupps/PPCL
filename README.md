@@ -35,7 +35,7 @@ with the same keys so muscle memory transfers: `Ctrl+G` go to statement,
 numbering on Enter, and **Command Assist** using Siemens' own eight command
 categories, with the signature and the argument you are on shown as you type.
 
-It adds what Desigo has nowhere to put: 72 lint rules, each citing the manual
+It adds what Desigo has nowhere to put: 79 lint rules, each citing the manual
 page it comes from, and a set of source transforms that are exact by machine
 and tedious by hand — DEFINE expand and collapse, point-name separator swap,
 clone a block of statements with renames and retargeted branches, and
