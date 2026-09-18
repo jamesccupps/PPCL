@@ -82,6 +82,23 @@ def _is_comment_body(body: str) -> bool:
     return len(body) == 1 or not (body[1].isalnum() or body[1] in "_$(")
 
 
+def _is_hash_disabled(body: str):
+    """The statement behind a PXC.A ``# `` disable marker, or None.
+
+    "Type # and a space at the front of a line to disable a line. Delete # and
+    a space to enable a line." -- Desigo PXC.A Web Interface User Guide
+    (A6V12893115).
+
+    This is the one generation where a disabled line is representable in the
+    program text. The space is required: ``#`` alone, or ``#`` against the
+    statement, is not the documented form and is left to fail as it would on
+    the panel.
+    """
+    if not body.startswith("# "):
+        return None
+    return body[2:].strip()
+
+
 # --------------------------------------------------------------------------
 # Statement parser
 # --------------------------------------------------------------------------
@@ -421,6 +438,25 @@ def parse(text: str, name: str = "", path: str = "") -> Program:
                 prog.errors.append(
                     (src_no, None, "statement has no line number: %r" % body)
                 )
+            continue
+
+        hashed = _is_hash_disabled(body)
+        if hashed is not None:
+            # PXC.A's own disable syntax: "Type # and a space at the front of a
+            # line to disable a line" (A6V12893115, Commenting Out and
+            # Uncommenting Lines of Code). Unlike every older generation this
+            # IS recorded in the program text, so the statement is parsed and
+            # the line is marked disabled rather than being flattened to prose.
+            # Keeping the statement means the linter still sees defects that
+            # would bite the moment someone re-enables the line.
+            try:
+                stmt = parse_statement_text(hashed)
+            except (ParseError, LexError):
+                stmt = Comment(hashed)
+            prog.lines.append(
+                Line(number, stmt, logical, src_no, body=body,
+                     continued=continued, disabled=True)
+            )
             continue
 
         if _is_comment_body(body):

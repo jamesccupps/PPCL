@@ -1552,3 +1552,103 @@ it to.
 2. Lint the 84-program Siemens application library as a regression corpus.
 3. The `E12` rule, once a point export with slope and intercept exists.
 4. A real `PPCL DISPLAY REPORT` to run `lint --report` against.
+
+---
+
+## 2026-09-18 (twelfth pass) — the PXC.A Web Interface guide, found online
+
+`A6V12893115`, **Desigo PXC.A Web Interface User Guide**. Public at
+`https://sid.siemens.com/r/A6V12893115`, HTML, access level Internet, no login.
+This documents the **onboard editor that replaces the Desigo CC PPCL Editor on
+PXC.A** -- the one the seventh pass established PXC.A sites actually use.
+
+It has a full PPCL Editor section: User Interface, Editing Programs, Creating
+New Programs, Commenting Out and Uncommenting Lines of Code, PPCL Diagnostics,
+PPCL Program Properties.
+
+### PXC.A has a file-level disable syntax, and we could not parse it
+
+> "Type **# and a space** at the front of a line to disable a line. Delete #
+> and a space to enable a line. Select multiple lines and press CTRL+/ as a
+> shortcut to comment out (disable) lines."
+
+This **contradicts a standing invariant**, which said a text file has nowhere
+to keep a real disable flag and that no file-level disable syntax should be
+invented. That was right for APOGEE and BACnet ALN, where the state lives in
+the panel and the editor database. It is wrong for PXC.A, where Siemens defines
+the syntax themselves.
+
+Before this pass, `00020  # OFF(FAN)` produced `E100 unexpected character '#'`.
+Every PXC.A program with a commented-out line would have been a page of
+spurious parse errors.
+
+`parser` now reads `# `, **parses the statement behind it**, and sets
+`Line.disabled` -- reusing the machinery built for panel reports in the seventh
+pass. The statement is kept rather than flattened to prose deliberately: the
+linter still sees defects that would bite the moment someone re-enables the
+line. A `# ` line whose content is not valid PPCL degrades to a comment rather
+than an error, because whatever it is, it is not running.
+
+The space is required. `#OFF(FAN)` is not the documented form and is left to
+fail exactly as it would on the panel.
+
+The invariant in `CLAUDE.md` is now stated per generation, with both forms
+named and neither invented.
+
+### ACT / DEACT / ENABLE / DISABL still work, and Siemens says stop using them
+
+> "These statements are still supported in PXC.A controllers, but it is advised
+> to use the new statements Goto(), Gosub(), or Return() to go around the logic
+> instead of disabling and enabling lines in new programs... Uncommenting
+> (enabling) and commenting out (disabling) statements that use ACT, DEACT,
+> ENABL, and DISABL **cause the device to use more system resources**."
+
+So they are not in `PXC_A_REMOVED` -- correctly -- but on a PXC.A they carry a
+cost the older generations did not have, and the recommended replacement is
+ordinary branching.
+
+**Spelling conflict, recorded not resolved:** this page writes `ENABL`, while
+125-1896 and everything else writes `ENABLE`. Given `DISABL` really is six
+characters, `ENABL` may be a slip toward symmetry. `spec.py` keeps `ENABLE`.
+
+### PPCL Diagnostics — several things worth having
+
+- **"DEFINE and LOCAL statements are always traced."** A cleared trace bit on
+  those means nothing, so `R703` must never conclude dead code from them.
+- **SAVE ERROR bar.** Invalid lines -- duplicates, out of range, missing line
+  number, bad syntax -- are **automatically commented out by the compiler** and
+  collected at the top of the editor "instead of discarding them without a
+  warning". A materially kinder failure mode than older panels.
+- **`UNKNOWN (...)` marker.** An unrecognised command is stored wrapped in
+  `UNKNOWN(...)` and ignored by the compiler. That is a real token that can
+  appear in PXC.A program text, and we do not handle it.
+- **Cycle time metrics per program** -- average over the last 10 cycles,
+  highest, lowest, in milliseconds, **mappable to virtual points and
+  trendable**. This makes open question 2, the real line-evaluation rate,
+  answerable from a live panel instead of from the manual's averages.
+- Line status indicators exist here too, several per line, with hover text.
+
+### A SET deadband idiom, which is the PXC.A analogue of the RELEAS storm
+
+> "The SET command is not always resolved to the actual value, which may result
+> in points being continuously commanded. To prevent unnecessary MS/TP traffic,
+> use a deadband."
+
+with a worked example that guards the `SET` behind a computed difference
+against a deadband local. Same shape as `W339`: a command that is logically a
+no-op but costs network traffic every pass. A rule candidate.
+
+### Two more document numbers
+
+- **`A6V12954390`**, "the PXC.A PPCL Manual", cited twice by this guide. Not
+  the same number as `A6V10374898`, which is the *PXC.A PPCL User Guide*. Worth
+  resolving whether it is a different document or a renumbering.
+- The guide's own number, `A6V12893115`, is now recorded in the sources table.
+
+### Still to do
+
+1. Read `A6V12954390` if it resolves to something distinct.
+2. Handle the `UNKNOWN (...)` marker in the lexer.
+3. A rule for the `SET`-without-deadband idiom on PXC.A.
+4. A rule noting `ACT`/`DEACT`/`ENABLE`/`DISABL` cost resources on PXC.A.
+5. Lint the 84-program Siemens application library.

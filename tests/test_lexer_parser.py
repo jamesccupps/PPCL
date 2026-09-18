@@ -234,3 +234,56 @@ def test_property_name_round_trips():
 def test_every_dangerous_property_is_in_the_property_table():
     for number in spec.DANGEROUS_PROPERTIES:
         assert number in spec.BACNET_PROPERTIES
+
+
+# -- PXC.A's own disable syntax --------------------------------------------
+
+
+def test_a_hash_disabled_line_parses_as_a_disabled_statement():
+    """PXC.A is the one generation where a disabled line lives in the text.
+
+    "Type # and a space at the front of a line to disable a line."
+    -- Desigo PXC.A Web Interface User Guide (A6V12893115).
+
+    The statement is kept rather than flattened to prose, so the linter still
+    sees defects that would bite the moment someone re-enables the line.
+    """
+    prog = parser.parse("00010\tON(FAN)\n00020\t# OFF(FAN)\n00030\tGOTO 10\n")
+    assert prog.errors == []
+    line = prog.by_number()[20]
+    assert line.disabled
+    assert not line.is_executable
+    assert type(line.stmt).__name__ == "CommandCall"
+    assert line.stmt.name == "OFF"
+
+
+def test_a_hash_disabled_line_that_is_not_valid_ppcl_is_not_an_error():
+    """Whatever someone commented out, it is not running and must not fail."""
+    prog = parser.parse("00010\tON(F)\n00020\t# half a thought &&&\n"
+                        "00030\tGOTO 10\n")
+    assert prog.errors == []
+    assert prog.by_number()[20].disabled
+
+
+def test_a_disabled_line_drops_out_of_the_executable_set():
+    prog = parser.parse("00010\tON(F)\n00020\t# OFF(F)\n00030\tGOTO 10\n")
+    numbers = {ln.number for ln in prog.lines if ln.is_executable}
+    assert numbers == {10, 30}
+
+
+def test_the_space_after_the_hash_is_required():
+    """`#` against the statement is not the documented form.
+
+    It is left to fail exactly as it would on the panel, rather than being
+    quietly accepted here and rejected there.
+    """
+    prog = parser.parse("00010\t#OFF(FAN)\n00020\tGOTO 10\n")
+    assert prog.errors
+    assert not prog.by_number()[10].disabled
+
+
+def test_a_C_comment_is_still_a_comment_not_a_disabled_line():
+    prog = parser.parse("00010\tC just prose\n00020\tON(F)\n00030\tGOTO 20\n")
+    line = prog.by_number()[10]
+    assert not line.disabled
+    assert type(line.stmt).__name__ == "Comment"

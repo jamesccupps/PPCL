@@ -96,9 +96,14 @@ so it runs on any engineering workstation without a package install.
   Any new `Firmware` member must be added to `MMI_LINE_LIMIT`,
   `MMI_CONTINUATION_LIMIT` and `MAX_OPERANDS` or the rules raise `KeyError` at
   lint time -- there is a test that walks every member.
-- **A disabled line is a comment carrying a marker**, because a text file has
-  nowhere to keep a real disable flag. The transform warns that loading it to a
-  panel removes the statement. Do not invent a file-level disable syntax.
+- **How a disabled line is represented depends on the generation, and neither
+  form may be invented.** On APOGEE and BACnet ALN the state lives in the panel
+  and the editor database, never in the text, so the transform writes a comment
+  carrying a marker and warns that loading it to a panel removes the statement.
+  On **PXC.A it is in the text**: Siemens defines `# ` at the front of a line
+  as the disable, and `parser` reads it, keeps the statement, and sets
+  `Line.disabled`. The statement is kept rather than flattened to prose so the
+  linter still sees defects that would bite the moment someone re-enables it.
 
 ## Rule authoring
 
@@ -117,7 +122,7 @@ on idiomatic PPCL gets turned off.
 ## Testing
 
 ```bash
-python -m pytest tests -q          # 460 tests
+python -m pytest tests -q          # 465 tests
 python -m ppcl.cli lint samples    # exercises the CLI against real programs
 ```
 
