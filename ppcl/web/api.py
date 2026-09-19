@@ -145,6 +145,7 @@ def api_lint(body, ws=None):
         firmware=_firmware(body),
         point_types=body.get("point_types") or {},
         disabled=body.get("disabled") or (),
+        options=body.get("options") or {},
     )
     a = analyzer.analyze(prog)
     counts = linter.summarize(diags)

@@ -3212,3 +3212,80 @@ and nobody uses it.
 ### Still to do
 
 1. **Decide `W104`.**
+
+---
+
+## 2026-09-24 (thirty-first pass) — `W104` was the wrong question
+
+Auditing the generators found the last of it. The fixed templates in
+`generator.py` are tested at their default arguments and lint clean. Given
+realistic point names they do not:
+
+| | longest line | warnings |
+|---|---|---|
+| `air_handler()` | 118 | clean |
+| `air_handler(name="AHU01", fan="AHU01.SFAN", ...)` | 118 | `W104` x1 |
+| the same with `PENTHOUSE.AHU01.SUPPLYFAN`-length names | 148 | `W104` x3 |
+
+Chasing why led back to `W104` itself, and to the fact that **every previous
+summary of it in this log was imprecise.**
+
+### It is two findings, and only one of them is a warning
+
+A statement over the MMI limit is a `WARNING` **per line**. Comments whose text
+is over it are **one aggregated `STYLE` finding** per program. The sentence
+quoted repeatedly here to justify regrading - "this only matters if the program
+is re-entered through the MMI port" - belongs to the *comment* half, which was
+already `STYLE`. The statement half says something adjacent but different:
+*"Entering this through the field panel MMI port will truncate it. Loading from
+a workstation is unaffected."*
+
+| Corpus | statement `WARNING` | comment `STYLE` | share of all warnings |
+|---|---|---|---|
+| Siemens' library | 1,037 | 30 | **76%** |
+| The site, Desigo era | 96 | 3 | **65%** |
+| The site, older | 349 | 16 | **61%** |
+
+### And the limit is not unusable, which nobody had measured either
+
+| Corpus | statement lines | median | p90 | max | over 66 |
+|---|---|---|---|---|---|
+| Siemens' library | 3,297 | 41 | 97 | 148 | 31% |
+| The site, Desigo era | 447 | 35 | 121 | 223 | 21% |
+| The site, older | 1,777 | 40 | 84 | 232 | 20% |
+
+Ordinary PPCL sits well under 66. It is the long conditionals and multi-point
+commands that break it - a fifth to a third of lines, each producing one
+warning, which is the whole of the 61-76%.
+
+So the finding is **true**, and whether it matters is **a property of the
+site**: do programs ever get typed at a panel MMI port, or only ever arrive
+from a workstation? That is not a severity question, and regrading globally
+would be wrong for anyone who does use the port.
+
+### The setting already existed
+
+`settings.wrap_long_lines` - *"Warn on long lines: Flag statements over the MMI
+character limit, which load from a workstation but cannot be typed at the
+panel."* Declared, documented, default `True`, **read by no code at all.**
+
+The design decision had been made and half-implemented, and the question kept
+being escalated as a judgement call because nobody noticed the switch was
+already specified.
+
+Wired up: `LintContext.options` and `.option()`, `lint(options=...)`, `ppcl
+lint --workstation-only`, and `api_lint` passes `options` through from the
+editor. Only the statement half is silenced - the comment rollup costs one line
+per program and stays.
+
+Default unchanged, so a site that says nothing sees exactly what it saw before.
+On the reference site's Desigo-era programs the flag takes **147 warnings to
+51**.
+
+`options` is deliberately narrow and the docstring says so: it is for a finding
+whose *relevance* is a property of the site, not a second way to switch rules
+off. `disabled` already does that.
+
+### Still to do
+
+Nothing on the immediate list.

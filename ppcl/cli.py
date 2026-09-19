@@ -107,6 +107,8 @@ def cmd_lint(args):
             point_types=point_types,
             disabled=disabled,
             analysis=analysis,
+            options={"wrap_long_lines":
+                     not getattr(args, "workstation_only", False)},
         )
         if panel_report is not None:
             diags = list(diags) + report_mod.diagnostics(panel_report, prog)
@@ -1249,6 +1251,11 @@ def build_parser():
                     choices=[f.value for f in spec.Firmware])
     sp.add_argument("--points", help="point database (JSON or name,type CSV)")
     sp.add_argument("--min-severity", default="style", choices=SEVERITY_ORDER)
+    sp.add_argument("--workstation-only", action="store_true",
+                    help="programs are only ever loaded from a workstation, "
+                         "never typed at a panel MMI port. Silences the "
+                         "statement half of W104, which is 61-76%% of all "
+                         "warnings on real programs")
     sp.add_argument("--disable", action="append", metavar="CODE",
                     help="suppress a rule code; repeatable")
     sp.add_argument("--report", metavar="FILE",

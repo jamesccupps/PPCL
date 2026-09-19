@@ -731,6 +731,44 @@ def test_E316_needs_a_known_point_type_and_says_which():
     assert run({"SF1": "LXYZ"}) == []
 
 
+def test_W104_is_two_findings_and_only_the_statement_half_is_settable():
+    """Whether a truncation risk matters is a property of the site.
+
+    W104 carries two findings: a statement over the MMI limit is a WARNING per
+    line, and comments whose text is over it are one aggregated STYLE finding.
+    The statement half is 61-76% of all warnings across three corpora, because
+    a fifth to a third of real statement lines exceed 66 characters -- the
+    median is 35-41, so it is the long conditionals that break it, not
+    ordinary code.
+
+    The finding is true and its relevance is not universal: "loading from a
+    workstation is unaffected". settings.wrap_long_lines was declared and
+    documented for exactly this and read by nothing.
+    """
+    from ppcl import linter, parser, settings
+
+    text = ("100\tIF(PENTHOUSE.AHU01.SUPPLYFAN.EQ.ON.AND."
+            "PENTHOUSE.AHU01.RETURNFAN.EQ.ON) THEN ON(X)\n"
+            "110\tC " + "y" * 90 + "\n120\tGOTO 100\n")
+    prog = parser.parse(text)
+
+    on = [d for d in linter.lint(prog) if d.code == "W104"]
+    assert {d.severity.value for d in on} == {"warning", "style"}
+
+    off = [d for d in linter.lint(prog, options={"wrap_long_lines": False})
+           if d.code == "W104"]
+    # The statement warning goes; the comment rollup stays, because it costs
+    # one line per program and says something different.
+    assert [d.severity.value for d in off] == ["style"]
+
+    # Default is on: a site that has not said otherwise still gets it.
+    assert [d.severity.value for d in linter.lint(prog, options={})
+            if d.code == "W104"] == [d.severity.value for d in on]
+
+    # And the setting it reads is a real declared one, not an invented key.
+    assert any(s_.key == "wrap_long_lines" for s_ in settings.SETTINGS)
+
+
 def test_the_manual_derived_rules_all_cite_the_manual():
     """The invariant is "every diagnostic carries a manual= citation where the
     manual supports it", and it decays silently.

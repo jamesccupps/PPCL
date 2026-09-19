@@ -130,7 +130,7 @@ on idiomatic PPCL gets turned off.
 ## Testing
 
 ```bash
-python -m pytest tests -q          # 509 tests
+python -m pytest tests -q          # 510 tests
 python -m ppcl.cli lint samples    # exercises the CLI against real programs
 ```
 

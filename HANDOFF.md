@@ -80,7 +80,7 @@ runs on any engineering workstation with no install. Windows is the primary
 platform.
 
 ```bash
-python -m pytest tests -q          # 509 tests, ~150s
+python -m pytest tests -q          # 510 tests, ~150s
 python -m ppcl.cli serve           # the app
 python -m ppcl.cli lint samples    # exercises the CLI on real programs
 python -m ppcl.cli help            # the built-in documentation
@@ -90,7 +90,7 @@ python -m ppcl.cli help            # the built-in documentation
 
 ## 2. Current state
 
-**509 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
+**510 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
 tests. 88 lint rules, 66 commands, 99 BACnet properties, 30 block types,
 17 CLI subcommands, 11 MCP tools, 12 help pages, 20 settings, 6 firmware
 families, 29 panel error codes.
@@ -358,19 +358,37 @@ Running real programs is no longer the pending item; it has happened, twice,
 and it is what produced most of the recent work. What is pending is acting on
 what it measured.
 
-**1. Decide `W104`'s severity.** The 66-character MMI limit is now measured on
-two independent corpora and dominates both:
+**1. ~~Decide `W104`.~~ Closed 2026-09-24 - it was the wrong question.**
 
-| Corpus | `W104` share of all warnings |
-|---|---|
-| The reference site's 22 programs | 65% |
-| Siemens' own 42-program library | **70%** (1,067 of 1,520) |
+`W104` is *two* findings under one code, and the difference had been blurred in
+every previous summary of it. A statement over the MMI limit is a WARNING per
+line; comments whose text is over it are **one aggregated STYLE finding** per
+program. Measured:
 
-Seventy per cent of the linter's output on Siemens' reference code concerns a
-port nobody enters programs through, and the rule's own detail text admits it
-"only matters if the program is re-entered through the MMI port". A linter that
-spends two thirds of its voice on that gets turned off. This is a judgement
-call for the user, not a unilateral change — but it should be *made*, not left.
+| Corpus | statement WARNINGs | comment STYLE rollups | share of all warnings |
+|---|---|---|---|
+| Siemens' library | 1,037 | 30 | **76%** |
+| The site, Desigo era | 96 | 3 | **65%** |
+| The site, older | 349 | 16 | **61%** |
+
+And the statement lines themselves: **median 35-41 characters**, p90 84-121,
+with **20-31% over 66**. So the limit is not unusable - ordinary code sits
+comfortably under it, and the long conditionals and multi-point commands break
+it.
+
+Which makes the finding *true* and its relevance *not universal*: its own text
+says "loading from a workstation is unaffected". A shop that only ever loads
+from Desigo is being told about a path it does not use, two thirds of the time.
+
+That is a property of the site, not of the program, so it is a setting rather
+than a severity. **And the setting already existed** - `wrap_long_lines`,
+"Flag statements over the MMI character limit, which load from a workstation
+but cannot be typed at the panel", declared and documented and read by nothing.
+Wired up now: `LintContext.options`, `lint(options=...)`, `ppcl lint
+--workstation-only`, and the API passes `options` through.
+
+Default unchanged, so nobody who says nothing sees a difference. On the
+reference site's Desigo-era programs the flag takes **147 warnings to 51**.
 
 **2. ~~Check `W330`.~~ Closed 2026-09-18 — and it found a counting error
 first.** The 340 was 170; the library ships in two product trees and the corpus

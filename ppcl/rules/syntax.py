@@ -93,7 +93,31 @@ def line_numbers_out_of_order(ctx):
 
 @rule("W104", "Program line exceeds the MMI character limit", Severity.WARNING)
 def line_too_long(ctx):
+    """Two findings under one code, and only one of them is a warning.
+
+    A statement over the limit is a WARNING per line; a comment whose text is
+    over it is one aggregated STYLE finding. The statement half dominates
+    everything: measured across three corpora it is 61-76% of all warnings,
+    because 20-31% of real statement lines exceed 66 characters. The median
+    statement line is 35-41, so the limit is not unusable -- it is the long
+    conditionals and multi-point commands that break it.
+
+    Whether that matters is a property of the SITE, not of the program. The
+    finding is "this would truncate if typed at the panel's MMI port; loading
+    from a workstation is unaffected." A shop that only ever loads from Desigo
+    is being told about a path it does not use, two thirds of the time.
+
+    So it is settable, and ``settings.wrap_long_lines`` had been declared and
+    documented for exactly this since before the measurement existed --
+    "Flag statements over the MMI character limit, which load from a
+    workstation but cannot be typed at the panel" -- and read by nothing.
+    Default stays on: a site that has not said otherwise gets the finding.
+
+    Turning it off silences only the statement half. The comment rollup costs
+    one STYLE line per program and stays.
+    """
     limit = spec.MMI_LINE_LIMIT[ctx.firmware]
+    warn_statements = ctx.option("wrap_long_lines", True)
     long_comments = []
     for ln in ctx.program.lines:
         if ln.continued:
@@ -109,7 +133,7 @@ def line_too_long(ctx):
                 long_comments.append(ln)
             continue
         text = ln.raw.strip()
-        if len(text) <= limit:
+        if len(text) <= limit or not warn_statements:
             continue
         yield _d(
             "W104",

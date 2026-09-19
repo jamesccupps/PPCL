@@ -21,6 +21,14 @@ class LintContext:
     point_types: dict = field(default_factory=dict)
     #: Rule codes the caller asked to suppress.
     disabled: frozenset = frozenset()
+    #: Site settings a rule may consult, from ``ppcl.settings``. Only for a
+    #: finding whose RELEVANCE is a property of the site rather than of the
+    #: program -- not a second way to switch rules off, which ``disabled``
+    #: already does.
+    options: dict = field(default_factory=dict)
+
+    def option(self, key, default=None):
+        return self.options.get(key, default)
 
     def point_type(self, name: str):
         return self.point_types.get(name.upper().lstrip("$"))
@@ -74,6 +82,7 @@ def lint(
     point_types: dict = None,
     disabled=(),
     analysis: Analysis = None,
+    options: dict = None,
 ) -> list:
     """Run every registered rule against ``program``.
 
@@ -86,6 +95,7 @@ def lint(
         firmware=firmware,
         point_types={k.upper(): v for k, v in (point_types or {}).items()},
         disabled=frozenset(disabled),
+        options=dict(options or {}),
     )
 
     out = []
