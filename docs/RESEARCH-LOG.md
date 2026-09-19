@@ -2965,3 +2965,68 @@ to a comment line" (`W204`).
 ### Still to do
 
 1. **Decide `W104`.** Still the only thing on the immediate list.
+
+---
+
+## 2026-09-24 (twenty-seventh pass) — Siemens' own worked examples, parsed
+
+Every corpus this parser has been tested against is **production code**, and
+production code writes about a third of the language. The wire corpus said so
+outright: thirty-one of sixty-six keywords never appear in it.
+
+The Insight Program Editor ships **115 worked examples**, one per command, and
+they had never been run through anything.
+
+### 424 of 425 lines
+
+Extracted every numbered line from all 115 pages -- 109 carry code -- and
+parsed them. Sixteen failures, and classifying each one matters more than the
+count:
+
+| Cause | Count |
+|---|---|
+| Extraction artifact: an "omitted lines" marker, `...` or a glyph lost in the CHM decompile | 10 |
+| Extraction artifact: prose arithmetic on a precedence page, `10 - 5 = 5` | 4 |
+| Documentation placeholder: a product-name phrase substituted into a code sample | 1 |
+| **A genuine typo in Siemens' help**: a `TABLE` call missing a comma between two arguments | 1 |
+| **Parser bugs** | **0** |
+
+The one real failure is the same class as the five in their shipped library:
+vendor text that does not compile. Fifteen of the sixteen are my extractor
+reading documentation furniture as code.
+
+### What it adds is the long tail
+
+This corpus is valuable precisely because it is *not* production code. Counting
+commands actually exercised:
+
+| Corpus | Commands exercised |
+|---|---|
+| Every program corpus combined -- Siemens' library, the reference site, `samples/` | **31** |
+| The 115 worked examples | **54** |
+| **Union** | **57 of 66** |
+
+Twenty-six commands appear in the examples and in **no program anywhere**: the
+entire `PDL`/`PDLDAT`/`PDLDPG`/`PDLMTR`/`PDLSET` family, `ADAPTM`/`ADAPTS`,
+`DC`/`DCR`, `HLIMIT`/`LLIMIT`, `ENALM`/`DISALM`, `EPHONE`/`DPHONE`,
+`ALARM`/`NORMAL`, `TOD`/`TODSET`, `SSTOCO`, `LSQ2`/`LSQDAT`, `HOLIDA`, `ACT`,
+`DEACT`, `AUTO`.
+
+Those are the commands a parser is most likely to be wrong about, because
+nothing had ever fed one to it.
+
+The nine still unexercised are unexercised for reasons rather than by accident:
+`GETVAL` and `SETVAL` are PXC.A-only and postdate this help entirely; `DISCOV`
+and `ENCOV` are the pair documented in the manual and absent from the help, so
+they have no example page to draw from; and `STATE`, `EMAUTO`, `EMFAST`,
+`EMSET` and `EMSLOW` have a syntax section in the help with no worked example
+beside it.
+
+Nothing from these pages enters the repository -- they are licensed Siemens
+material, used here as a test corpus and described, not copied.
+
+### Still to do
+
+1. **Decide `W104`.**
+2. Get a worked case for the nine unexercised commands from somewhere other
+   than Siemens' help, or accept that they are parsed but unproven.
