@@ -199,8 +199,11 @@ their own docs misprint document numbers. Do not spend more time on it.
 ### Original four, in decreasing authority for a modern PXC:
 
 1. **Desigo CC PPCL Editor Command Assist** — read from the user's live system
-   via screenshots. The only source for `ADAPTM`, `ADAPTS`, `LSQ2`, `LSQDAT`
-   signatures.
+   via screenshots. ~~The only source for `ADAPTM`, `ADAPTS`, `LSQ2`,
+   `LSQDAT` signatures.~~ **Not true, corrected 2026-09-18:** the Insight
+   Program Editor documents all four in full -- a command page, a Statement
+   Arguments page and a worked example each. Command Assist was the first
+   source read, not the only one.
 2. **Desigo CC engineering help** — the user supplied the full extract as
    `PPCL.md` (3,537 lines) at `C:\Users\JamesCupps\Downloads\PPCL.md`. This is
    the *compiler's* rulebook: operand and operator limits, the common compiler

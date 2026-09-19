@@ -23,6 +23,46 @@ this toolkit.
 > panels. "APOGEE" here is a firmware family — which is how `spec.Firmware`
 > treats it — not a qualifier on the language.
 
+### Insight or Desigo — which source has more?
+
+Asked properly: for each of the 66 commands, does 125-1896 Rev. 5 document it,
+does the Insight Program Editor help, and does Desigo CC's Command Assist list
+it? Answered by matching all three against `spec.ALL`:
+
+| 125-1896 | Insight help | Desigo list | Count | Which |
+|---|---|---|---|---|
+| yes | yes | yes | **57** | |
+| yes | **no** | yes | 2 | `DISCOV`, `ENCOV` |
+| **no** | yes | yes | 4 | `ADAPTM`, `ADAPTS`, `LSQ2`, `LSQDAT` |
+| — | — | **no** | 3 | `GETVAL`, `SETVAL`, `LSTSQR` |
+
+**Nothing was dropped.** Every command Insight documents, Desigo lists. The
+worry that the newer generation lost material does not survive the check.
+
+**No single source is complete, and the gaps run both ways.** The Insight
+Program Editor's 736 pages are not a superset of the 2000 manual: `DISCOV` and
+`ENCOV` have a full Chapter 4 entry with syntax and a worked example there, and
+no mention anywhere in the help. Conversely `ADAPTM`, `ADAPTS`, `LSQ2` and
+`LSQDAT` postdate the manual and are documented only in the help and in
+Command Assist.
+
+The three outside the list are outside for three different reasons.
+`GETVAL`/`SETVAL` are PXC.A additions documented in A6V10374898, a different
+manual for a different generation. `LSTSQR` is in no Siemens documentation at
+all and was recovered from Siemens' own shipped application library.
+
+**What Insight has that Desigo does not** is depth rather than coverage: a page
+per command with a worked example, an enumerated reserved-word list (Desigo
+ships none), the compiler error list, the decision-table planning method, the
+`LFMSSL`/`LFMSSP` definitions, the status-field invariant that a report row
+always carries `E` or `D`, the Time of Day ↔ PPCL relative-time-point
+interface, and the inbound BACnet priority banding.
+
+**What Desigo has that Insight does not** is the current compiler's own limits
+— 16 operands and 32 operators where 125-1896 says 13 — and, through
+A6V10374898, the PXC.A generation: `GETVAL`/`SETVAL`, the BACnet property
+appendix, the ten removed statements, and the `# ` disable syntax.
+
 Where sources disagree, that is called out rather than smoothed over — see
 [Known discrepancies](#known-discrepancies). Everything the toolkit enforces
 carries a citation to whichever source it came from.
@@ -734,12 +774,18 @@ Questions this toolkit does not answer, each with the test that would settle it:
    The appendix has since been read — 99 properties, in the table above — so
    what is left is hardware confirmation, and nothing available here can give
    it: no PXC.A appears in any corpus examined, wire capture included.
-8. ~~Signatures for ADAPTM, ADAPTS, LSQ2 and LSQDAT~~ — **RESOLVED** from the
-   PPCL Editor's Command Assist: `ADAPTM(pt1,...,pt14)`,
-   `ADAPTS(pt1,...,pt14)` (both firmware 2.7+),
+8. ~~Signatures for ADAPTM, ADAPTS, LSQ2 and LSQDAT~~ — **CLOSED.**
+   `ADAPTM(pt1,...,pt14)`, `ADAPTS(pt1,...,pt14)` (both firmware 2.7+),
    `LSQ2(execution,pt1,..,pt6,startline#,endline#)`, `LSQDAT(pt1,pt2,pt3)`.
-   Still open: what the `execution` parameter of LSQ2 accepts, and whether
-   ADAPTM/ADAPTS have a documented tuning procedure.
+   Both remaining sub-questions are answered, and by a **second independent
+   source**: the Insight Program Editor carries a full page, a Statement
+   Arguments page and a worked example for each of the four. `LSQ2`'s
+   `execution` is *"the execution time in minutes"*, and `ADAPTM`/`ADAPTS`
+   have a documented parameter-by-parameter procedure — sample time at most a
+   third of the smallest time constant, each time constant at least three
+   times the sample time, `Kc = 3`, a unique error point per statement, and
+   the four preconditions a loop must meet (controllable, open-loop stable,
+   consistently direct or reverse acting, modulating).
 9. ~~ARC or ATN for arc-tangent~~ — **RESOLVED. It is `ATN`.** The PPCL
    Editor's Command Assist lists ATN and describes it as calculating the
    arc-tangent in degrees. The `ARC(value1)` in the Desigo precedence table is

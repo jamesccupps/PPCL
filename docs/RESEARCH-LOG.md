@@ -2826,3 +2826,76 @@ recorded alongside.
 
 1. **Decide `W104`.** Still the user's call.
 2. `Eqedit` is the last book on the list with PPCL content.
+
+---
+
+## 2026-09-18 (twenty-fifth pass) — Tier 3.6, answered with a table
+
+`Eqedit` closes the book sweep: it confirms the zone model already recorded
+from the wire reference and adds one piece of lineage — PPCL is "the
+programming language used to write control programs for the **System 600**",
+the pre-APOGEE name. Nothing to change.
+
+Which leaves the question the user asked several passes ago and that has been
+answered piecemeal ever since: **has Desigo dropped anything Insight had, and
+does Insight hold anything worth keeping?**
+
+It is answerable mechanically. For each of the 66 commands: does 125-1896
+Rev. 5 document it, does the Insight Program Editor help, does Desigo CC's
+Command Assist list it?
+
+| 125-1896 | Insight help | Desigo list | Count | Which |
+|---|---|---|---|---|
+| yes | yes | yes | **57** | |
+| yes | **no** | yes | 2 | `DISCOV`, `ENCOV` |
+| **no** | yes | yes | 4 | `ADAPTM`, `ADAPTS`, `LSQ2`, `LSQDAT` |
+| — | — | **no** | 3 | `GETVAL`, `SETVAL`, `LSTSQR` |
+
+**Nothing was dropped.** Every command Insight documents, Desigo lists. That
+worry does not survive the check.
+
+**And no single source is complete, in either direction.** The Program
+Editor's 736 pages are not a superset of the 2000 manual — `DISCOV` and
+`ENCOV` have a full Chapter 4 entry with syntax and a worked example, and
+**zero mentions** in the help. The four that run the other way postdate the
+manual.
+
+Now in `PPCL-REFERENCE` §Sources, with what each side holds that the other
+does not.
+
+### Two stale claims, found by asking the question properly
+
+**`HANDOFF` said Desigo CC's Command Assist was "the only source" for
+`ADAPTM`, `ADAPTS`, `LSQ2` and `LSQDAT` signatures.** It is not. The Insight
+Program Editor carries, for each of the four, a command page, a Statement
+Arguments page and a worked example. Command Assist was the first source read,
+not the only one. Corrected, and the four are now second-source verified.
+
+**Open question 8 was carrying two sub-questions that the spec had already
+answered.** "What the `execution` parameter of LSQ2 accepts" — *"the execution
+time in minutes"*, which is already `LSQ2`'s parameter doc. "Whether
+ADAPTM/ADAPTS have a documented tuning procedure" — they do, in detail, and
+every constraint of it is already in the `ADAPTM` notes: sample time at most a
+third of the smallest time constant, each time constant at least three times
+the sample time, `Kc = 3`, a unique error point per statement, and the four
+preconditions a loop must satisfy.
+
+Both had been mined and neither had been struck off the list. That is its own
+small lesson: an open-questions list decays if only additions are audited.
+Question 8 is now closed.
+
+### Two things from the LSQ2 pages worth having
+
+- Its coefficients "generally range from 0.0 to 1.0", so Siemens recommends
+  defining those points with a **slope of 0.001** for usable resolution.
+- The coefficient points and the `LSQDAT` inputs "should be defined in the
+  point database as **virtual LAO** points in order to have the chiller's
+  part-load performance model dynamically update based on actual chiller plant
+  performance."
+
+Both were already in `spec.py`. Recorded here because the second source
+confirms them.
+
+### Still to do
+
+1. **Decide `W104`.** The only thing left on the immediate list.
