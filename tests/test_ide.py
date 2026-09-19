@@ -673,6 +673,46 @@ def test_the_word_form_comparisons_are_reserved():
     assert ".LESS." not in spec.DOTTED_OPS
 
 
+def test_cloning_renames_inside_an_OIP_keystroke_sequence():
+    """Cloning an AHU program is the whole reason this transform exists, and
+    it used to hand back a copy that still commanded the original equipment.
+
+    An OIP sequence is one quoted token holding what an operator would type,
+    so a point name inside it is a component and a whole-token rename can
+    never match it. The copy renamed ON("AHU1.SFAN") and left the OIP
+    sequence pointing at AHU1 -- silently, in a file you load to a panel.
+
+    Siemens hit the same wall and stopped there: "Point names in comments or
+    OIP statements are not modified and must be modified manually."
+    """
+    from ppcl import transforms
+
+    text = ('00100\tOIP(TRIG,"P/T/D/H///AHU1.SFAN/1/")\n'
+            '00110\tON("AHU1.SFAN")\n00120\tGOTO 100\n')
+    r = transforms.clone_lines(text, 100, 120, {"AHU1.SFAN": "AHU2.SFAN"},
+                               start=200, step=10)
+    copy = r.text.split("00200")[1]
+
+    assert "AHU2.SFAN" in copy
+    assert "AHU1" not in copy          # neither in the command nor the sequence
+    # The menu keystrokes are untouched.
+    assert "P/T/D/H///" in copy and "/1/" in copy
+    # Both references counted, not just the command.
+    assert "renaming 2 reference" in r.notes[0]
+    # And it still warns, because a sequence can name a point in a form no
+    # rename map will match.
+    assert any("OIP" in w for w in r.warnings)
+
+
+def test_cloning_without_an_OIP_does_not_raise_the_OIP_warning():
+    from ppcl import transforms
+
+    text = '00100\tON("AHU1.SFAN")\n00110\tGOTO 100\n'
+    r = transforms.clone_lines(text, 100, 110, {"AHU1.SFAN": "AHU2.SFAN"},
+                               start=200, step=10)
+    assert not any("OIP" in w for w in r.warnings)
+
+
 def test_the_three_speed_point_types_are_accepted_by_the_speed_commands():
     """LFMSSL/LFMSSP postdate Table 3-2, and leaving them out rejected real code.
 

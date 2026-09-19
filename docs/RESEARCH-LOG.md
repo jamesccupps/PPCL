@@ -3084,3 +3084,66 @@ lying; the other pins the stale-output naming.
 ### Still to do
 
 1. **Decide `W104`.**
+
+---
+
+## 2026-09-24 (twenty-ninth pass) — auditing the transforms that write files
+
+Three passes of auditing our own artifacts have found more than three passes of
+reading did. The remaining code that produces something a person loads into a
+panel is the formatter and `transforms.py`, so: does either lie?
+
+### Renumbering is sound, and that is worth stating
+
+Eight commands carry a line number as an argument — `GOTO`, `GOSUB`, `ACT`,
+`DEACT`, `ENABLE`, `DISABL`, `ONPWRT` and `LSQ2`, the last with two. A
+renumber that missed any one of them would produce a file that loads and
+misbehaves: an `ONPWRT` pointing at the wrong restart line, an `ACT` enabling
+somebody else's block.
+
+Built one program per command, renumbered each, checked for a stale reference.
+**All eight rewritten.** Then the nested cases, which are where this kind of
+thing usually breaks: a line-carrying command inside an `IF`'s THEN and ELSE,
+inside a `SAMPLE`, an `ACT` with three targets. **All correct.**
+
+A negative result, recorded because the alternative was assuming.
+
+### `clone_lines` handed back a copy that commanded the original equipment
+
+`swap_separators` came through clean — it works character-wise, so it reaches
+inside a quoted sequence consistently.
+
+`clone_lines` did not.
+
+Cloning an AHU program is the single most common reason this transform exists.
+Given `AHU1.SFAN` → `AHU2.SFAN`, it renamed `ON("AHU1.SFAN")` and **left the
+`OIP` keystroke sequence pointing at `AHU1.SFAN`**. The copy loads, runs, and
+its operator sequence drives the original fan. Nothing warned.
+
+Same root cause as the `redact` defect two passes ago, and it should have been
+looked for then: **an OIP sequence is one quoted token** holding what an
+operator would type, so a point name inside it is a *component* and a
+whole-token rename can never match it.
+
+Siemens hit this exact wall and stopped at it:
+
+> "Point names in comments or **OIP statements are not modified** and must be
+> modified manually."
+
+This now renames components that match a rename exactly — safe, and the common
+case — **and warns anyway**, because a sequence can name a point in a form no
+rename map will match: typed across menu levels, or abbreviated. Renaming what
+can be renamed and telling the truth about the rest is better than either
+guessing or giving up.
+
+### The pattern worth naming
+
+Three defects this week, all the same shape: `redact` mangling an OIP
+sequence, the bare-name pass walking back into its own output, and now
+`clone_lines`. Every one was invisible because **no test anywhere contained a
+`/`**. A quoted string in PPCL is usually a point name; in exactly one
+statement it is not, and that statement was in none of the fixtures.
+
+### Still to do
+
+1. **Decide `W104`.**

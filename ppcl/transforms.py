@@ -318,6 +318,7 @@ def clone_lines(text, first, last, renames, start=None, step=None):
 
     copied = []
     renamed = 0
+    oip_copied = False
     for ln in block:
         head, body = by_number.get(ln.number, (None, None))
         if body is None:
@@ -327,7 +328,16 @@ def clone_lines(text, first, last, renames, start=None, step=None):
             continue
         edits = []
         for token in lexer.tokenize(body):
-            if token.kind in (Tok.IDENT, Tok.QUOTED):
+            if (token.kind is Tok.QUOTED and "/" in token.text
+                    and _OIP_BODY.search(body)):
+                # A keystroke sequence: rename its components, not the token.
+                oip_copied = True
+                seq, hits = _rename_in_keystrokes(token.text, lookup)
+                if hits:
+                    renamed += hits
+                    edits.append((token.col, _span(token),
+                                  _requote(token, seq)))
+            elif token.kind in (Tok.IDENT, Tok.QUOTED):
                 replacement = lookup.get(token.text.upper())
                 if replacement:
                     renamed += 1
@@ -347,6 +357,14 @@ def clone_lines(text, first, last, renames, start=None, step=None):
         )
 
     warnings = []
+    if oip_copied:
+        warnings.append(
+            "an OIP statement was copied. Components of its keystroke "
+            "sequence that matched a rename exactly have been renamed, but a "
+            "sequence can name a point in a form no rename map will match -- "
+            "typed across menu levels, or abbreviated. Read every copied OIP "
+            "sequence by hand before loading this."
+        )
     if renames and not renamed:
         warnings.append(
             "none of the renames matched anything in the copied lines, so the "
@@ -365,6 +383,33 @@ def clone_lines(text, first, last, renames, start=None, step=None):
                   renamed)],
         warnings=warnings,
     )
+
+
+_OIP_BODY = re.compile(r"\bOIP\s*\(", re.I)
+
+
+def _rename_in_keystrokes(seq, lookup):
+    """Apply renames to the components of an OIP keystroke sequence.
+
+    An OIP sequence is one quoted token holding what an operator would type,
+    with ``/`` per menu level -- so a point name inside it is a component, not
+    the token, and a whole-token rename can never match it. Siemens hit the
+    same wall and stopped: "Point names in comments or OIP statements are not
+    modified and must be modified manually" (Insight Database Conversion help,
+    PPCL Conversion Guidelines).
+
+    Renaming an exact component is safe and is done. Anything else is left,
+    and the caller warns -- a sequence can name a point in a form no rename
+    map will match, typed across menu levels or abbreviated.
+    """
+    parts = seq.split("/")
+    hits = 0
+    for i, part in enumerate(parts):
+        replacement = lookup.get(part.upper())
+        if replacement:
+            parts[i] = replacement
+            hits += 1
+    return "/".join(parts), hits
 
 
 def _looks_like_reference(body):
