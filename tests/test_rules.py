@@ -731,6 +731,35 @@ def test_E316_needs_a_known_point_type_and_says_which():
     assert run({"SF1": "LXYZ"}) == []
 
 
+def test_the_manual_derived_rules_all_cite_the_manual():
+    """The invariant is "every diagnostic carries a manual= citation where the
+    manual supports it", and it decays silently.
+
+    Four rules asserted manual-derived facts and cited nothing: E110 (the
+    command set is the manual's), E111 and W115 (argument counts and parameter
+    kinds are Chapter 4, per command), E112 (which commands take an @priority).
+    A finding an engineer cannot trace is a finding they cannot take to a
+    vendor.
+
+    Rules that assert nothing from a manual -- the P7xx optimisations, the
+    dataflow findings -- correctly carry none, and this test does not ask them
+    to invent one.
+    """
+    from ppcl import linter, parser
+
+    cases = [
+        ("E110", "10\tNOTACMD(A)\n20\tGOTO 10\n", "Chapter 4"),
+        ("E111", "10\tON()\n20\tGOTO 10\n", "Chapter 4, ON"),
+        ("E112", "10\tTIMAVG(@EMER,60,10,AVG)\n20\tGOTO 10\n", "TIMAVG"),
+        ("W115", "10\tTIMAVG(60,10,1.0)\n20\tGOTO 10\n", "Chapter 4, TIMAVG"),
+    ]
+    for code, text, expect in cases:
+        hits = [d for d in linter.lint(parser.parse(text)) if d.code == code]
+        assert hits, code
+        assert hits[0].manual, code
+        assert expect in hits[0].manual, (code, hits[0].manual)
+
+
 def test_line_state_commands_are_supported_and_discouraged_on_pxc_a():
     """A third category: not removed, not fine. E119 is for removed.
 

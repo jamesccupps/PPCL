@@ -304,6 +304,8 @@ def unknown_command(ctx):
                 "%s is not a PPCL command" % stmt.name,
                 ln.number,
                 source_line=ln.source_line,
+                manual="Chapter 4, Command syntax; Chapter 5, PPCL reserved "
+                       "word list",
                 suggestion=_suggest_command(stmt.name),
             )
 
@@ -446,6 +448,7 @@ def argument_count(ctx):
                     ln.number,
                     source_line=ln.source_line,
                     detail=_signature(cmd),
+                    manual="Chapter 4, %s" % cmd.name,
                 )
                 continue
 
@@ -463,6 +466,7 @@ def argument_count(ctx):
                     ln.number,
                     source_line=ln.source_line,
                     detail=_signature(cmd),
+                    manual="Chapter 4, %s" % cmd.name,
                 )
                 continue
 
@@ -479,6 +483,7 @@ def argument_count(ctx):
                         ln.number,
                         source_line=ln.source_line,
                         detail=_signature(cmd),
+                        manual="Chapter 4, %s" % cmd.name,
                     )
 
 
@@ -513,6 +518,8 @@ def priority_not_allowed(ctx):
                     source_line=ln.source_line,
                     detail="Commands accepting @priority: "
                     + ", ".join(sorted(c for c, v in spec.ALL.items() if v.priority_arg)),
+                    manual="Chapter 3, Command priority; Chapter 4, %s"
+                           % stmt.name,
                 )
 
 
@@ -620,6 +627,7 @@ def literal_where_point_required(ctx):
                         ln.number,
                         source_line=ln.source_line,
                         detail=param.doc,
+                        manual="Chapter 4, %s" % stmt.name,
                     )
 
 

@@ -2899,3 +2899,69 @@ confirms them.
 ### Still to do
 
 1. **Decide `W104`.** The only thing left on the immediate list.
+
+---
+
+## 2026-09-24 (twenty-sixth pass) — auditing the citations
+
+With the reading done, the thing most worth checking was our own work. The
+invariant in `CLAUDE.md` is:
+
+> Every diagnostic carries a `manual=` citation **where the manual supports
+> it**. A finding you cannot cite is a finding the user cannot argue with a
+> vendor.
+
+That decays silently. Nothing fails when a citation is missing, and nothing
+fails when one is wrong.
+
+### The largest category verifies clean
+
+Thirty-eight diagnostics cite 125-1896 in the form `Chapter 4, <COMMAND>`.
+Chapter 4 is the syntax chapter with a page per command, and the manual prints
+its own table of contents for it — sixty-one entries of the form
+`NAME ....... 4-nn`. Matching every citation against that TOC:
+
+**38 of 38 verified. Zero misses.**
+
+Worth knowing, because the alternative was assuming.
+
+### Four rules asserted manual facts and cited nothing
+
+Counting citations *by emitted code* rather than by enclosing decorator — the
+first attempt got this wrong, because several rules are registered as
+placeholders and emit from another rule's body — seventeen of eighty-eight
+carry none. Most correctly: the `P7xx` optimisation findings and the dataflow
+rules assert nothing a manual could support, and inventing a citation for them
+would be worse than having none.
+
+Four were not in that category:
+
+| | asserts |
+|---|---|
+| `E110` | that a name is not a PPCL command — the command set is the manual's |
+| `E111` | argument counts, which are Chapter 4, per command |
+| `E112` | which commands accept an `@priority`, which is Chapter 3 and 4 |
+| `W115` | parameter kinds, which are Chapter 4, per command |
+
+All four now cite, and three of them cite *the specific command's* page rather
+than the chapter, because that is what an engineer needs in front of a vendor.
+A test pins all four.
+
+### Checked in passing, and already right
+
+`W202` says a branch to a missing line is "silently redirected", which is a
+claim about panel behaviour and needed a source. 125-1896's `GOTO` section
+states it outright:
+
+> "If the line number indicated in the GOTO does not exist, execution is
+> transferred to the next line after the line number specified in the GOTO
+> command."
+
+The same passage carries two more constraints, both already implemented: "a
+GOTO command should only transfer program control to a sequentially higher
+line number" (`W203`) and "a GOTO command should not transfer program control
+to a comment line" (`W204`).
+
+### Still to do
+
+1. **Decide `W104`.** Still the only thing on the immediate list.
