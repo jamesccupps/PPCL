@@ -3147,3 +3147,68 @@ statement it is not, and that statement was in none of the fixtures.
 ### Still to do
 
 1. **Decide `W104`.**
+
+---
+
+## 2026-09-24 (thirtieth pass) — generalising the slash
+
+Three defects last week shared a shape: a construct that appears in exactly one
+kind of statement, and in none of the fixtures. The generalisation is obvious
+once stated — **enumerate the rare constructs and push each through every tool
+that writes a file.**
+
+Six constructs, four tools:
+
+| | parse | renumber | redact | clone |
+|---|---|---|---|---|
+| `&` continuation | ok | **joins** | ok | ok |
+| `%X%` DEFINE macro | ok | ok | ok | ok |
+| colon-qualified name | ok | ok | ok | ok |
+| `[Node]Point` reference | ok | ok | ok | ok |
+| `# ` disabled line | ok | ok | ok | **LexError** |
+| `UNKNOWN (...)` marker | ok | ok | ok | ok |
+
+Two hits out of twenty-four. Both worth having.
+
+### `clone_lines` could not clone a disabled line
+
+`LexError: unexpected character '#'`. A PXC.A disabled line keeps its state in
+the text, and `clone_lines` handed the whole body to the lexer, `# ` and all.
+
+That is the wrong answer to a line the panel itself keeps — and keeps
+*runnable*, since enabling it means deleting two characters. A block with a
+disabled line in it is an entirely ordinary thing to clone.
+
+The marker is now held aside, the statement behind it renamed like any other,
+and the marker put back. The copy stays disabled, which is right: you enable a
+line deliberately, not as a side effect of copying it.
+
+### Renumbering joins continuations, and that can break a compliant program
+
+Not a crash. A statement split across `&` comes back joined, because the parser
+joins it and keeps only a flag — `Line.raw` is *already* the joined text by the
+time the formatter sees it.
+
+Demonstrated end to end: a three-zone `IF` split across a continuation lints
+clean, and after renumbering the joined line is 84 characters and **`W104`
+fires**. The continuation was there to stay under the 66-character APOGEE line
+limit — 198 is allowed continued — so renumbering turned a compliant program
+into a non-compliant one.
+
+**Not fixed by re-splitting.** Doing that faithfully means tracking break
+offsets through reference rewriting, and the construct appears **zero times in
+11,873 lines** — Siemens' shipped library, the reference site's programs, and
+`samples/` combined. Not one `&` anywhere. Machinery for a case nobody has is
+the complexity this project refuses elsewhere; the measurement is what makes
+that a decision rather than an excuse.
+
+So it warns, the invariant in `CLAUDE.md` now states the exception, and the
+instruction for the next person is explicit: if `&` ever shows up in real code,
+fix it properly rather than widening the warning.
+
+That zero is itself a finding. `&` is documented, supported on every firmware,
+and nobody uses it.
+
+### Still to do
+
+1. **Decide `W104`.**

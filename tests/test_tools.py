@@ -480,6 +480,56 @@ def test_redaction_drops_comment_text():
     assert "Acme" not in out and "Suite" not in out
 
 
+def test_renumber_rewrites_every_line_carrying_command():
+    """Eight commands take a line number, and missing one corrupts a file
+    somebody loads into a panel -- an ONPWRT restarting at the wrong place,
+    an ACT enabling somebody else's block.
+    """
+    cases = {
+        "GOTO":   "10\tGOTO 500\n500\tON(A)\n510\tGOTO 10\n",
+        "GOSUB":  "10\tGOSUB 500\n20\tGOTO 10\n500\tON(A)\n510\tRETURN\n",
+        "ACT":    "10\tACT(500)\n500\tON(A)\n510\tGOTO 10\n",
+        "DEACT":  "10\tDEACT(500)\n500\tON(A)\n510\tGOTO 10\n",
+        "ENABLE": "10\tENABLE(500)\n500\tON(A)\n510\tGOTO 10\n",
+        "DISABL": "10\tDISABL(500)\n500\tON(A)\n510\tGOTO 10\n",
+        "ONPWRT": "10\tONPWRT(500)\n500\tON(A)\n510\tGOTO 10\n",
+        # and the nested forms, which is where this usually breaks
+        "in IF":  "10\tIF(A.GT.1.0) THEN ACT(500) ELSE DEACT(510)\n"
+                  "500\tON(B)\n510\tOFF(B)\n520\tGOTO 10\n",
+        "in SAMPLE": "10\tSAMPLE(60) ACT(500)\n500\tON(B)\n510\tGOTO 10\n",
+        "multi":  "10\tACT(500,510)\n500\tON(B)\n510\tON(C)\n520\tGOTO 10\n",
+    }
+    for name, text in cases.items():
+        prog = parser.parse(text)
+        assert prog.errors == [], (name, prog.errors)
+        out = formatter.renumber(prog, start=1010, step=10)
+        for line in out.text.splitlines():
+            arg = line.split(chr(9), 1)[-1]
+            assert "500" not in arg and "510" not in arg, (name, line)
+
+
+def test_renumber_says_so_when_it_joins_a_continuation():
+    """The one place renumbering is not byte-for-byte, stated rather than hidden.
+
+    The parser joins a statement split across '&' into one body and keeps only
+    a flag, so renumbering returns the joined form. A continuation is usually
+    there to stay under the line limit -- 66 characters on APOGEE against 198
+    continued -- so the join can turn a compliant program into one W104 fires
+    on. It is not re-split, because the construct appears zero times in 11,873
+    lines of real PPCL and machinery for a case nobody has is complexity this
+    project refuses elsewhere.
+    """
+    text = ("100\tIF(ZONE1.GT.75.0.AND.ZONE2.GT.75.0.AND.ZONE3.GT.75.0) THEN &\n"
+            "\tON(" + chr(34) + "AHU1.COOLING.STAGE1" + chr(34) + ")\n"
+            "110\tGOTO 100\n")
+    out = formatter.renumber(parser.parse(text), start=500, step=10)
+    assert any("continuation" in w for w in out.warnings)
+
+    plain = formatter.renumber(parser.parse("100\tON(A)\n110\tGOTO 100\n"),
+                               start=500, step=10)
+    assert not any("continuation" in w for w in plain.warnings)
+
+
 def test_every_command_is_either_simulated_or_declared_unsimulated():
     """The third state -- neither -- is the one that lies.
 

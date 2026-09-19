@@ -673,6 +673,28 @@ def test_the_word_form_comparisons_are_reserved():
     assert ".LESS." not in spec.DOTTED_OPS
 
 
+def test_cloning_a_disabled_line_keeps_it_disabled_and_renames_it():
+    """A PXC.A disabled line carries "# " in the text, and the lexer has no
+    business seeing it -- cloning a block containing one used to raise
+    LexError. That is the wrong answer to a line the panel itself keeps and
+    runs the moment somebody deletes two characters.
+    """
+    from ppcl import transforms
+
+    text = ('00100\t# ON("AHU1.SFAN")\n00110\tON("AHU1.RFAN")\n'
+            '00120\tGOTO 100\n')
+    r = transforms.clone_lines(
+        text, 100, 120,
+        {"AHU1.SFAN": "AHU2.SFAN", "AHU1.RFAN": "AHU2.RFAN"},
+        start=300, step=10)
+
+    copy = r.text.split("00300")[1]
+    assert "# ON(" in copy                  # still disabled
+    assert "AHU2.SFAN" in copy              # and renamed behind the marker
+    assert "AHU1" not in copy
+    assert "renaming 2 reference" in r.notes[0]
+
+
 def test_cloning_renames_inside_an_OIP_keystroke_sequence():
     """Cloning an AHU program is the whole reason this transform exists, and
     it used to hand back a copy that still commanded the original equipment.

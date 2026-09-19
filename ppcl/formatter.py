@@ -288,6 +288,29 @@ def renumber(program: Program, start: int = 10, step: int = 10,
     )
     result.mapping = mapping
 
+    # The one place renumbering is NOT byte-for-byte, stated rather than
+    # hidden. The parser joins a statement split across "&" continuations into
+    # a single body and keeps only a flag, so what comes out here is the joined
+    # form. A continuation is usually there to keep the line under the MMI
+    # limit -- 66 characters on APOGEE against 198 for the continued form -- so
+    # joining can turn a compliant program into one W104 fires on.
+    #
+    # Not fixed by re-splitting, because doing that faithfully means tracking
+    # the break offsets through reference rewriting, and this construct appears
+    # ZERO times in 11,873 lines across Siemens' shipped library, the reference
+    # site's programs and samples/. Machinery for a case nobody has is the kind
+    # of complexity this project refuses elsewhere. Saying so costs nothing.
+    joined = [ln.number for ln in program.lines if ln.continued]
+    if joined:
+        result.warnings.append(
+            "%d line(s) were written across '&' continuations and come back "
+            "joined: %s. The join is faithful to what the panel runs, but a "
+            "continuation is usually there to stay under the line limit -- "
+            "lint the result before loading it."
+            % (len(joined), ", ".join(str(n) for n in joined[:8])
+               + (", ..." if len(joined) > 8 else ""))
+        )
+
     over = [new for _, new in assignments if new > spec.LINE_MAX]
     if over:
         result.warnings.append(

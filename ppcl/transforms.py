@@ -326,6 +326,15 @@ def clone_lines(text, first, last, renames, start=None, step=None):
         if _is_comment(body):
             copied.append("%05d\t%s" % (mapping[ln.number], body))
             continue
+        # A PXC.A disabled line carries its state in the text, as "# " at
+        # the front. The lexer has no business seeing that -- it is not
+        # PPCL -- so it is held aside and put back, and the statement behind
+        # it is renamed like any other. Cloning a block containing one used
+        # to raise LexError, which is the wrong answer to a line the panel
+        # itself keeps and runs the moment somebody deletes two characters.
+        prefix = ""
+        if body.startswith("# "):
+            prefix, body = "# ", body[2:]
         edits = []
         for token in lexer.tokenize(body):
             if (token.kind is Tok.QUOTED and "/" in token.text
@@ -353,7 +362,8 @@ def clone_lines(text, first, last, renames, start=None, step=None):
                         (token.col, _span(token), str(mapping[target]))
                     )
         copied.append(
-            "%05d\t%s" % (mapping[ln.number], _apply_edits(body, edits))
+            "%05d\t%s%s" % (mapping[ln.number], prefix,
+                                _apply_edits(body, edits))
         )
 
     warnings = []

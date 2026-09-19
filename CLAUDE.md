@@ -46,7 +46,12 @@ so it runs on any engineering workstation without a package install.
   vendor.
 - **Renumbering must be exact.** `formatter.rewrite_references` works at the
   token level so line bodies survive byte for byte. Do not reroute it through
-  the unparser.
+  the unparser. **One documented exception:** the parser joins a statement
+  split across `&` continuations and keeps only `Line.continued`, so
+  renumbering returns the joined form. It warns when it does. Re-splitting
+  faithfully means tracking break offsets through reference rewriting, and the
+  construct appears zero times in 11,873 lines of real PPCL -- if that ever
+  stops being true, fix it properly rather than widening the warning.
 - **Refuse rather than guess.** Duplicate line numbers make renumbering
   ambiguous, so it refuses by default and makes the user choose. Keep that
   posture for any transform that could silently change what the panel runs.
@@ -125,7 +130,7 @@ on idiomatic PPCL gets turned off.
 ## Testing
 
 ```bash
-python -m pytest tests -q          # 506 tests
+python -m pytest tests -q          # 509 tests
 python -m ppcl.cli lint samples    # exercises the CLI against real programs
 ```
 
