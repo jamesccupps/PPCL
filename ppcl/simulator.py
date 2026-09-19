@@ -63,8 +63,30 @@ UNMODELLED = frozenset(
     {"PDL", "PDLDAT", "PDLDPG", "PDLMTR", "PDLSET", "SSTO", "SSTOCO",
      "OIP", "DC", "DCR", "DPHONE", "EPHONE", "DISCOV", "ENCOV",
      "DISALM", "ENALM", "ALARM", "NORMAL", "HLIMIT", "LLIMIT", "INITTO",
-     "DEFINE", "DAY", "NIGHT"}
+     "DEFINE", "DAY", "NIGHT",
+     # Added 2026-09-24. These seven used to fall past every branch of
+     # _exec_command to a bare `return None` -- not modelled AND not warned
+     # about, which is the worst of both. A program whose ADAPTM drives a
+     # damper simulated cleanly, left cv at whatever it already held, and any
+     # IF downstream took the wrong branch with nothing to say why. The fix
+     # is not to model them: an invented adaptive output or curve fit would
+     # be a confident wrong number, which is what LOOP's standing disclaimer
+     # exists to avoid. The fix is to say so.
+     "ADAPTM", "ADAPTS", "LSQ2", "LSQDAT", "LSTSQR", "GETVAL", "SETVAL"}
 )
+
+#: For an unmodelled command, which argument positions are points it WOULD
+#: have written. Naming them in the warning is the difference between "this
+#: was skipped" and "these values are stale and everything downstream of them
+#: is unsound". Positions are zero-based into the argument list.
+UNMODELLED_OUTPUTS = {
+    "ADAPTM": (1, 13), "ADAPTS": (1, 13),
+    "LSQ2": (1, 2, 3, 4, 5, 6),
+    "LSTSQR": (1, 2, 3),
+    "GETVAL": (0,),
+    "SSTO": (2, 3),
+    "TIMAVG": (),
+}
 
 
 class SimulationError(Exception):
@@ -678,9 +700,22 @@ class Simulator:
             return self._exec_tod(name, args, line)
 
         if name in UNMODELLED:
+            written = []
+            for index in UNMODELLED_OUTPUTS.get(name, ()):
+                if index < len(args) and isinstance(args[index], Ref):
+                    written.append(args[index].name)
+            extra = ""
+            if written:
+                extra = ("; %s %s not written, so %s value%s here %s whatever "
+                         "the panel was loaded with"
+                         % (", ".join(written),
+                            "is" if len(written) == 1 else "are",
+                            "its" if len(written) == 1 else "their",
+                            "" if len(written) == 1 else "s",
+                            "is" if len(written) == 1 else "are"))
             self._warn(
                 "%s at line %d is recognised but not simulated; it is treated "
-                "as a no-op" % (name, line)
+                "as a no-op%s" % (name, line, extra)
             )
             return None
 

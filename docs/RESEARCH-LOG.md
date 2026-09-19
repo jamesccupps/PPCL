@@ -3030,3 +3030,57 @@ material, used here as a test corpus and described, not copied.
 1. **Decide `W104`.**
 2. Get a worked case for the nine unexercised commands from somewhere other
    than Siemens' help, or accept that they are parsed but unproven.
+
+---
+
+## 2026-09-24 (twenty-eighth pass) — the simulator's third state
+
+The parser is now about as validated as it can be without a panel. The
+simulator is not, and the useful question is not "is the modelling right" —
+`LOOP` has said no for twenty passes — but **"does it always say what it is
+doing?"**
+
+There turned out to be three states, not two.
+
+`_exec_command` executes 31 commands. `UNMODELLED` held 24 more, which warn:
+*"recognised but not simulated; it is treated as a no-op"*. That accounts for
+55 of 66. Four more — `GOTO`, `GOSUB`, `RETURN`, `SAMPLE` — are their own AST
+node types and never reach `_exec_command` at all.
+
+**Which leaves seven that were in neither list**, falling past every branch to
+a bare `return None`:
+
+`ADAPTM`, `ADAPTS`, `LSQ2`, `LSQDAT`, `LSTSQR`, `GETVAL`, `SETVAL`
+
+Not modelled **and not warned about** — the worst of both. Every one of them
+writes into points. A program whose `ADAPTM` drives a sequenced damper
+simulated cleanly, left `cv` at whatever the panel was loaded with, and every
+`IF` downstream of `cv` took the wrong branch with nothing anywhere to say why.
+
+### The fix is not to model them
+
+An invented adaptive output, or a curve fit produced by guessing at Siemens'
+least-squares implementation, is a confident wrong number. That is exactly what
+`LOOP`'s standing runtime disclaimer exists to prevent, and what the `LSTSQR`
+entry in `spec.py` refuses to do about argument counts. Declaring them is the
+honest fix.
+
+### And the warning now names what went stale
+
+*"Skipped"* and *"these values are stale"* are different warnings. An
+unmodelled command that writes points now lists them:
+
+> `ADAPTM at line 10 is recognised but not simulated; it is treated as a
+> no-op; CV, ERRP are not written, so their values here are whatever the panel
+> was loaded with`
+
+Because the finding that matters is not the skipped statement — it is
+everything reading its output.
+
+Two tests: one asserts the partition is total, so a command added to `spec.ALL`
+without a decision about simulation fails the suite rather than silently
+lying; the other pins the stale-output naming.
+
+### Still to do
+
+1. **Decide `W104`.**

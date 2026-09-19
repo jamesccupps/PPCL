@@ -480,6 +480,57 @@ def test_redaction_drops_comment_text():
     assert "Acme" not in out and "Suite" not in out
 
 
+def test_every_command_is_either_simulated_or_declared_unsimulated():
+    """The third state -- neither -- is the one that lies.
+
+    Seven commands used to fall past every branch of _exec_command to a bare
+    `return None`: ADAPTM, ADAPTS, LSQ2, LSQDAT, LSTSQR, GETVAL, SETVAL. Not
+    modelled and not warned about. A program whose ADAPTM drives a damper
+    simulated cleanly, left cv at whatever it already held, and every IF
+    downstream took the wrong branch with nothing to say why.
+
+    Modelling them is the wrong fix -- an invented adaptive output is a
+    confident wrong number, which is what LOOP's standing disclaimer exists to
+    avoid. Saying so is the right one.
+    """
+    import pathlib
+    import re
+    from ppcl import simulator, spec
+
+    src = pathlib.Path("ppcl/simulator.py").read_text(encoding="utf-8")
+    body = src[src.index("def _exec_command"):
+               src.index("# -- individual command implementations")]
+    modelled = set(re.findall(r'name == "([A-Z0-9]+)"', body))
+    for grp in re.findall(r"name in \(([^)]*)\)", body):
+        modelled |= set(re.findall(r'"([A-Z0-9]+)"', grp))
+
+    # GOTO/GOSUB/RETURN/SAMPLE are their own AST nodes, handled before this
+    # ever sees a CommandCall.
+    branch_nodes = {"GOTO", "GOSUB", "RETURN", "SAMPLE"}
+    unaccounted = (set(spec.ALL) - modelled - set(simulator.UNMODELLED)
+                   - branch_nodes)
+    assert unaccounted == set(), sorted(unaccounted)
+
+
+def test_an_unsimulated_command_names_the_points_it_did_not_write():
+    """"Skipped" and "these values are stale" are different warnings."""
+    from ppcl import parser
+    from ppcl.simulator import Simulator
+
+    text = ("10\tADAPTM(SAT,CV,SP,MATC,MAM,10,3.0,60,60,60,HER,DBR,DER,ERRP)\n"
+            "20\tGOTO 10\n")
+    sim = Simulator(parser.parse(text))
+    sim.panel.load({"SAT": 55.0, "SP": 55.0, "CV": 0.0})
+    sim.run(passes=2, seconds_per_pass=1.0)
+
+    assert len(sim.warnings) == 1
+    w = sim.warnings[0]
+    assert "ADAPTM" in w and "not simulated" in w
+    # The output points are named, because everything downstream of them is
+    # unsound and the person needs to know which values to distrust.
+    assert "CV" in w and "ERRP" in w
+
+
 def test_redaction_keeps_an_OIP_keystroke_sequence_intact():
     """An OIP sequence is keystrokes, not a point name.
 
