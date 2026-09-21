@@ -673,6 +673,40 @@ def test_the_word_form_comparisons_are_reserved():
     assert ".LESS." not in spec.DOTTED_OPS
 
 
+def test_the_help_does_not_contradict_the_rules_it_names():
+    """Prose and code are two representations of the same facts, and only one
+    of them fails when it goes wrong.
+
+    W330 was split and W337 was regraded and reworded, and the help pages
+    naming them kept the old story for two passes -- the SSTO page still said
+    an unread cst/csp meant the optimisation did nothing, which is what W337
+    stopped claiming precisely because a correctly wired SSTO has no
+    in-program reader.
+    """
+    from ppcl import helpdocs
+    import ppcl.linter as L
+
+    L._load_rules()
+    codes = {r.code for r in L.REGISTRY}
+
+    ssto = helpdocs.page("ssto")["body"]
+    # It must name the real reader, and must not assert the old conclusion.
+    assert "control schedule" in ssto or "Time of Day" in ssto
+    assert "single most common way an SSTO installation does nothing" not in ssto
+
+    priority = helpdocs.page("priority")["body"]
+    # The split is user-visible, so the page that teaches priority must know
+    # both halves exist.
+    assert "W330" in priority and "W341" in priority
+    assert {"W330", "W341"} <= codes
+
+    # And no page may name a rule code that does not exist.
+    import re
+    for page_ in helpdocs.PAGES:
+        for m in re.finditer(r"`([EWPSR][0-9]{3})`", page_["body"]):
+            assert m.group(1) in codes, (page_["id"], m.group(1))
+
+
 def test_no_runtime_string_hardcodes_a_count_the_code_can_compute():
     """A number in prose decays silently. Nothing fails, nobody notices.
 

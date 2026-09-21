@@ -3352,3 +3352,70 @@ code was not.
 ### Still to do
 
 Nothing on the immediate list.
+
+---
+
+## 2026-09-21 (thirty-third pass) — the corrections that only landed once
+
+Last pass found two counts in runtime text that had gone stale. The obvious
+next question: when a *claim* gets corrected, does the correction reach every
+copy of it?
+
+No.
+
+### The same wrong sentence, in three places, fixed in one
+
+Pass 25 established that Desigo CC's Command Assist is **not** the only source
+for the `ADAPTM`, `ADAPTS`, `LSQ2` and `LSQDAT` signatures -- the Insight
+Program Editor documents all four in full. `HANDOFF` was corrected. The
+identical claim was left standing in **`helpdocs`**, where a user reads it, and
+in **`PPCL-REFERENCE` §Sources**, where the next session reads it.
+
+Corrected in one place, wrong in two, for eight passes.
+
+### The help pages had not followed two rule changes
+
+| Page | Said | Since |
+|---|---|---|
+| `ssto` | an unread `cst`/`csp` means "the command runs every pass and changes nothing" | pass 24 regraded `W337` precisely because a **correctly wired** SSTO has no in-program reader -- the Time of Day zone reads the LAOs |
+| `priority` | "rules `W330` and `W331` find it" | pass 18 split `W330`, and `W341` carries the driven-every-pass half |
+
+The `ssto` page was the worse of the two: it named `W337` and then asserted the
+conclusion `W337` had stopped asserting. A user following the page would have
+read a finding as a defect that the rule itself no longer calls one.
+
+Both rewritten. The `priority` page now explains the split in the terms that
+matter to somebody holding a program -- `W330` is a point on a path that
+**ends**, `W341` is a point driven **every pass** that no operator can keep.
+
+### And two more places the live-panel claim was too broad
+
+`README` and `SKILL.md` both still said flatly that nothing had been validated
+against a live panel. Narrowed in `PPCL-REFERENCE` and `HANDOFF` in pass 15,
+not in the two files a reader and an agent actually meet first. Both now say
+what is true: no statement's *behaviour* has been observed, and the grammar is
+further along than that.
+
+`SKILL.md` also still listed four unsimulated commands. There are thirty-five,
+and since pass 28 they name the points they did not write.
+
+### A test, because this will happen again
+
+`test_the_help_does_not_contradict_the_rules_it_names` asserts the `ssto` page
+names the real reader and no longer carries the old conclusion, that the
+`priority` page knows both halves of the split, and that **no help page names a
+rule code that does not exist**.
+
+That last one is the general form and the cheapest to keep.
+
+### The pattern, stated once
+
+Prose and code are two representations of the same facts, and **only one of
+them fails when it goes wrong.** Every drift this week and last -- the counts,
+the provenance, the two rule descriptions, the live-panel claim -- sat in the
+half that cannot fail. The fix is not vigilance; it is making the prose ask,
+or making a test compare the two.
+
+### Still to do
+
+Nothing on the immediate list.

@@ -209,11 +209,18 @@ about command semantics from memory.
   control logic. They are not a load calculation and not an energy model, and
   there is no dehumidification. A passing bench run means the logic behaves; it
   does not size equipment or predict energy.
-- `SSTO`, `PDL*`, `OIP` and `DC`/`DCR` are **not simulated** — they are traced
-  as no-ops. A clean simulation of a program using them proves nothing about
-  those commands.
-- Nothing in this toolkit has been validated against a live panel. Cite the
-  manual, not the tool, when making a claim about the language.
+- **Thirty-one commands are simulated; the rest are not.** `SSTO`, `PDL*`,
+  `OIP`, `DC`/`DCR`, the adaptive pair, the curve fits and `GETVAL`/`SETVAL`
+  are traced as no-ops and say so, naming any point they would have written so
+  you know which values in the run are stale. A clean simulation of a program
+  using them proves nothing about those commands, and anything reading their
+  output is unsound.
+- **No statement's behaviour has been validated against a live panel.** The
+  grammar is further along than that — an independent P2 wire corpus ran this
+  parser over 2,644 lines recovered from running panels without a failure —
+  but that says the language is read correctly, not that a modelled behaviour
+  is right. Cite the manual, not the tool, when making a claim about the
+  language.
 - If a rule's finding looks like a false positive, check it against the manual
   citation the finding carries before dismissing it — and say which one it was.
 

@@ -385,9 +385,18 @@ program looks wrong.
     IF("$FREEZE".EQ.1.0) THEN OFF(@EMER,SFAN)
     IF("$FREEZE".EQ.0.0) THEN RELEAS(@EMER,SFAN)
 
-The workbench enforces this three ways: rules `W330` and `W331` find it in
-hand-written code, the sequence compiler always emits the matching release,
-and the Command block's *Release when false* option writes it for you.
+The workbench enforces this three ways: rules `W330`, `W331` and `W341` find
+it in hand-written code, the sequence compiler always emits the matching
+release, and the Command block's *Release when false* option writes it for you.
+
+`W330` and `W341` split one situation in two, because they are not the same
+defect. `W330` is a point commanded on a path that **ends** -- the condition
+clears, nothing rewrites it, and it sits at that priority until somebody finds
+it. `W341` is a point driven at priority on **every pass**: it cannot strand,
+because something writes it again within a second or two, but no operator can
+keep it either, and their command is overwritten with nothing to say why.
+Deliberate for a lamp test or a hard interlock, a surprise otherwise, which is
+why it is `INFO`.
 
 ## Reading a priority at the panel
 
@@ -669,13 +678,19 @@ It takes **two commands**, and a third to actually do anything.
 
 ## SSTO calculates. It does not command.
 
-`SSTO` writes two virtual LAO points, `cst` and `csp` — calculated start time
-and calculated stop time. That is all it does. If nothing reads those points,
-the command runs every pass and changes nothing in the building.
+`SSTO` writes two virtual LAO points, `cst` and `csp`: calculated start
+time and calculated stop time. That is all it does. Something else has to
+act on them, and **that something is usually not a PPCL statement** -- a
+Time of Day zone's START and STOP relative time points wire straight to
+these LAOs, and "these values are passed from PPCL to the control
+schedule". The schedule reads them; the program never does.
 
-That is the single most common way an SSTO installation does nothing, and it is
-invisible: the command is there, it compiles, the calculated times are even
-correct. Rule `W337` looks for it.
+An SSTO wired to nothing really does run every pass and change nothing, and
+it is invisible: the command is there, it compiles, the calculated times are
+even correct. But it looks **identical** to one wired correctly to a zone,
+because neither has an in-program reader. Only the Time of Day zone can tell
+them apart, which is why rule `W337` is `INFO` and names the check rather than
+asserting a defect: open the zone and look at its START and STOP time points.
 
 ## SSTOCO — the zone's thermal personality
 
@@ -805,8 +820,10 @@ from your panel.
 
 Four sources, in decreasing authority for a modern PXC.
 
-1. **Desigo CC PPCL Editor Command Assist**, read from a live system. The only
-   source for the `ADAPTM`, `ADAPTS`, `LSQ2` and `LSQDAT` signatures.
+1. **Desigo CC PPCL Editor Command Assist**, read from a live system. Where
+   the `ADAPTM`, `ADAPTS`, `LSQ2` and `LSQDAT` signatures were read first --
+   the Insight Program Editor documents all four as well, with a Statement
+   Arguments page and a worked example each, so they are second-sourced.
 2. **Desigo CC engineering help.** The compiler's rulebook: operand and
    operator limits, the compiler error list, point referencing, Cross Trunk,
    program naming, the subroutine benefit table, and the Command Assist

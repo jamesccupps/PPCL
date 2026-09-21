@@ -141,9 +141,16 @@ publish the PID form — and says so at runtime. Never take a tuning constant
 from the bench to a real panel. Long bench runs lower the simulated line rate
 to stay responsive, and the response says when it did.
 
-**Nothing has been validated against a live panel.** Every command signature
-traces to the manual or to Desigo CC's own Command Assist, which is a stronger
-claim than "tested" and the only claim being made.
+**No statement's behaviour has been validated against a live panel.** Every
+command signature traces to the manual or to Desigo CC's own Command Assist,
+which is a stronger claim than "tested" and close to the whole claim being
+made.
+
+The grammar is a step further along. An independent project reading APOGEE P2
+traffic ran this parser over **2,644 lines recovered from programs running on
+panels** and it handled all of them; Siemens' own 115 worked examples take
+command coverage to 57 of 66. Nothing there says a modelled *behaviour* is
+right — only that the language is read correctly.
 
 ---
 

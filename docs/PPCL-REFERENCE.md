@@ -851,5 +851,7 @@ an unpublishable input, not as a citation.
   compiler limits, program-naming rules, subroutine break-even table and
   debugging features.
 - The Desigo CC **PPCL Editor Command Assist**, read directly from a live
-  installation — the only source found for the ADAPTM, ADAPTS, LSQ2 and
-  LSQDAT signatures, and the authority that settles ATN over ARC.
+  installation — where the ADAPTM, ADAPTS, LSQ2 and LSQDAT signatures were
+  read first, and the authority that settles ATN over ARC. Not the only
+  source for those four: the Insight Program Editor documents each of them
+  with a command page, a Statement Arguments page and a worked example.
