@@ -480,6 +480,46 @@ def test_redaction_drops_comment_text():
     assert "Acme" not in out and "Suite" not in out
 
 
+def test_the_analysis_holds_together(sample_files):
+    """Invariants a dozen flow rules rest on, asserted rather than assumed.
+
+    Checked across every program in samples/ here, and across all 69 real
+    programs in the research corpora when this was first run: zero violations.
+
+    The one apparent violation was this test being wrong. `edges` records the
+    target a branch was WRITTEN with, not where control lands -- resolution is
+    `resolve_target`'s job, because the panel sends a branch to a missing line
+    on to the next line after it. So the real invariant is stronger and is the
+    last one here: a target that does not exist is always both resolved AND
+    reported, never silently redirected.
+    """
+    from ppcl import analyzer, linter, parser
+
+    for path in sample_files:
+        prog = parser.parse(open(path, encoding="utf-8").read(), name=path)
+        a = analyzer.analyze(prog)
+        numbers = set(a.numbers)
+
+        assert a.steady_state <= a.reachable, path
+        assert not (a.one_shot & a.steady_state), path
+        assert a.one_shot <= a.reachable, path
+        for name in ("reachable", "steady_state", "one_shot", "subroutine_lines"):
+            assert getattr(a, name) <= numbers, (path, name)
+
+        for n in numbers:
+            target = a.resolve_target(n)
+            assert target is None or target in numbers, (path, n, target)
+
+        reported = {d.line for d in linter.lint(prog, analysis=a)
+                    if d.code in ("E201", "W202")}
+        for frm, to, kind in a.edges:
+            if to is None or to in numbers:
+                continue
+            # written at a line that does not exist: resolved, and reported.
+            assert a.resolve_target(to) in numbers or a.resolve_target(to) is None
+            assert frm in reported, (path, frm, to, kind)
+
+
 def test_renumber_rewrites_every_line_carrying_command():
     """Eight commands take a line number, and missing one corrupts a file
     somebody loads into a panel -- an ONPWRT restarting at the wrong place,

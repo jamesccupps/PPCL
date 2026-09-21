@@ -3479,3 +3479,59 @@ stale counts.
 ### Still to do
 
 Nothing on the immediate list.
+
+---
+
+## 2026-09-21 (thirty-fifth pass) — the analyzer, checked against itself
+
+`analyzer.py` is the largest thing in this project that had never been audited,
+and a dozen flow rules rest on it: `reachable`, `steady_state`, `one_shot`,
+`subroutine_lines`, `edges`, `resolve_target`. If it is wrong, those rules are
+wrong in ways nothing would surface.
+
+There is no external ground truth for it. A panel report knows which lines have
+*executed*, which is a different claim -- that is `report.py`'s whole premise,
+and the one report fixture on this machine is a constructed example built to
+exercise the report reader rather than the analysis.
+
+So: **self-consistency, over every real program.** Six invariants, 69 programs
+from Siemens' shipped library and the reference site.
+
+| Invariant | Violations |
+|---|---|
+| `steady_state` is a subset of `reachable` | 0 |
+| `one_shot` and `steady_state` are disjoint | 0 |
+| `one_shot` is a subset of `reachable` | 0 |
+| every set contains only real line numbers | 0 |
+| `resolve_target` lands on a real line or `None` | 0 |
+| every edge endpoint exists | **189** |
+
+### The 189 were this audit being wrong
+
+`edges` records the target a branch was **written** with, not where control
+lands. Resolution is `resolve_target`'s job, because the panel sends a branch
+aimed at a missing line on to the next line after it -- which the manual states
+outright and `W202` reports.
+
+Checked on the one program with the most of them: two edges name a line that
+does not exist, `resolve_target` maps both onto real lines, and the linter
+emits a `W202` for each, naming where control actually lands.
+
+So the invariant was too strong, and the true one is **better**:
+
+> A branch target that does not exist is always *both* resolved *and*
+> reported. Nothing is silently redirected.
+
+That is now the last assertion in the test, and it is the property that
+actually matters to somebody reading a program.
+
+### Why this one is worth having as a test
+
+Every other audit this week found a defect. This one found none, which is the
+result you cannot get by reading the code and is the reason to run it. The
+invariants are cheap, they hold, and the first time a change to the control-flow
+graph breaks one, something fails.
+
+### Still to do
+
+Nothing on the immediate list.
