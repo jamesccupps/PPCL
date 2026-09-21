@@ -764,16 +764,16 @@ Questions this toolkit does not answer, each with the test that would settle it:
 5. **Which operand limit the PXC.A compiler actually enforces**, 13 or 16.
    *Test:* compile a 15-operand `IF` in the Desigo CC PPCL Editor against a
    PXC.A and see whether it is rejected.
-6. **What A6V10374898 changed.** The PXC.A reference manual says to use "new
-   guidelines" but does not say what they are. *Test:* obtain A6V10374898 and
-   diff its Program Methodology chapter against 125-1896 Rev. 5.
-7. **BACnet property referencing syntax in PPCL on PXC.A.** A6V10374898 has a
-   property-names appendix. The Desigo help documents object *referencing*
-   (`BAC_10_MO_1`) but not how a *property* of an object is named. *Test:*
-   read the appendix, then confirm against a PXC.A with a known BACnet object.
-   The appendix has since been read — 99 properties, in the table above — so
-   what is left is hardware confirmation, and nothing available here can give
-   it: no PXC.A appears in any corpus examined, wire capture included.
+6. ~~**What A6V10374898 changed.**~~ **CLOSED 2026-09-18.** The document was
+   obtained and mined: it adds `GETVAL`/`SETVAL` and the 99-entry BACnet
+   property appendix, adds the `[NodeName]PointName` reference form, and
+   removes ten statements from the language.
+7. ~~**BACnet property referencing syntax in PPCL on PXC.A.**~~ **CLOSED
+   2026-09-18.** A property is reached as `@ShortName` or a numeric property
+   identifier, through `GETVAL`/`SETVAL`. *One sub-point stays open:* Appendix
+   B says the `@` is required and the Chapter 3 examples omit it. Both forms
+   are accepted here and `@` is what gets emitted. Settling it needs a PXC.A,
+   and none appears in any corpus available here.
 8. ~~Signatures for ADAPTM, ADAPTS, LSQ2 and LSQDAT~~ — **CLOSED.**
    `ADAPTM(pt1,...,pt14)`, `ADAPTS(pt1,...,pt14)` (both firmware 2.7+),
    `LSQ2(execution,pt1,..,pt6,startline#,endline#)`, `LSQDAT(pt1,pt2,pt3)`.
@@ -814,6 +814,15 @@ Questions this toolkit does not answer, each with the test that would settle it:
     naming decision. So it stays a documented hazard with a stated fix —
     **quote any name with a dotted-operator segment** — rather than a lint
     rule, which would fire zero times on every corpus anyone has.
+11. ~~**Does an exported text file represent a disabled statement at all?**~~
+    **CLOSED.** Two real representations exist and neither is this project's
+    invention. On PXC.A the engineer's own disable is `# ` at the front of the
+    line, which `parser` reads into `Line.disabled`. Separately the *compiler*
+    writes `UNKNOWN (...)` around a statement it cannot resolve and ignores the
+    line, which `parser` reads into `Line.unknown` and `E123` reports. On
+    APOGEE and BACnet ALN there is still no text representation -- the state
+    lives in the panel, which is what `report.py` exists to read.
+
 
 **Nothing here has been validated against a live panel** — no statement's
 *behaviour* has been observed executing. Everything is transcribed from the

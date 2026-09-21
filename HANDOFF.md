@@ -286,35 +286,34 @@ editor.** The Sublime package's feature set is now fully covered by
 grammar has now met code that panels are executing (above) and handled all of
 it; nothing has watched a statement execute. Keep the two claims apart.
 
-### Open questions, each with the test that settles it
+### Open questions
 
-1. Exact `LOOP` PID form — drive a known `pv` step on an isolated PXC, log `cv`, fit.
-2. Line-evaluation rate on current PXC hardware — and **PXC.A already
-   reports it**. The Web Interface exposes per-program cycle time (average over
-   the last ten cycles, highest, lowest, in ms) and those metrics are mappable
-   to virtual points and trendable. Cheapest open question here to close, and
-   it needs no lab: map the three to virtual points on a panel in service.
-3. Does a bare `RELEAS` clear `@SMOKE`? Manual is silent.
-4. ~~`DC` example vs Table 4-1~~ — **CLOSED 2026-09-18.** A6V10374898 Table 3-1
-   confirms Table 4-1, with a worked example that agrees with it this time.
-   `generator.duty_cycle_pattern` already matched; now pinned by tests.
-5. Which operand limit the PXC.A compiler enforces, 13 or 16. **Now partly
-   answerable without a lab**: the panel exposes `@MaxPPCLChs` (property 5165)
-   as a readable property, so `GETVAL` can ask it directly.
-6. ~~What A6V10374898 changed~~ — **CLOSED 2026-09-18.** Adds `GETVAL`,
-   `SETVAL`, the property appendix, `[Node]Point`; drops `LSQ2`/`LSQDAT`.
-7. ~~BACnet **property** referencing syntax~~ — **CLOSED 2026-09-18.**
-   `@ShortName` or a numeric property identifier, via `GETVAL`/`SETVAL`.
-   Unresolved sub-point: Appendix B says the `@` is required, the Chapter 3
-   examples omit it. Both accepted; `@` is emitted.
-8. `LSQ2`'s `execution` parameter — what values it accepts.
-9. **New:** whether a disabled statement has any representation in an exported
-   text file. The workbench uses a `C [DISABLED] ` comment marker as its own
-   convention and warns about it; if Desigo has a real one, adopt it.
-10. **New:** does a panel absorb a dotted-operator segment into an *unquoted*
-    point name? `AHU1.MIN.SP` is unambiguous — `.MIN.` is not an operator — but
-    `AHU1.ROOT.SP` is not, and this lexer splits it. No corpus examined
-    contains one, which is why it is a question and not a rule.
+**Kept in `docs/PPCL-REFERENCE.md` §8, not here.** This file used to carry a
+parallel list and the two drifted apart in both directions -- HANDOFF had two
+items closed that the reference still showed open, the reference had two closed
+that HANDOFF still showed open, and their numbering had diverged so item 8 in
+one was a different question from item 8 in the other. `CLAUDE.md` already
+names the reference as the place they live; now only one list exists.
+
+**Five remain open**, each with the test that would settle it:
+
+1. The exact `LOOP` PID form.
+2. Line-evaluation rate on current hardware. The cheapest of the five and it
+   needs no lab: **a PXC.A already reports per-program cycle time** -- average
+   over the last ten cycles, highest and lowest, in milliseconds -- and those
+   metrics map to virtual points and trend. Nobody has read them off.
+3. Whether a bare `RELEAS` clears `@SMOKE`.
+5. Which operand limit a PXC.A compiler actually enforces, 13 or 16. Partly
+   answerable without a lab: the panel exposes `@MaxPPCLChs` (property 5165)
+   as readable, so `GETVAL` can ask it.
+10. Whether a panel absorbs a dotted-operator segment into an unquoted point
+    name. Measured at one site as zero occurrences in 3,025 names, with one
+    near miss, so it is a documented hazard rather than a rule.
+
+The sixth, question 7's `@` sub-point, is open in the same sense: both forms
+are accepted and `@` is emitted.
+
+Everything else is closed and says when and from what.
 
 ---
 
