@@ -3419,3 +3419,63 @@ or making a test compare the two.
 ### Still to do
 
 Nothing on the immediate list.
+
+---
+
+## 2026-09-21 (thirty-fourth pass) — finishing the link and citation audits
+
+Two audits were left half-done, and both finish clean. Recorded because a
+negative result nobody wrote down gets re-run.
+
+### Every citation now verified, or explicitly unverifiable
+
+Pass 26 checked the 38 `Chapter 4, <COMMAND>` citations against the manual's
+own table of contents: 38 of 38. The other twenty cite something else, and
+nobody had looked at those.
+
+| Source cited | Verifiable locally | Result |
+|---|---|---|
+| Insight Program Editor (5) | yes | all five name a page that exists |
+| Desigo CC engineering help (4) | yes | all four found |
+| Insight Time of Day help (1) | yes | found |
+| `A6V12893115` (3) | web only | two found in the copy fetched this session; the third is the page pass 22 re-fetched and quoted |
+| `A6V10374898` (3) | no local copy | titles recorded when the document was read online in passes 9-12 |
+| "Not documented. Vendor enum" (1) | n/a | deliberately not a document citation |
+| Desigo CC PPCL Editor errors (3) | yes | found |
+
+The two that needed real checking were `W335`'s "PPCL Editor - APOGEE Cross
+Trunk" and `W340`'s "What Are Resident Points / Point Status Indicators /
+Special Functions". Both name real pages. No citation in this toolkit points at
+something that does not exist.
+
+### 196 cross-references, none dangling
+
+`explain` prints a command's `see_also`; the help pane renders its own. A
+dangling entry in either is a reference the reader cannot follow, and nothing
+would ever have failed.
+
+**161 `see_also` links in `spec.py`, 35 in `helpdocs`. All 196 resolve.** Now
+asserted by a test, which costs nothing and catches the first broken one.
+
+### And a dead-code check over everything a person or an agent reads
+
+`README`, `PLUGIN`, `PPCL-REFERENCE`, `SKILL.md`, the four slash commands and
+the nine UI modules: **no rule code named anywhere that does not exist.**
+`HANDOFF` is excluded on purpose — it records corrections, and "`E113` became
+`W113`" has to be able to name `E113`.
+
+The web UI came through clean on both counts and hand-written figures too.
+
+### `HANDOFF`'s own header was stale
+
+"Last updated: 2026-09-18. Fourteen research passes." Thirty-three, and the
+date had moved. Its state table said the help had 11 pages while the counts
+line four rows above said 12; the truth is 12.
+
+Which is the joke of the last three passes: the file that exists to carry
+accurate state was carrying a stale count of how many times we had checked for
+stale counts.
+
+### Still to do
+
+Nothing on the immediate list.

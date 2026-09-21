@@ -673,6 +673,59 @@ def test_the_word_form_comparisons_are_reserved():
     assert ".LESS." not in spec.DOTTED_OPS
 
 
+def test_no_user_facing_text_names_a_rule_code_that_does_not_exist():
+    """A dead code in prose is a dead link the reader cannot follow.
+
+    HANDOFF is excluded deliberately: it records corrections, and "E113 became
+    W113" has to be able to name E113. Everything else here is current-state
+    text a user or an agent reads.
+    """
+    import pathlib
+    import re
+    import ppcl.linter as L
+
+    L._load_rules()
+    codes = {r.code for r in L.REGISTRY}
+    # report.py emits its own R7xx family outside the rule registry.
+    codes |= {"R701", "R702", "R703", "R704", "R705"}
+
+    targets = [pathlib.Path(n) for n in
+               ("README.md", "PLUGIN.md", "docs/PPCL-REFERENCE.md",
+                "skills/ppcl/SKILL.md")]
+    targets += sorted(pathlib.Path("commands").glob("*.md"))
+    targets += sorted(pathlib.Path("ppcl/web").rglob("*.js"))
+
+    dead = []
+    for path in targets:
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for m in re.finditer(r"`([EWPSR][0-9]{3})`", text):
+            if m.group(1) not in codes:
+                dead.append("%s: %s" % (path, m.group(1)))
+    assert dead == [], dead
+
+
+def test_every_cross_reference_resolves():
+    """196 links nobody had followed.
+
+    `explain` prints a command's see_also list and the help pane renders its
+    own; a dangling entry in either is a reference the reader cannot chase.
+    """
+    from ppcl import helpdocs, spec
+
+    dangling = [(name, ref)
+                for name, cmd in spec.ALL.items()
+                for ref in (getattr(cmd, "see_also", ()) or ())
+                if ref not in spec.ALL and ref not in spec.FUNCTIONS]
+    assert dangling == [], dangling
+
+    ids = {p["id"] for p in helpdocs.PAGES}
+    bad = [(p["id"], ref) for p in helpdocs.PAGES
+           for ref in (p.get("see_also", ()) or ()) if ref not in ids]
+    assert bad == [], bad
+
+
 def test_the_help_does_not_contradict_the_rules_it_names():
     """Prose and code are two representations of the same facts, and only one
     of them fails when it goes wrong.

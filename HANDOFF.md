@@ -4,7 +4,9 @@
 otherwise be lost: what exists, what is verified versus assumed, which
 decisions were deliberate, and what to build next.
 
-Last updated: 2026-09-18. Fourteen research passes; see docs/RESEARCH-LOG.md.
+Last updated: 2026-09-21. Thirty-three research passes; see
+docs/RESEARCH-LOG.md. The last ten audited this project's own artifacts
+rather than reading another source, and found more.
 
 ---
 
@@ -80,7 +82,7 @@ runs on any engineering workstation with no install. Windows is the primary
 platform.
 
 ```bash
-python -m pytest tests -q          # 513 tests, ~150s
+python -m pytest tests -q          # 515 tests, ~150s
 python -m ppcl.cli serve           # the app
 python -m ppcl.cli lint samples    # exercises the CLI on real programs
 python -m ppcl.cli help            # the built-in documentation
@@ -90,7 +92,7 @@ python -m ppcl.cli help            # the built-in documentation
 
 ## 2. Current state
 
-**513 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
+**515 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
 tests. 88 lint rules, 66 commands, 99 BACnet properties, 30 block types,
 17 CLI subcommands, 11 MCP tools, 12 help pages, 20 settings, 6 firmware
 families, 29 panel error codes.
@@ -111,7 +113,7 @@ families, 29 panel error codes.
 | **Points** | `ppcl/points.py` | CSV/JSON import, alias column mapping, unresolved-reference check, slope/intercept for panel error E12 |
 | **Panel report** | `ppcl/report.py` | Reads a `PPCL DISPLAY REPORT`: disabled lines, unresolved points, trace bits. Folded into `lint --report` |
 | **Settings** | `ppcl/settings.py` | 20 declared settings with types, ranges, help |
-| **Help** | `ppcl/helpdocs.py` | 11 pages, served to the UI and the CLI |
+| **Help** | `ppcl/helpdocs.py` | 12 pages, served to the UI and the CLI. Counts in the prose are substituted at import, not written |
 | Plant | `ppcl/plant/` | Equipment models + test bench with faults and checks |
 | Web | `ppcl/web/` | `api.py` + `api_ide.py`, 34 endpoints; UI is 9 ES modules, no framework |
 | **MCP** | `ppcl/mcp_server.py` | 11 tools over the same dispatch. Analysis only -- no file-writing endpoint is exposed |
