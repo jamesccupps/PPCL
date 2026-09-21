@@ -3289,3 +3289,66 @@ off. `disabled` already does that.
 ### Still to do
 
 Nothing on the immediate list.
+
+---
+
+## 2026-09-21 (thirty-second pass) — the counts nobody was checking
+
+The roadmap is empty, so: what else in this project asserts something it does
+not verify? The same question that found the unenforced `point_types`, the
+unread `wrap_long_lines` and four uncited rules.
+
+Numbers written into prose.
+
+### Two of them were in runtime text, not documentation
+
+| Where | Said | Was |
+|---|---|---|
+| `mcp_server.TOOLS`, the `ppcl_lint` description | "against **75 rules**" | 88 |
+| `helpdocs`, the Getting started page | "**72 lint rules**, each citing the manual" | 88 |
+
+These are not documentation drift. The first is the text an **agent** reads
+before deciding whether to run the linter — every Claude session using this
+plugin has been told a figure thirteen short. The second is the page a person
+opens to find out what the tool is.
+
+The markdown counts were all current, because those get updated when the tests
+are rerun and the number is in the same diff. The two in code do not appear in
+any diff anybody looks at, which is exactly why they rotted.
+
+### Both now ask
+
+`mcp_server._rule_count()` loads the registry and counts it.
+`helpdocs._resolve_figures()` substitutes `{rules}`, `{commands}` and
+`{point_types}` into page bodies once at import.
+
+Asked rather than remembered, they cannot go stale.
+
+### And a test so the next one is not written
+
+`test_no_runtime_string_hardcodes_a_count_the_code_can_compute` scans every
+`.py` under `ppcl/` for a two- or three-digit literal followed by "rules",
+"commands", "point types", "block types", "help pages" or "settings", skipping
+comments. It caught its own explanatory docstring on the first run, which is a
+fair sign the pattern is tight enough to be worth having.
+
+A second test asserts the help page and the MCP tool description both contain
+the live count, so the mechanism is checked rather than merely present.
+
+### The shape of the last eight passes
+
+Eight passes of auditing this project's own artifacts have found: `redact`
+mangling an OIP sequence and re-redacting its own output; `W337` asserting
+something false about the reference site's programs; four rules citing nothing;
+seven commands silently unsimulated; `clone_lines` returning a copy that
+commanded the original equipment and crashing on a disabled line; renumbering
+quietly breaking a compliant program; a declared setting nothing read; and now
+two counts lying to an agent and a user.
+
+Every one was invisible for the same reason — **nothing fails when a claim
+stops being true.** The manuals were close to exhausted twenty passes ago. The
+code was not.
+
+### Still to do
+
+Nothing on the immediate list.

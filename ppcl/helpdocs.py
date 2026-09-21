@@ -35,7 +35,7 @@ The workbench has five panes. They are meant to be used left to right.
 A PPCL text editor that checks as you type. Everything Desigo's PPCL Editor
 does to a program, this does to a file: go to a statement, find and replace,
 renumber, enable and disable statements, and Command Assist while typing.
-It adds what Desigo has no place for -- 72 lint rules, each citing the manual
+It adds what Desigo has no place for -- {rules} lint rules, each citing the manual
 page it comes from.
 
 Nothing here talks to a panel. You edit a file and load it yourself.
@@ -859,6 +859,39 @@ editor for this language that I could find.
 ]
 
 BY_ID = {p["id"]: p for p in PAGES}
+
+
+def _live_figures() -> dict:
+    """Counts the help would otherwise carry in prose and get wrong.
+
+    The rule count was written here by hand as a literal, and stood at 72
+    while the linter grew past 88. A number in prose decays silently --
+    nothing fails, nobody notices,
+    and the person reading the help is told something untrue about the tool
+    they are holding. Asked rather than remembered, it cannot.
+    """
+    from . import linter, spec
+
+    linter._load_rules()
+    return {
+        "rules": len(linter.REGISTRY),
+        "commands": len(spec.ALL),
+        "point_types": len(spec.POINT_TYPES),
+    }
+
+
+def _resolve_figures() -> None:
+    figures = _live_figures()
+    for page_ in PAGES:
+        body = page_.get("body", "")
+        if "{" not in body:
+            continue
+        for key, value in figures.items():
+            body = body.replace("{%s}" % key, str(value))
+        page_["body"] = body
+
+
+_resolve_figures()
 
 
 def contents():

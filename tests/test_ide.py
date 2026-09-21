@@ -673,6 +673,53 @@ def test_the_word_form_comparisons_are_reserved():
     assert ".LESS." not in spec.DOTTED_OPS
 
 
+def test_no_runtime_string_hardcodes_a_count_the_code_can_compute():
+    """A number in prose decays silently. Nothing fails, nobody notices.
+
+    The MCP tool description told every agent the linter checked "75 rules"
+    while it checked 88, and the in-app help said "72 lint rules". Both were
+    written by hand and both went stale, in exactly the places a person or a
+    model would trust them: the text an agent reads before deciding whether to
+    run the linter, and the page a user opens to learn what the tool is.
+
+    Both now ask. This stops the next one being written.
+    """
+    import pathlib
+    import re
+
+    pattern = re.compile(
+        r"[^%d](" + r"[0-9]{2,3})" + r"[ ]+(lint rules|rules|commands|"
+        r"point types|block types|help pages|settings)" + r"[^a-z]")
+    offenders = []
+    for path in sorted(pathlib.Path("ppcl").rglob("*.py")):
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue          # a comment is a note to a reader, not output
+            m = pattern.search(line)
+            if m:
+                offenders.append("%s:%d %s" % (path, n, stripped[:70]))
+    assert offenders == [], (
+        "counts written by hand in runtime text:" + chr(10)
+        + chr(10).join(offenders))
+
+
+def test_the_help_and_the_mcp_surface_report_the_real_rule_count():
+    import ppcl.linter as L
+    from ppcl import helpdocs
+    from ppcl.mcp_server import TOOLS
+
+    L._load_rules()
+    live = str(len(L.REGISTRY))
+
+    lint_tool = next(t for t in TOOLS if t["name"] == "ppcl_lint")
+    assert live in lint_tool["description"]
+
+    start = helpdocs.page("start")["body"]
+    assert live + " lint rules" in start
+    assert "{rules}" not in start
+
+
 def test_cloning_a_disabled_line_keeps_it_disabled_and_renames_it():
     """A PXC.A disabled line carries "# " in the text, and the lexer has no
     business seeing it -- cloning a block containing one used to raise

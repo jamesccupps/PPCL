@@ -37,6 +37,20 @@ def _text(desc, required=True):
     return {"type": "string", "description": desc}
 
 
+def _rule_count() -> int:
+    """How many rules there actually are, asked rather than remembered.
+
+    This number was written into the tool description by hand and went stale
+    at 75 while the linter grew to 88 -- so every agent using this plugin was
+    told a figure thirteen short. A count in prose decays silently; a count
+    that is computed cannot.
+    """
+    from . import linter
+
+    linter._load_rules()
+    return len(linter.REGISTRY)
+
+
 #: Every tool maps to an endpoint in :mod:`ppcl.web.api`, so the MCP surface
 #: cannot drift from the CLI and the UI. ``format`` names the renderer that
 #: turns the JSON result into something worth putting in a model's context --
@@ -45,7 +59,8 @@ TOOLS = [
     {
         "name": "ppcl_lint",
         "description": (
-            "Check a PPCL program against 75 rules and report every finding "
+            "Check a PPCL program against %d rules and report every finding "
+            % _rule_count() +
             "with the manual reference it comes from. Use this instead of "
             "reading a program for defects by eye -- it catches duplicate "
             "line numbers, unreleased priorities, time-based commands outside "
