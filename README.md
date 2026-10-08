@@ -12,12 +12,40 @@ firmware families.
 Zero dependencies, Python 3.10+, stdlib only. Everything runs locally — no
 program text ever leaves the machine.
 
+## Running it
+
+Nothing to install. Clone it, stand in the directory, and run:
+
 ```bash
-python -m ppcl.cli serve                    # the whole thing, in a browser
-python -m ppcl.cli lint  path/to/programs/
-python -m ppcl.cli bench AHU1.ppcl --weather design_winter
-python -m ppcl.cli bench AHU1.ppcl --fault "AHU1,oa_damper_stuck,1800,100"
+python -m ppcl serve
 ```
+
+That opens the workbench in a browser. For the command line, the same module
+takes a subcommand:
+
+```bash
+python -m ppcl lint  path/to/programs/
+python -m ppcl bench AHU1.ppcl --weather design_winter
+python -m ppcl bench AHU1.ppcl --fault "AHU1,oa_damper_stuck,1800,100"
+python -m ppcl rules                        # every rule and what it checks
+python -m ppcl help                         # the built-in documentation
+```
+
+`--help` works on the top level and on every subcommand.
+
+If your programs only ever reach a panel from a workstation and are never
+typed at a panel's serial port, add `--workstation-only` to `lint`. It drops
+the line-length findings, which are usually most of the output on anything
+written in Desigo.
+
+To install it properly instead, so that `ppcl` is on the path:
+
+```bash
+pip install -e .
+```
+
+Then `ppcl lint ...` works from anywhere. The install pulls in nothing; the
+dependency list is empty and meant to stay that way.
 
 ---
 
