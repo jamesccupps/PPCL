@@ -3545,3 +3545,177 @@ graph breaks one, something fails.
 ### Still to do
 
 Nothing on the immediate list.
+
+---
+
+## 2026-10-08 (thirty-sixth pass) — the toolchain's own tables
+
+A new source, and the first that is not documentation: **the shipped toolchain
+carries its own tables** — a statement table, a function table, an operator
+table and a system-point symbol table, each holding the names the compiler
+actually dispatches on. Documentation *describes* the language; these *are* the
+language as implemented. Where they disagree, the tables win.
+
+Read as records rather than as strings they decode cleanly. The statement table
+is 75 entries of name, parser class, per-operand bitmasks, an operand count and
+a revision gate. The masks are the interesting part: a fourteen-operand
+statement carries fourteen significant bits, and the repeating groups of the
+variadic statements show up as alternating bit patterns.
+
+### The reconciliation, which is the reason to do it
+
+Diffed mechanically against `spec.ALL`:
+
+| | |
+|---|---|
+| Statements in the table | **75** |
+| Five duplicate placeholder slots | −5 |
+| `IF`, `THEN`, `ELSE`, `C` — structural, handled by the parser | −4 |
+| `ONERR`, `ENTHAL`, `RELTCU`, `DIM` — in `FIRMWARE_STATEMENT_TOKENS` | −4 |
+| **Remainder** | **62** |
+| `spec.ALL` | 66 |
+| `DISCOV`, `ENCOV`, `GETVAL`, `SETVAL` — postdate this table | −4 |
+| **Remainder** | **62** |
+
+**Exact.** Nothing in the compiler's statement table is missing here, and
+nothing here is invented. The operator table reconciles exactly too — all
+eleven of `DOTTED_OPS`, nothing more, nothing less, and no `NOT`. So does the
+resident-point structure: `NODE0`–`NODE99` and `SECND1`–`SECND7` are precisely
+`RESIDENT_RANGES`, and `$ARG`/`$LOC` run to fifteen each, which is what
+`LOCAL_ARG_COUNT` and `LOCAL_LOC_COUNT` already said.
+
+That is worth more than any single correction below: two independently built
+models of the same language, agreeing name for name.
+
+### What the tables corrected
+
+**`LOG` is the common log.** It was described here as the natural log — the
+only entry in `FUNCTIONS` with no citation behind it, which is the tell.
+Siemens' shipped library converts a natural log by multiplying the common log
+by 2.3026, and 2.3026 is ln(10): the identity only holds if `LOG` is base 10.
+Read the other way it reduces to `LN(X) = 2.3026 × LN(X)`. Eight psychrometric
+programs carry that conversion, wrapped around arithmetic that is the ASHRAE
+saturation-pressure correlation — published base 10 as well. Anyone doing
+enthalpy math from the old description was wrong by a factor of ln(10).
+
+**`LN` exists**, and raised `E118 ERROR — LN is not a PPCL function`, so
+writing the correct thing was reported as a mistake. The library never calls it
+and converts by hand, which is what you would expect of code older than the
+function.
+
+**`MMI` was never a statement.** Five tokens were recorded as named by the
+controller's `PPCL_statement_type` enum and documented by nothing. The
+compiler's statement table, read as a 1-based index, agrees with that enum at
+`ONERR` 21, `ENTHAL` 48, `RELTCU` 60 and `DIM` 68 — four exact matches against
+an enum another project recovered off the wire, from a source this one has
+nothing in common with. Slot 49 is **`OIP`**, where the enum has `WHOPMMI`. One
+statement under two names: OIP is the Operator Interface Port, MMI is the
+Man-Machine Interface, and those are the same port. The enum already needed
+reducing to source spellings — `WHOPRELEASE` to `RELEAS` — and this is the same
+reduction, just not one anybody was going to guess.
+
+It also retires a curiosity this log had been carrying: that `OIP` was real
+"although the enum does not name it". The enum did name it. A 71-entry list was
+read as having a hole in it. The lesson drawn from the hole — absence from a
+vendor enum proves nothing — is still true, but this was not an instance of it.
+
+Smaller: `TROUBL` is a point status, sitting among the alarm states, and
+`$TOTKW` a resident point next to `$BATT`. Both added.
+
+### Three defects the tables did not find — the tooling's own limits did
+
+The vendor's offline tool documents what it **refuses** to model, and reading
+that list against ours found the half we had missed.
+
+**Resident points returned invented values.** `X = LINK + ALMCNT + NODE5 +
+ALMCT2` returned a confident `2.0`; all four operands were stand-ins. Our
+`UNMODELLED` set is keyed by command name, and these are read through `_read`,
+so they fell outside it entirely. The vendor's ignored list names exactly the
+same points, which is the useful part — the boundary is not ours to argue with.
+Values are unchanged so programs still run; the run now says the answer rests
+on an assumption.
+
+**An unknown priority arbitrated as the lowest.** `PRIORITY_RANK.get(p, 0)`
+turned any priority not in the ladder into rank 0, so a point an operator had
+overridden lost to PPCL at `@NONE` — and the write overwrote the priority too.
+The simulator showed PPCL winning a fight it would lose on a panel, which is
+the one direction this kind of error must not go. `release()` was worse: a bare
+`RELEAS` carries no priority to compare, so it skipped the comparison and
+cleared the point unconditionally.
+
+Desigo's own help settles the shape of this. PPCL has exactly five indicators —
+"PPCL supports the following @priority indicators: Emergency (@EMER), PPCL
+(@NONE), Operator (@OPER), Peak Demand Limiting (@PDL), and Smoke (@SMOKE)" —
+and `OVRD`, the sixth thing a priority field can say, is not a command priority
+at all but the override marker on an APOGEE TEC subpoint: "To override a value,
+select the value and type a new number, and then click Save. OVRD displays in
+the Override column." It arrives from an engineer at a workstation, never from
+a program, and a program cannot name it to release it either.
+
+So its rank is deliberately **not** recorded. Nothing published says where an
+override sits relative to the five. Both call sites now refuse and say so.
+
+**`E124`, two `DEFINE`s of one abbreviation.** Checking the rules against what
+the compiler *refuses to compile*, rather than against prose, found that
+duplicate definition has its own refusal code — next to the unresolved point
+and the wrong point type, both of which we already report. This linted clean.
+The dangerous case is redefinition: the second wins, so uses written above it
+resolve to the later point and the program reads correctly line by line. Zero
+findings across all three corpora.
+
+### The 27 errors that were not errors
+
+Linting the shipped library threw 27 `E105` — unquoted point names of seven and
+eight characters, in four programs, against a documented six-character limit.
+Either the limit was wrong or Siemens ships uncompilable code.
+
+Neither. They are **name-exchange placeholders**. The library's own example
+file states the convention: prompt definitions delimited by backslashes,
+"required in order to resolve any conflicts between your ppcl program and this
+library routine", substituted through the tool's replace-editable-variables
+command before the program is loaded. The prompts for these ten names read
+`(SUBSTITUTE NUMBER)` — so they do not stand for point names at all, but for
+numeric literals. A plant-kW line becomes a pump's kW rating times its proof.
+
+So the limit holds, the library is not defective here, and the real finding is
+about this toolkit: **a library template is not a program, and linting one
+reports its placeholders as defects.** Recognising the convention and saying
+"this template has ten unsubstituted placeholders, substitute them before
+loading" would turn 27 misleading errors into one useful one.
+
+### Checked and already right
+
+Worth recording, because a pass that lists only corrections overstates how much
+was wrong:
+
+- `WAIT` takes four arguments. The table's operand count says three, and all
+  forty-odd corpus calls have four — the count under-reports for the one
+  statement carrying an extra pair of fields. **`spec` unchanged**, and the
+  corpus check is what stopped it being "fixed".
+- `MAX_OPERATORS = 32` and the operand limits were already modelled. Desigo's
+  help confirms the shape of the 16-parameter limit from the other side: "A
+  total of 16 parameters can be used in one PPCL statement. When using an
+  @priority indicator with PPCL statements, the priority level you define in
+  that statement occupies one of the parameters" — which is exactly what
+  `Command.priority_arg` has always encoded.
+- `L2SL` and `LFSSL` are both present and decompose as the vendor describes.
+- A breakpoint already refuses to land on a comment line, as the tooling says.
+- The APOGEE-to-BACnet slot map holds from a second direction: the BACnet
+  command priority array names level 8 "Manual Operator", which is the slot
+  `@OPER` maps onto.
+- `NODE0` gains a sixth independent source. `EQUAL` and `LESS` gain a clean
+  negative one — neither appears as a token anywhere in the toolchain. That
+  does not overturn their reservation, which is an editor-level claim about
+  what a point may be named, but the compiler's operator table has neither,
+  which is exactly what `spec` already said about them.
+
+### Still to do
+
+1. **Recognise library name-exchange placeholders** — the finding above. One
+   rule, and it reframes every other finding on a template.
+2. **Open question 12 (`EXP`)**: if `LOG` is base 10 then `EXP` is unpaired,
+   and nothing available says whether it returns `e**x` or `10**x`. One line of
+   PPCL settles it.
+3. The table gives `PDLSET` four leading operands where `spec` requires six. No
+   corpus call anywhere to arbitrate, so **nothing changed** — a manual-derived
+   signature is not worth overturning on a bitfield.

@@ -4,9 +4,12 @@
 otherwise be lost: what exists, what is verified versus assumed, which
 decisions were deliberate, and what to build next.
 
-Last updated: 2026-10-08. Thirty-five research passes; see
-docs/RESEARCH-LOG.md. The first twenty were sources; the last ten audited this
-project's own artifacts instead, and found more.
+Last updated: 2026-10-08. Thirty-six research passes; see
+docs/RESEARCH-LOG.md. The first twenty were sources; ten after that audited
+this project's own artifacts instead, and found more. The thirty-sixth opened
+a source class the others did not have -- the shipped toolchain's own
+dispatch tables, which are the language as implemented rather than as
+described. The command list reconciles against them exactly.
 
 ---
 

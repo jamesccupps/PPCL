@@ -253,16 +253,26 @@ PRIORITY_ORDER = ["@NONE", "@PDL", "@EMER", "@SMOKE", "@OPER"]
 PRIORITY_RANK = {name: i for i, name in enumerate(PRIORITY_ORDER)}
 
 #: A priority a point can *hold* that PPCL has no literal for, so it can never
-#: be the priority of a command. Siemens' own tooling offers six proprietary
-#: priorities where PPCL has five -- EMER, NONE, OPER, OVRD, PDL and SMOKE --
-#: and OVRD is the one with no ``@`` form: there is no @OVRD in the compiler's
-#: symbol table, which carries exactly the five in PRIORITY_ORDER.
+#: be the priority of a command.
 #:
-#: Its rank is deliberately **not** recorded. The list it comes from is
-#: alphabetical, which says nothing about where it sits relative to the five,
-#: and guessing would decide a priority fight the wrong way round half the
-#: time. ``Simulator.command`` refuses rather than guesses when a point is at
-#: a priority with no rank, which is the same posture the transforms take.
+#: That PPCL has exactly five is stated outright: "PPCL supports the following
+#: @priority indicators: Emergency (@EMER), PPCL (@NONE), Operator (@OPER),
+#: Peak Demand Limiting (@PDL), and Smoke (@SMOKE)" -- Desigo CC engineering
+#: help, "At Priority Indicators - @". The compiler's symbol table carries the
+#: same five and no others.
+#:
+#: OVRD is the sixth thing a point's priority field can say, and it is not a
+#: command priority at all: it is the override marker on an APOGEE TEC
+#: subpoint. "To override a value, select the value and type a new number, and
+#: then click Save. OVRD displays in the Override column" -- Desigo CC, "APOGEE
+#: TEC Subpoints". So it arrives from an engineer at a workstation, never from
+#: a program, and a program cannot name it to release it either.
+#:
+#: Its rank is deliberately **not** recorded. Nothing published says where an
+#: override sits relative to the five, and guessing decides a priority fight
+#: the wrong way round half the time. ``Simulator.command`` refuses rather
+#: than guesses when a point is at a priority with no rank, which is the same
+#: posture the transforms take for anything ambiguous.
 NON_PPCL_PRIORITIES = frozenset({"@OVRD"})
 
 PRIORITY_DESCRIPTIONS = {
