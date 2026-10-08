@@ -252,6 +252,19 @@ SPEED_TYPES = frozenset({"LFSSL", "LFSSP", "LFMSSL", "LFMSSP"})
 PRIORITY_ORDER = ["@NONE", "@PDL", "@EMER", "@SMOKE", "@OPER"]
 PRIORITY_RANK = {name: i for i, name in enumerate(PRIORITY_ORDER)}
 
+#: A priority a point can *hold* that PPCL has no literal for, so it can never
+#: be the priority of a command. Siemens' own tooling offers six proprietary
+#: priorities where PPCL has five -- EMER, NONE, OPER, OVRD, PDL and SMOKE --
+#: and OVRD is the one with no ``@`` form: there is no @OVRD in the compiler's
+#: symbol table, which carries exactly the five in PRIORITY_ORDER.
+#:
+#: Its rank is deliberately **not** recorded. The list it comes from is
+#: alphabetical, which says nothing about where it sits relative to the five,
+#: and guessing would decide a priority fight the wrong way round half the
+#: time. ``Simulator.command`` refuses rather than guesses when a point is at
+#: a priority with no rank, which is the same posture the transforms take.
+NON_PPCL_PRIORITIES = frozenset({"@OVRD"})
+
 PRIORITY_DESCRIPTIONS = {
     "@NONE": "PPCL priority (lowest) - the level PPCL commands act at by default",
     "@PDL": "Peak Demand Limiting",

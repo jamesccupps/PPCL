@@ -658,6 +658,61 @@ def test_a_clock_backed_resident_point_stays_quiet():
     assert sim.warnings == []
 
 
+def test_a_point_at_an_unranked_priority_is_not_commanded():
+    """An unknown priority used to arbitrate as the lowest, and silently.
+
+    Siemens' own tooling offers six proprietary priorities where PPCL has
+    five; OVRD is the one with no @ form, so it can only reach a point from an
+    operator or the panel. Its rank is not published. PRIORITY_RANK.get(p, 0)
+    turned that into "lowest", which let PPCL at @NONE take the point and
+    overwrite the priority -- the optimistic answer to a fight whose outcome
+    nobody here knows.
+    """
+    from ppcl import parser
+    from ppcl.simulator import Simulator
+
+    text = "10\tON(\"PUMP\")\n20\tGOTO 10\n"
+    sim = Simulator(parser.parse(text))
+    pt = sim.panel.get("PUMP")
+    pt.value, pt.priority = 0.0, "@OVRD"
+    sim.run(passes=2, seconds_per_pass=1.0)
+
+    assert sim.panel.value("PUMP") == 0.0
+    assert sim.panel.get("PUMP").priority == "@OVRD"
+    assert len(sim.warnings) == 1
+    assert "no rank here" in sim.warnings[0]
+
+
+def test_a_bare_RELEAS_does_not_clear_an_unranked_priority():
+    """The worse half: a bare RELEAS carries no priority to compare at all."""
+    from ppcl import parser
+    from ppcl.simulator import Simulator
+
+    text = "10\tRELEAS(\"PUMP\")\n20\tGOTO 10\n"
+    sim = Simulator(parser.parse(text))
+    pt = sim.panel.get("PUMP")
+    pt.value, pt.priority = 1.0, "@OVRD"
+    sim.run(passes=1, seconds_per_pass=1.0)
+
+    assert sim.panel.get("PUMP").priority == "@OVRD"
+
+
+def test_the_five_PPCL_priorities_still_arbitrate_silently():
+    """The ordinary ladder must not start warning. @OPER blocks @NONE."""
+    from ppcl import parser
+    from ppcl.simulator import Simulator
+
+    text = "10\tON(\"PUMP\")\n20\tGOTO 10\n"
+    sim = Simulator(parser.parse(text))
+    pt = sim.panel.get("PUMP")
+    pt.value, pt.priority = 0.0, "@OPER"
+    sim.run(passes=1, seconds_per_pass=1.0)
+
+    assert sim.panel.value("PUMP") == 0.0        # blocked, as it should be
+    assert sim.panel.get("PUMP").priority == "@OPER"
+    assert sim.warnings == []                    # and quietly
+
+
 def test_redaction_keeps_an_OIP_keystroke_sequence_intact():
     """An OIP sequence is keystrokes, not a point name.
 

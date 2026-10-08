@@ -256,6 +256,20 @@ class Simulator:
         if text not in self.warnings:
             self.warnings.append(text)
 
+    def _unranked_priority(self, point, priority, line, what) -> None:
+        """Say that a priority fight was declined, not decided."""
+        extra = ""
+        if priority in spec.NON_PPCL_PRIORITIES:
+            extra = (" PPCL has no %s literal, so this priority can only have "
+                     "come from an operator or the panel, and where it sits "
+                     "relative to the five PPCL levels is not published."
+                     % priority)
+        self._warn(
+            "%s is at %s, which has no rank here, so %s at line %d was "
+            "refused rather than arbitrated.%s"
+            % (point, priority, what, line, extra)
+        )
+
     def _warn_resident(self, name: str, why: str = "") -> None:
         """Record that a resident point's value is a stand-in, not a result."""
         why = why or UNMODELLED_RESIDENTS.get(name, "value unknown offline")
@@ -310,7 +324,18 @@ class Simulator:
         high as the point's current priority.
         """
         pt = self.panel.get(name)
-        cur_rank = spec.PRIORITY_RANK.get(pt.priority, 0)
+        if pt.priority not in spec.PRIORITY_RANK:
+            # An unranked priority used to resolve to rank 0, the lowest, so
+            # PPCL at @NONE won and overwrote it. That is the optimistic
+            # answer in a fight whose outcome is unknown, and it is silent.
+            self._unranked_priority(name, pt.priority, line, what)
+            self._emit(
+                line, "blocked",
+                "%s %s blocked: point is at %s, whose rank is unknown"
+                % (what, name, pt.priority),
+            )
+            return False
+        cur_rank = spec.PRIORITY_RANK[pt.priority]
         new_rank = spec.PRIORITY_RANK.get(priority, 0)
         if new_rank < cur_rank:
             self._emit(
@@ -333,7 +358,19 @@ class Simulator:
 
     def release(self, name: str, priority: str, line: int) -> bool:
         pt = self.panel.get(name)
-        cur_rank = spec.PRIORITY_RANK.get(pt.priority, 0)
+        if pt.priority not in spec.PRIORITY_RANK:
+            # Worse here than in command(): a bare RELEAS carries no priority
+            # at all, so it skipped the comparison entirely and cleared the
+            # point to @NONE. An operator override would have been thrown
+            # away by a program that cannot name that priority.
+            self._unranked_priority(name, pt.priority, line, "RELEAS")
+            self._emit(
+                line, "blocked",
+                "RELEAS %s refused: point is at %s, whose rank is unknown"
+                % (name, pt.priority),
+            )
+            return False
+        cur_rank = spec.PRIORITY_RANK[pt.priority]
         rel_rank = spec.PRIORITY_RANK.get(priority or pt.priority, 0)
         if priority is not None and rel_rank < cur_rank:
             self._emit(
