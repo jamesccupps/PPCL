@@ -88,6 +88,24 @@ UNMODELLED_OUTPUTS = {
     "TIMAVG": (),
 }
 
+#: Resident points whose value no offline simulator can know, paired with the
+#: stand-in this one returns. Siemens' own offline tooling declines to model
+#: exactly these, on the stated grounds that they "require a firmware
+#: environment": NODE0 through NODE99, ADAPTM, ADAPTS, ALMCNT, ALMCT2, OIP,
+#: ONPWRT, $BATT and LINK. $PDL is added on the same reasoning: it reports
+#: the panel's load-shed state, which exists only in firmware.
+#:
+#: The stand-in is still returned, so a program that reads one of these runs
+#: to completion instead of aborting. What changes is that the run says so.
+#: An arithmetic result built on a stand-in looks exactly like a real one.
+UNMODELLED_RESIDENTS = {
+    "LINK": "BLN link status, ON here",
+    "$BATT": "battery condition, ON here",
+    "ALMCNT": "panel alarm count, 0 here",
+    "ALMCT2": "second alarm counter, 0 here",
+    "$PDL": "PDL load-shed state, 0 here",
+}
+
 
 class SimulationError(Exception):
     """Raised when the program cannot continue."""
@@ -238,6 +256,15 @@ class Simulator:
         if text not in self.warnings:
             self.warnings.append(text)
 
+    def _warn_resident(self, name: str, why: str = "") -> None:
+        """Record that a resident point's value is a stand-in, not a result."""
+        why = why or UNMODELLED_RESIDENTS.get(name, "value unknown offline")
+        self._warn(
+            "%s is a resident point no offline simulator can know (%s); "
+            "Siemens' own offline tooling ignores it too, so anything computed "
+            "from it is only as sound as that assumption" % (name, why)
+        )
+
     # -- point access ------------------------------------------------------
 
     def _resolve_name(self, ref: Ref) -> str:
@@ -259,12 +286,16 @@ class Simulator:
         if upper.startswith("SECND") and upper[5:].isdigit():
             return float(int(self.clock.elapsed) % 60)
         if upper == "LINK":
+            self._warn_resident(upper)
             return ON
         if upper == "$BATT":
+            self._warn_resident(upper)
             return ON
         if upper in ("ALMCNT", "ALMCT2", "$PDL"):
+            self._warn_resident(upper)
             return 0.0
         if upper.startswith("NODE") and upper[4:].isdigit():
+            self._warn_resident(upper, "peer panel online status, ON here")
             return ON
         if upper in self.parameters:
             return self.parameters[upper]

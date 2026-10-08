@@ -621,6 +621,43 @@ def test_an_unsimulated_command_names_the_points_it_did_not_write():
     assert "CV" in w and "ERRP" in w
 
 
+def test_a_resident_point_the_simulator_cannot_know_says_so():
+    """A stand-in value and a simulated one look identical in the result.
+
+    Siemens' own offline tooling refuses to model these -- NODE0 through
+    NODE99, ADAPTM, ADAPTS, ALMCNT, ALMCT2, OIP, ONPWRT, $BATT and LINK are
+    all listed as ignored. This simulator still returns a value so the
+    program runs to completion, which means the only thing between the
+    engineer and a confident wrong answer is the warning.
+    """
+    from ppcl import parser
+    from ppcl.simulator import Simulator
+
+    text = "10\tX = LINK + ALMCNT + NODE5 + ALMCT2\n20\tGOTO 10\n"
+    sim = Simulator(parser.parse(text))
+    sim.run(passes=3, seconds_per_pass=1.0)
+
+    # The arithmetic still completes; nothing aborts mid-program.
+    assert sim.panel.value("X") == 2.0
+    # One warning per name, not one per pass.
+    assert len(sim.warnings) == 4
+    joined = " ".join(sim.warnings)
+    for name in ("LINK", "ALMCNT", "NODE5", "ALMCT2"):
+        assert name in joined
+    assert "no offline simulator can know" in joined
+
+
+def test_a_clock_backed_resident_point_stays_quiet():
+    """TIME, DAY and SECNDS are genuinely simulated, so warning is noise."""
+    from ppcl import parser
+    from ppcl.simulator import Simulator
+
+    text = "10\tX = TIME + DAY + SECNDS + DAYOFM + MONTH\n20\tGOTO 10\n"
+    sim = Simulator(parser.parse(text))
+    sim.run(passes=2, seconds_per_pass=1.0)
+    assert sim.warnings == []
+
+
 def test_redaction_keeps_an_OIP_keystroke_sequence_intact():
     """An OIP sequence is keystrokes, not a point name.
 
