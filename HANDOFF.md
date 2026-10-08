@@ -180,8 +180,8 @@ repository** -- findings from those corpora are described, not quoted.
 
 | Source | Size | Verdict |
 |---|---|---|
-| **Insight 3.15 `Proged.chm`** | 736 pages | *Exhausted.* The deepest source on the language itself: a page per command with worked examples, the compiler error list, the decision-table method |
-| **Insight 3.15 `Point.chm`** | 320 pages | *Exhausted.* Point-type taxonomy, bundled-point decomposition |
+| **Insight 3.15 the Program Editor help** | 736 pages | *Exhausted.* The deepest source on the language itself: a page per command with worked examples, the compiler error list, the decision-table method |
+| **Insight 3.15 the point help** | 320 pages | *Exhausted.* Point-type taxonomy, bundled-point decomposition |
 | **Desigo CC Engineering help** | 3,618 pages, 436 mentioning PPCL | Mined. Its PPCL section is a glossary and is thinner than Insight's |
 | **Desigo CC Operating help** | 844 pages | *Strict subset of Engineering* -- 733 shared titles, zero unique, 702 identical. Nothing to do |
 | **A6V10374898** PXC.A PPCL User Guide, rev `_j` | HTML, public | Mined across five passes. `GETVAL`/`SETVAL`, the property appendix, `[Node]Point`, the ten removed statements |
@@ -207,7 +207,7 @@ their own docs misprint document numbers. Do not spend more time on it.
    Arguments page and a worked example each. Command Assist was the first
    source read, not the only one.
 2. **Desigo CC engineering help** — the user supplied the full extract as
-   `PPCL.md` (3,537 lines) at `C:\Users\JamesCupps\Downloads\PPCL.md`. This is
+   a local extract of 3,537 lines. This is
    the *compiler's* rulebook: operand and operator limits, the common compiler
    error list, point referencing, Cross Trunk, program naming, the subroutine
    benefit table, the keyboard shortcuts, and the **Command Assist category

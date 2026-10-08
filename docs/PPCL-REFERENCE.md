@@ -673,7 +673,7 @@ The Program Editor's reserved-word page prints `NODE1 through NODE99`. The
 dedicated node-points page **in the same book** states the range in prose —
 "acceptable node numbers for the NODE resident point range from 0 through 99",
 and again "between 0 and 99" — and carries `NODE0` in its own title. So do
-that book's glossary, the PPCL Debugger help, and Desigo CC's engineering
+that book's glossary, Siemens' offline tooling, and Desigo CC's engineering
 help.
 
 Four sources say zero, one says one, and the one is contradicted by its own

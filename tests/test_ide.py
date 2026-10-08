@@ -938,7 +938,7 @@ def test_the_node_resident_points_start_at_zero():
     The Program Editor's reserved-word page prints "NODE1 through NODE99".
     The dedicated page in the same book states the range in prose -- from 0
     through 99, twice -- and carries NODE0 in its title; so do that book's
-    glossary, the PPCL Debugger help and Desigo CC. Four to one, and the one
+    glossary, Siemens' offline tooling and Desigo CC. Four to one, and the one
     is contradicted by its own book. Node 0 is a real drop address besides.
     """
     from ppcl import spec

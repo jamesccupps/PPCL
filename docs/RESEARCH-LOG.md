@@ -661,25 +661,27 @@ what `.mcp.json` does.
 > "Honest conclusion: the public PPCL corpus is essentially five programs…
 > There is no large body of PPCL to mine, and there never will be."
 
-True of the *public internet*. Completely false of **this machine**, which was
-never searched. A full sweep of `C:\` found, all local, all first-party:
+True of the *public internet*. Completely false of **this machine**, which
+was never searched. A full local sweep found, all first-party and all held
+under licence:
 
-| What | Where | Size |
-|---|---|---|
-| **Insight 3.15 compiled help** | several copies of the Insight install tree | **30 `.chm` books, ~3,600 pages** |
-| **Siemens' shipped PPCL application library** | `…\insight315_tree\PPCLLIB\` and `…\DMAdv\Product\PPCLLib\` | **84 programs** |
-| **An Insight database backup** | `Downloads\InsightBackup\Insight\` | 5 engineered programs, panel data, BASINFO exports |
-| **The reference site's own PPCL** | a site file share | **22 programs** |
+| What | Size |
+|---|---|
+| **Insight 3.15 compiled help**, several copies of the install tree | **30 books, ~3,600 pages** |
+| **Siemens' shipped PPCL application library**, in two product trees | **84 program files, 42 distinct** |
+| **An Insight database backup** | 5 engineered programs, panel data, database exports |
+| **The reference site's own PPCL** | **22 programs** |
 
-Every claim in this entry traces to one of those, by filename.
+Locations are deliberately not recorded here. Every claim in this entry
+traces to one of those sources; none of their text is reproduced.
 
-`.chm` extraction: `hh.exe -decompile <dir> <file>` silently produces nothing
-when the file carries a `Zone.Identifier` stream. `Unblock-File` first, and copy
-to a short path. That cost an hour; it is written down so it does not again.
+Extracting compiled help silently produces nothing when the file carries a
+download-zone marker. Clear it first, and copy to a short path. That cost an
+hour; it is written down so it does not again.
 
 ### What the Insight help settles
 
-**`Proged.chm` is the complete APOGEE-era PPCL reference** — 736 pages, a page
+**The Program Editor help is the complete APOGEE-era PPCL reference** — 736 pages, a page
 per command, per argument list, per worked example, plus the compiler error
 list and Siemens' own program-development method (decision tables, pseudocode,
 flowcharts, modular programming).
@@ -751,7 +753,7 @@ panel. Siemens ships exactly those three as toggles.
 did not — there was no cross-panel rule at all. `W340` now covers the part of it
 that is decidable from text alone. See the sixth pass.
 
-#### `PPCLDebug.chm` — Siemens' own simulator, and what it refuses to model
+#### Siemens' offline simulation tooling — Siemens' own simulator, and what it refuses to model
 
 Its ignored list is **different from ours** and is authoritative about what a
 simulator honestly cannot do:
@@ -818,10 +820,10 @@ machine.
 
 ### Still to do
 
-1. **Read `Proged.chm` systematically** against `spec.py`, command by command.
+1. **Read the Program Editor help systematically** against `spec.py`, command by command.
    ~3,600 pages are extracted to text in the scratchpad; this entry covers maybe
    a dozen of them. Expect more corrections of this kind.
-2. **`Point.chm` (320 pages)** for the point-type taxonomy, and the bundled-point
+2. **The point help (320 pages)** for the point-type taxonomy, and the bundled-point
    decomposition the debugger describes.
 3. **`OVRD` priority and the BACnet `BN08/10/12/14` mapping** — neither is in
    `spec.py`.
@@ -833,7 +835,7 @@ machine.
 
 ---
 
-## 2026-09-18 (sixth pass) — `Proged.chm` read against `spec.py`
+## 2026-09-18 (sixth pass) — the Program Editor help read against `spec.py`
 
 Systematic comparison, not spot checks. Source is the Insight 3.15 Program
 Editor help unless noted.
@@ -987,10 +989,10 @@ priority with point status. Nothing to add to `spec.py`; the note was wrong.
 
 ### Still to do
 
-1. **Keep reading `Proged.chm`.** Two passes have covered perhaps thirty of 736
+1. **Keep reading the Program Editor help.** Two passes have covered perhaps thirty of 736
    pages and produced a renumbering bug, a false positive, three new rules and
    two closed questions. The rate has not dropped off.
-2. **`Point.chm` (320 pages)** — point-type taxonomy, and the bundled-point
+2. **The point help (320 pages)** — point-type taxonomy, and the bundled-point
    decomposition (`L2SL` is a DO plus a proof) the debugger describes.
 3. The BACnet priority-slot mapping `OPER-BN08 / SMOKE-BN10 / EMER-BN12 /
    PDL-BN14` is still not in `spec.py`.
@@ -1008,7 +1010,7 @@ feature rather than a fact.
 
 ### Correction: passes five and six were not reading Desigo documentation
 
-They were reading **Insight 3.15** help — `Proged.chm` and friends out of the
+They were reading **Insight 3.15** help — the Program Editor help and friends out of the
 Insight install trees. That is the APOGEE-era workstation, not Desigo CC. The
 entries are still sound, because the language they document is the same
 language, but "the Desigo CHM files" was the wrong name for them throughout and
@@ -1024,7 +1026,7 @@ HTML pages, and its manuals as A6V-numbered PDFs.
 
 #### The APOGEE-to-BACnet priority slot map — now recorded
 
-The PPCL Debugger's priority column hinted at this; 125-3020 prints the table:
+Siemens' offline tooling showed the same mapping in its priority column; 125-3020 prints the table:
 
 | APOGEE priority | BACnet slot | BACnet name |
 |---|---|---|
@@ -1196,7 +1198,7 @@ spell it `ATN`. Four document sets now, same split, same direction.
 3. **Per-file firmware**, for a genuinely mixed estate. Not needed at the
    reference site, which turned out to be one generation throughout -- see
    above. Still real for anyone running SCU/MBC alongside PXC.A.
-4. `Point.chm` bundled-point detail: the proof DI is documented as *optional*
+4. The point help bundled-point detail: the proof DI is documented as *optional*
    on every bundled type except `L2SL`, and `LOOAP` mixes pulsed On/Off with a
    latched Auto. Neither is in `spec.py`.
 5. `A6V12954388` — still unread.
@@ -1272,7 +1274,7 @@ something this toolkit touches, but worth knowing it is on.
 1. `A6V10324350` Appendix C, "PPCL (R-code) Error Codes" — runtime errors,
    still untranscribed.
 2. A real `PPCL DISPLAY REPORT` to run `lint --report` against.
-3. `Point.chm` bundled-point detail: the proof DI is optional on every bundled
+3. The point help bundled-point detail: the proof DI is optional on every bundled
    type except `L2SL`, and `LOOAP` mixes pulsed On/Off with a latched Auto.
 4. `A6V12954388` — still unread.
 
@@ -1350,7 +1352,7 @@ would be exactly the speculative tuning the immediate roadmap item warns about.
 ### Still to do
 
 1. **The `E12` rule**, once a point export with slope and intercept exists.
-2. `Point.chm` bundled-point detail: the proof DI is optional on every bundled
+2. The point help bundled-point detail: the proof DI is optional on every bundled
    type except `L2SL`; `LOOAP` mixes pulsed On/Off with a latched Auto.
 3. A real `PPCL DISPLAY REPORT` to run `lint --report` against.
 4. `A6V12954388` -- still unread.
@@ -1373,8 +1375,8 @@ The result is the useful finding:
 
 | Corpus | Pages | Constraint sentences not already reflected |
 |---|---|---|
-| `Proged.chm` (Program Editor) | 736 | **7** |
-| `Point.chm` | 320 | **8** |
+| the Program Editor help (Program Editor) | 736 | **7** |
+| the point help | 320 | **8** |
 
 And of those fifteen, **one** was a PPCL language fact. The rest are workstation
 matters -- alarm printing options, Staefa point editing, supervised-object
@@ -1412,7 +1414,7 @@ out to break with impunity.
 
 ### Bundled points, finished off
 
-From `Point.chm`, and phrased too gently for the scanner to catch:
+From the point help, and phrased too gently for the scanner to catch:
 
 - **The proof DI is optional on every bundled type except `L2SL`.** Every other
   definition says "one **optional** latched digital input point (proof)";
@@ -1430,7 +1432,7 @@ can drive the type.
 
 | Source | Status |
 |---|---|
-| `Proged.chm`, `Point.chm` | **exhausted** |
+| the Program Editor help, the point help | **exhausted** |
 | Desigo CC Engineering help | mined; its PPCL section is a glossary and is thinner than Insight's |
 | Desigo CC Operating help | **strict subset of Engineering** -- nothing to do |
 | A6V10374898 (PXC.A PPCL) | mined across passes 1-4 |
@@ -2023,7 +2025,7 @@ It is not an edition difference. It is **internal to one book**:
 | Program Editor reserved-word page | `NODE1 through NODE99` |
 | Program Editor **dedicated node-points page** | `NODE0 through NODE99`, in the title, and in prose twice — "range from 0 through 99", "between 0 and 99" |
 | Program Editor glossary | `NODE0 through NODE99` |
-| PPCL Debugger help | `NODE0 through NODE99` |
+| Offline simulation tooling | `NODE0 through NODE99` |
 | Desigo CC engineering help | `NODE0 through NODE99` |
 
 Four to one, and the one is contradicted by a dedicated page in its own book.
@@ -2574,33 +2576,33 @@ the sources table stands and needed no more time than one navigation.
 
 ### A coverage map, and a book that had never been opened
 
-Thirty Insight books were extracted in pass 6. `Proged` and `Point` were mined
+Thirty Insight books were extracted in pass 6. The Program Editor help and the point help were mined
 to exhaustion; the rest were searched by keyword and never read. That is how
-`LFMSSL` sat undiscovered in `Ptdetail` for fourteen passes.
+`LFMSSL` sat undiscovered in the point-detail help for fourteen passes.
 
 So: how many pages in each book mention PPCL at all?
 
 | Book | pages | mention PPCL |
 |---|---|---|
-| `Proged` | 736 | 223 |
-| `Point` | 320 | 15 |
-| `Convert` | 149 | 14 |
-| `Syspro` | 498 | 10 |
-| `Commandr` | 87 | 9 |
-| `Tod` | 162 | 8 |
-| `Ptdetail` | 180 | 8 |
-| `Globcmd` | 51 | 8 |
-| `PPCLDebug` | 7 | 7 |
-| `Eqedit` | 102 | 5 |
-| `MMIXfer` | 42 | 4 |
+| the Program Editor help | 736 | 223 |
+| the point help | 320 | 15 |
+| the generation-translation help | 149 | 14 |
+| the system-profile help | 498 | 10 |
+| the commander help | 87 | 9 |
+| the time-of-day help | 162 | 8 |
+| the point-detail help | 180 | 8 |
+| the global-command help | 51 | 8 |
+| the offline simulator help | 7 | 7 |
+| the equation-editor help | 102 | 5 |
+| the MMI-port help | 42 | 4 |
 
-`MMIXfer` was opened first because it bears on the one decision still
-outstanding: `W104` concerns the 66-character MMI line limit, and `MMIXfer` is
+The MMI-port help was opened first because it bears on the one decision still
+outstanding: `W104` concerns the 66-character MMI line limit, and that book is
 the book about the MMI port.
 
 ### What it gave: the state column, from a third direction
 
-`MMIXfer`'s **UC PPCL Window** page documents the same status field
+The MMI-port help's **UC PPCL Window** page documents the same status field
 `report.py` reads — and documents it differently again:
 
 > "The Status Field — displays any combination of **five letters** and/or
@@ -2610,7 +2612,7 @@ the book about the MMI port.
 > failed."
 
 It says five and lists four. The fifth is the loop flag, which this book omits,
-`Proged` carries, and the controller's own `PPCL_data` record confirms as
+The Program Editor help carries, and the controller's own `PPCL_data` record confirms as
 `line_looped`. Three sources, one of them internally inconsistent, and they
 agree on the model.
 
@@ -2638,12 +2640,12 @@ wrong: the entire reason to read a report is to learn which lines the panel is
 
 ### Still to do
 
-1. **Decide `W104`.** Still the user's call. `MMIXfer` says what the MMI port
+1. **Decide `W104`.** Still the user's call. The MMI-port help says what the MMI port
    is *for* but not how often anyone uses it, so it does not settle the
    question.
-2. Read the remaining unopened books, in the order above. `Globcmd`
-   (cross-panel commanding, which `W340` is about), `Convert` (generation
-   translation) and `Tod` (schedules) are the next three worth opening.
+2. Read the remaining unopened books, in the order above. The global-command help
+   (cross-panel commanding, which `W340` is about), the generation-translation help (generation
+   translation) and the time-of-day help (schedules) are the next three worth opening.
 
 ---
 
@@ -2651,7 +2653,7 @@ wrong: the entire reason to read a report is to learn which lines the panel is
 
 Three of the books from the coverage map, in the order the map suggested.
 
-### `Globcmd` — the priority model, confirmed from the commanding side
+### the global-command help — the priority model, confirmed from the commanding side
 
 Fifty-one pages about the Global Commander, with a page per priority. It
 states the arbitration rule in one sentence:
@@ -2681,7 +2683,7 @@ Two things it adds:
   exist; and command priority does not affect Fire points at all in a
   fire-alarm network integrated through the Life Safety Option.
 
-### `Convert` — one sentence, and it found a defect here
+### the generation-translation help — one sentence, and it found a defect here
 
 The database-conversion book has a **PPCL Conversion Guidelines** page, and one
 sentence on it is worth the whole pass:
@@ -2720,20 +2722,20 @@ Result: `OIP(PT003,"P/T/D/H///PT001.PT002.AHU01.SFAN/1/")` beside
 `ON("PT001.PT002.AHU01.SFAN")` — same point, same token, menu structure
 intact, four mapping entries instead of six.
 
-`Convert` also confirms `LCTLR` is real and application-numbered, defaulting to
+The generation-translation help also confirms `LCTLR` is real and application-numbered, defaulting to
 application 65535 when no descriptor exists; and that conversion preserves
 enabled/disabled attributes and line numbers unchanged.
 
 ### Still to do
 
 1. **Decide `W104`.** Still the user's call.
-2. `Tod`, `Syspro`, `Commandr` and `Eqedit` remain unopened.
+2. The time-of-day help, the system-profile help, the commander help and the equation-editor help remain unopened.
 
 ---
 
 ## 2026-09-18 (twenty-fourth pass) — two mappings, and a rule that was wrong
 
-`Syspro`, `Commandr` and `Tod`. Each corrected something.
+The system-profile help, the commander help and the time-of-day help. Each corrected something.
 
 ### The BACnet priority mapping is two mappings, and neither is fixed
 
@@ -2741,7 +2743,7 @@ Pass 23 put the APOGEE-to-BACnet slot map into `PPCL-REFERENCE` §2 as a table.
 That table was incomplete in one way and wrong in another, and both show up
 within an hour of opening the right books.
 
-**It is a configurable default, not a mapping.** `Syspro`'s *BACnet Command
+**It is a configurable default, not a mapping.** the system-profile help's *BACnet Command
 Priority Array* dialog holds **six** defaults — Operator, Smoke, Emergency,
 **Scheduler**, PDL and **PPCL Programs** — as global data "replicated
 automatically to all field panels on the BLN", and states outright: *"unless
@@ -2757,7 +2759,7 @@ four. Both are right. The four are the PPCL `@` indicators; the six are
 priority *sources* with configurable BACnet slots, and `Scheduler` and
 `PPCL Programs` are sources that have no `@` spelling.
 
-**And there is a second mapping running the other way.** `Commandr`'s
+**And there is a second mapping running the other way.** the commander help's
 *Commanding APOGEE Points from a BACnet Workstation* gives the inbound
 direction, and it is banded rather than one-to-one:
 
@@ -2782,7 +2784,7 @@ that row, which conflated two different things.
 
 ### `W337` was wrong, and the corpus had been telling us
 
-`Tod`'s *How Does Time of Day Work* explains the interface this project had
+The time-of-day help's *How Does Time of Day Work* explains the interface this project had
 only half of:
 
 > "Time points are linked to virtual Analog Output (LAO) points which
@@ -2811,7 +2813,7 @@ zone, look at its START and STOP time points.
 reader to rebuild the same rule. Corrected, with `ost`/`osp` ↔ `SOCC`/`SVAC`
 recorded alongside.
 
-### Smaller things from `Tod`
+### Smaller things from the time-of-day help
 
 - The **recommand delay is 0–900 seconds**, set per point in the Time of Day
   zone rather than in PPCL. The `recomd` flag in `TOD`/`TODSET` turns the
@@ -2825,13 +2827,13 @@ recorded alongside.
 ### Still to do
 
 1. **Decide `W104`.** Still the user's call.
-2. `Eqedit` is the last book on the list with PPCL content.
+2. The equation-editor help is the last book on the list with PPCL content.
 
 ---
 
 ## 2026-09-18 (twenty-fifth pass) — Tier 3.6, answered with a table
 
-`Eqedit` closes the book sweep: it confirms the zone model already recorded
+The equation-editor help closes the book sweep: it confirms the zone model already recorded
 from the wire reference and adds one piece of lineage — PPCL is "the
 programming language used to write control programs for the **System 600**",
 the pre-APOGEE name. Nothing to change.
