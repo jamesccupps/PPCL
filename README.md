@@ -14,7 +14,14 @@ program text ever leaves the machine.
 
 ## Running it
 
-Nothing to install. Clone it, stand in the directory, and run:
+Nothing to install.
+
+On Windows, **double-click `ppcl.bat`**. It finds a suitable Python, starts the
+workbench and opens it in your browser. The same file takes a subcommand if you
+would rather use the command line — `ppcl.bat lint programs\` — and passes the
+exit code through, so it drops into a build script unchanged.
+
+Otherwise, stand in the directory and run:
 
 ```bash
 python -m ppcl serve

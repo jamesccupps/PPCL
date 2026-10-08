@@ -84,3 +84,30 @@ def test_the_editor_document_names_the_firmware_only_tokens_it_warns_about():
     # And it must not have picked up a name that is a real command.
     for name in spec.FIRMWARE_STATEMENT_TOKENS:
         assert name not in spec.ALL, name
+
+
+def test_every_version_string_agrees():
+    """The version lived in three files and all three went stale together.
+
+    The package reported 0.2.0 while the published tag said v1.0.0, so a
+    download of the release got a tool that misreported itself -- and the
+    only way to notice was to compare a git tag against a Python attribute,
+    which nothing did. pyproject now reads the attribute. The plugin
+    manifest is static JSON and cannot, so it is checked here instead.
+    """
+    import json
+
+    import ppcl
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+
+    manifest = json.loads(
+        io.open(root / ".claude-plugin" / "plugin.json", encoding="utf-8").read()
+    )
+    assert manifest["version"] == ppcl.__version__
+
+    # pyproject must not carry a literal version at all -- it declares the
+    # attribute as dynamic, which is what keeps it from going stale.
+    pyproject = io.open(root / "pyproject.toml", encoding="utf-8").read()
+    assert 'dynamic = ["version"]' in pyproject
+    assert 'attr = "ppcl.__version__"' in pyproject

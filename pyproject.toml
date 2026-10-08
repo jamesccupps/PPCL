@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ppcl-workbench"
-version = "0.2.0"
+dynamic = ["version"]
 description = "IDE, linter, simulator and debugger for Siemens APOGEE PPCL"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -40,6 +40,12 @@ dev = ["pytest>=7"]
 [project.scripts]
 ppcl = "ppcl.cli:main"
 ppcl-mcp = "ppcl.mcp_server:serve"
+
+[tool.setuptools.dynamic]
+# One source of truth. The version lived in three files and all three went
+# stale together: the package said 0.2.0 while the published tag said v1.0.0,
+# so anyone who downloaded the release got a tool that misreported itself.
+version = { attr = "ppcl.__version__" }
 
 [tool.setuptools.packages.find]
 include = ["ppcl*"]
