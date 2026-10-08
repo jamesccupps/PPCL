@@ -4,9 +4,9 @@
 otherwise be lost: what exists, what is verified versus assumed, which
 decisions were deliberate, and what to build next.
 
-Last updated: 2026-09-21. Thirty-three research passes; see
-docs/RESEARCH-LOG.md. The last ten audited this project's own artifacts
-rather than reading another source, and found more.
+Last updated: 2026-10-08. Thirty-five research passes; see
+docs/RESEARCH-LOG.md. The first twenty were sources; the last ten audited this
+project's own artifacts instead, and found more.
 
 ---
 
@@ -486,6 +486,78 @@ panel error codes (compiler `R` and runtime `E`, and the distinction between
 them), the PDL command order and panel roles, bundled-point proof optionality,
 slope/intercept on points, and `LSTSQR` -- a command that appears in no manual
 anywhere, recovered from Siemens' own shipped library.
+
+### Done since, passes 16-35 (2026-09-18 to 2026-10-08)
+
+**The research ran out, and auditing our own artifacts did not.** Roughly the
+first twenty passes were sources: manuals, the thirty Insight CHM books, the
+wire cross-check. The last ten asked a different question -- *what does this
+project assert that it does not verify?* -- and found more than the reading
+did.
+
+**Research, concluded:**
+
+- **Tier 3.6 answered with a table.** Of the 66 commands, 57 are in 125-1896,
+  the Insight help and Desigo's Command Assist. **Nothing was dropped** between
+  generations. No single source is complete: `DISCOV`/`ENCOV` are in the manual
+  and absent from the 736-page help; `ADAPTM`/`ADAPTS`/`LSQ2`/`LSQDAT` are in
+  the help and postdate the manual.
+- **It is "PPCL", not "APOGEE PPCL".** Siemens' 2025 PXC.A manual cites the
+  2000 manual for the language; the 2026 modernization guide moves PPCL *onto*
+  current hardware. Corrected everywhere, including the repo description.
+- **The Siemens library is 42 programs, not 84.** It ships in two product
+  trees and the collection took both. Every absolute figure from it was
+  doubled; every ratio was unaffected.
+- **Siemens' 115 worked examples parsed**: 424 of 425 lines, the one failure a
+  missing comma in their own help. They cover the long tail production code
+  never writes, taking command coverage from 31 to **57 of 66**.
+- **Five statement tokens exist that nobody documents** -- `ONERR`, `ENTHAL`,
+  `MMI`, `RELTCU`, `DIM`, from the controller's own enum. Recorded in
+  `spec.FIRMWARE_STATEMENT_TOKENS`, deliberately *not* in `spec.ALL`.
+
+**Defects found by auditing this project, not by reading:**
+
+- `redact` folded an `OIP` keystroke sequence through the point-name mapper,
+  and its bare-name pass walked back into its own output. Invisible because no
+  fixture contained a `/`.
+- `clone_lines` returned a copy that **still commanded the original
+  equipment**, and crashed outright on a PXC.A disabled line.
+- `W337` asserted that an unread `cst`/`csp` meant the SSTO did nothing. The
+  Time of Day *application* reads them; a correctly wired SSTO has no
+  in-program reader. It fired twice on the reference site's own programs.
+- Seven commands were **neither simulated nor declared unsimulated** -- they
+  fell through to a silent `return None`, leaving their output points stale
+  with nothing said.
+- Renumbering joins `&` continuations, which can turn a compliant program into
+  one `W104` fires on. Documented and warned rather than fixed: the construct
+  appears zero times in 11,873 lines.
+- Four rules asserted manual facts and cited nothing. The 38 `Chapter 4`
+  citations verify 38 of 38 against the manual's own table of contents.
+- Two counts in **runtime text** had gone stale, including the MCP tool
+  description every agent reads. Both now computed.
+- The same corrected sentence was left standing in three places, and the two
+  open-question lists had drifted apart four ways.
+
+**`W104` closed, and it was the wrong question.** It is two findings: a
+statement over the MMI limit is a `WARNING` per line, comments are one
+aggregated `STYLE` finding. The statement half is 61-76% of all warnings
+because 20-31% of real statement lines exceed 66 characters -- the median is
+35-41, so ordinary code is fine and the long conditionals are not. Whether that
+matters is a property of the **site**, and `settings.wrap_long_lines` had been
+declared and documented for it and read by nothing. Wired up:
+`lint(options=...)` and `ppcl lint --workstation-only`, default unchanged. On
+the reference site's Desigo-era programs it takes **147 warnings to 51**.
+
+**Rules added since pass 15:** `W121` (firmware-only statement), `E122` (OIP
+sequence over 60 characters -- and the 80 this project had was its own error),
+`E123` (`UNKNOWN (...)`), `E316` (command on a point type it cannot control --
+`spec.Command.point_types` had never been read by any rule), `W341` (held at
+priority every pass), `W342` (captured SSTO adjustment), `W343` (unguarded
+`SET` on PXC.A), `W344` (line-state commands cost resources on PXC.A), `R705`
+(report row with neither `E` nor `D`).
+
+**Point types `LFMSSL`/`LFMSSP`** added -- three-speed, named on every speed
+command page in the Insight help and absent from Table 3-2.
 
 ### Tier 3.5 — the reference deliverable (the user has asked for this)
 
