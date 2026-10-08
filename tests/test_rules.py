@@ -1236,3 +1236,31 @@ def test_an_executable_line_still_counts_its_line_number():
     limit as characters per line *including* the line number."""
     body = "ON(" + ",".join('"LONGPOINT%d"' % i for i in range(1, 8)) + ")"
     assert "W104" in codes("00010\t" + body + "\n00020\tGOTO 10\n")
+
+
+def test_the_same_DEFINE_abbreviation_twice_is_an_error():
+    """A hard compiler refusal that linted clean until 2026-10-08.
+
+    The dangerous half is the silent one: the second DEFINE wins, so uses of
+    the abbreviation written *above* it resolve to the later point, and the
+    program reads correctly line by line.
+    """
+    text = ("10\tDEFINE(AA,ROOM1.TEMP)\n"
+            "20\tDEFINE(AA,ROOM2.TEMP)\n"
+            "30\tX = AA\n40\tGOTO 10\n")
+    prog = parser.parse(text, name="t")
+    found = [d for d in linter.lint(prog) if d.code == "E124"]
+    assert len(found) == 1
+    assert found[0].severity is linter.Severity.ERROR
+    assert "line 10" in found[0].message
+    # It names the shadowed target, because that is the part a reader misses.
+    assert "ROOM1.TEMP" in found[0].detail
+    assert "ROOM2.TEMP" in found[0].detail
+
+
+def test_two_different_DEFINE_abbreviations_stay_quiet():
+    """The ordinary case. A program may DEFINE as many names as it likes."""
+    text = ("10\tDEFINE(AA,ROOM1.TEMP)\n"
+            "20\tDEFINE(BB,ROOM2.TEMP)\n"
+            "30\tDEFINE(CC,ROOM3.TEMP)\n40\tGOTO 10\n")
+    assert "E124" not in codes(text)

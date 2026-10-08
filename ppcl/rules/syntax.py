@@ -678,6 +678,56 @@ def undefined_macro(ctx):
                 )
 
 
+@rule("E124", "Two DEFINEs for the same abbreviation", Severity.ERROR)
+def duplicate_define(ctx):
+    """The compiler refuses this, and nothing here used to say so.
+
+    An abbreviation defined twice is a hard compiler refusal -- it has its own
+    code in the compiler's diagnostic set, alongside the unresolved point and
+    the bad point type. Until now two DEFINEs of the same name linted clean,
+    which meant the worst case went unreported: the second quietly wins, every
+    use of the abbreviation above it reads as the later point, and the program
+    looks right.
+    """
+    first = {}
+    for ln in ctx.program.lines:
+        for stmt in substatements(ln.stmt):
+            if not isinstance(stmt, CommandCall) or stmt.name != "DEFINE":
+                continue
+            if not stmt.args or not isinstance(stmt.args[0], Ref):
+                continue
+            name = stmt.args[0].name.upper()
+            target = (stmt.args[1].name
+                      if len(stmt.args) > 1 and isinstance(stmt.args[1], Ref)
+                      else None)
+            if name not in first:
+                first[name] = (ln.number, target)
+                continue
+            prev_line, prev_target = first[name]
+            if target is not None and prev_target is not None                     and target.upper() != prev_target.upper():
+                detail = ("Line %s defines it as %s. The later DEFINE wins, so "
+                          "every use of %s in this program resolves to %s -- "
+                          "including the ones written above line %s, which is "
+                          "where this is most likely to be read wrongly."
+                          % (prev_line, prev_target, name, target, ln.number))
+            else:
+                detail = ("Line %s already defines it, to the same thing. "
+                          "Harmless in meaning and still refused." % prev_line)
+            yield _d(
+                "E124",
+                Severity.ERROR,
+                "%s is defined twice; the first DEFINE is at line %s"
+                % (name, prev_line),
+                ln.number,
+                source_line=ln.source_line,
+                detail=detail,
+                manual="Chapter 4, DEFINE; the compiler's own duplicate-"
+                       "definition refusal",
+                suggestion="Delete one, or give the second a different "
+                           "abbreviation.",
+            )
+
+
 def _refs_in(stmt):
     """Yield the direct Ref nodes of a statement (not nested statements)."""
     from ..analyzer import expr_refs
