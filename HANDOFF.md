@@ -511,9 +511,12 @@ did.
 - **Siemens' 115 worked examples parsed**: 424 of 425 lines, the one failure a
   missing comma in their own help. They cover the long tail production code
   never writes, taking command coverage from 31 to **57 of 66**.
-- **Five statement tokens exist that nobody documents** -- `ONERR`, `ENTHAL`,
-  `MMI`, `RELTCU`, `DIM`, from the controller's own enum. Recorded in
-  `spec.FIRMWARE_STATEMENT_TOKENS`, deliberately *not* in `spec.ALL`.
+- **Four statement tokens exist that nobody documents** -- `ONERR`, `ENTHAL`,
+  `RELTCU`, `DIM`, from the controller's own enum and confirmed at the same
+  indices by the shipped compiler's statement table. Recorded in
+  `spec.FIRMWARE_STATEMENT_TOKENS`, deliberately *not* in `spec.ALL`. It was
+  five: slot 49 is `OIP` under the firmware's name for it, not a separate
+  `MMI`.
 
 **Defects found by auditing this project, not by reading:**
 

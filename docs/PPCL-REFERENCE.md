@@ -637,7 +637,18 @@ One wrinkle worth knowing if you read the same pages: the Commanding help's
 has `DO(OFF/FAST)`, `DO(OFF/SLOW)`, `DI(PROOF)`, and that is what this toolkit
 carries.
 
-**Five statements exist that nobody can document — 2026-09-18.** The
+**Four statements exist that nobody can document — 2026-09-18, revised
+2026-10-08.** It was five. The shipped compiler's own statement table, read as
+a 1-based index, agrees with the enum at four points — `ONERR` 21, `ENTHAL`
+48, `RELTCU` 60, `DIM` 68 — and puts **`OIP`** in slot 49, where the enum has
+`WHOPMMI`. Those are one statement under two names: OIP is the Operator
+Interface Port, MMI is the Man-Machine Interface, and they are the same port.
+The enum needs reducing to source spellings in any case (`WHOPRELEASE` →
+`RELEAS`), and this is the same reduction. It also closes the oddity noted
+below, that `OIP` appeared to be missing from an enum that should have carried
+it; it was there under the firmware's own name. `MMI` is not a statement.
+
+The
 controller's own `PPCL_statement_type` enum has 71 members. Sixty map onto
 commands in `spec.ALL`; two are explicitly unnamed (`WHOPUNKNOWN1` and
 `WHOPUNKNOWN2`, values 61 and 62 — the vendor's table admitting its own
@@ -648,7 +659,6 @@ declarations. **Five are left over:**
 |---|---|---|
 | `ONERR` | 21 | an error handler — nothing says what it traps or where control goes |
 | `ENTHAL` | 48 | enthalpy, though the manuals build economizer logic out of ordinary arithmetic and never with a statement of this name |
-| `MMI` | 49 | the man-machine interface port, which the manuals discuss constantly but never as a statement |
 | `RELTCU` | 60 | "release TCU" — the Terminal Control Unit generation that predates the documentation on hand |
 | `DIM` | 68 | a dimension or array declaration, which would be unlike anything else in the language |
 
@@ -722,7 +732,7 @@ Following the discipline of tagging each claim by how it was established:
 | PXC.A statement availability | **Manual-verified** — A6V10374898, "Obsolete PPCL Statements Removed from the Language". Ten statements, each with Siemens' stated reason |
 | Panel error codes | **Manual-verified** — A6V10324350 Appendix C. R-codes are compiler refusals, E-codes are runtime failures on a line that loaded |
 | Per-line state (`report.py`) | **Confirmed from the panel's own record.** The five flags the `PPCL DISPLAY REPORT` state column carries — enabled, traced, unresolved, failed, looped — are exactly the five booleans of the controller's `PPCL_data` structure as read off the wire by an independent project. The model is complete, not a guess from a column of letters |
-| Five statement tokens the firmware names | **Known to exist, unknown in every other way.** `ONERR`, `ENTHAL`, `MMI`, `RELTCU`, `DIM` are members 21, 48, 49, 60 and 68 of the controller's `PPCL_statement_type` enum. No manual on hand documents any of them and no program in any corpus uses one. They are deliberately **not** in `spec.ALL`; `W121` reports a line using one as unchecked rather than wrong. See §7 |
+| Four statement tokens the firmware names | **Known to exist, unknown in every other way.** `ONERR`, `ENTHAL`, `RELTCU` and `DIM` are members 21, 48, 60 and 68 of the controller's `PPCL_statement_type` enum, and all four are confirmed at the same indices by the shipped compiler's own statement table. No manual on hand documents any of them and no program in any corpus uses one. They are deliberately **not** in `spec.ALL`; `W121` reports a line using one as unchecked rather than wrong. There were five until 2026-10-08: slot 49 is `OIP`, not a separate `MMI`. See §7 |
 | `LSTSQR` | **Inferred from code, not documented anywhere.** Recovered from Siemens' shipped chiller programs; argument order deduced from what those programs compute from the results. Argument count is deliberately NOT enforced |
 
 **Program planning method.** Siemens' recommended process, which is also a

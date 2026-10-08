@@ -921,15 +921,22 @@ def test_firmware_only_tokens_are_not_offered_as_commands():
     """
     from ppcl import spec
 
-    assert len(spec.FIRMWARE_STATEMENT_TOKENS) == 5
+    assert len(spec.FIRMWARE_STATEMENT_TOKENS) == 4
     for name, (value, note) in spec.FIRMWARE_STATEMENT_TOKENS.items():
         assert name not in spec.ALL, name
         assert name not in spec.FUNCTIONS, name
         assert 1 <= value <= 71, name
         assert note
-    # And they are still reserved: a point may not be named one.
-    for name in spec.FIRMWARE_STATEMENT_TOKENS:
+        # Every one has to be writable at an MMI port, so six characters.
         assert len(name) <= 6, name
+
+    # MMI is not one of them. The enum's WHOPMMI and the source keyword OIP
+    # are the same statement -- the Operator Interface Port and the
+    # Man-Machine Interface are the same port -- so slot 49 belongs to OIP,
+    # which is documented and carries a real signature.
+    assert "MMI" not in spec.FIRMWARE_STATEMENT_TOKENS
+    assert "OIP" in spec.ALL
+    assert spec.ALL["OIP"].max_args() == 2
 
 
 def test_the_node_resident_points_start_at_zero():

@@ -2253,7 +2253,8 @@ compiled statement. Diffed mechanically against `spec.ALL`:
 - 2 are explicitly unnamed — `WHOPUNKNOWN1` and `WHOPUNKNOWN2`, values 61 and
   62. The vendor's own table records that it is incomplete;
 - **5 are left over: `ONERR` (21), `ENTHAL` (48), `MMI` (49), `RELTCU` (60),
-  `DIM` (68).**
+  `DIM` (68).** *Revised 2026-10-08 — see pass 36: slot 49 is `OIP` under the
+  firmware's own name, so there are four, not five.*
 
 Every manual on hand was then searched for those five — the Insight Program
 Editor help, the Desigo CC engineering and operating help, 125-1896,
@@ -2271,6 +2272,13 @@ corpus and is missing from the same 71-entry table. **Absence from a vendor
 enum is evidence of nothing.** It is the second time that has been shown here,
 and it cuts both ways: the five leftovers are real because the enum names them,
 and `OIP` is real although the enum does not.
+
+> *Revised 2026-10-08.* The second half of that is wrong, and the mistake was
+> to treat a 71-entry list as having a hole in it. The enum does name `OIP` —
+> as `WHOPMMI`, at 49, because the firmware calls that port the Man-Machine
+> Interface and the source keyword calls it the Operator Interface Port. The
+> conclusion "absence from a vendor enum is evidence of nothing" survives, but
+> this was not an instance of it. See pass 36.
 
 ### What the toolkit does with them
 

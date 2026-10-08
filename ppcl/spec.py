@@ -2227,20 +2227,50 @@ _add(
 #: Keeping them out of ``ALL`` is deliberate. A name the toolkit cannot
 #: validate must not be offered by completion, emitted by the generator, or
 #: listed as a command the engineer can use.
+#: Statement tokens the controller's own ``PPCL_statement_type`` enum names
+#: and no manual documents. Values are that enum's.
+#:
+#: There were five. The shipped compiler's own statement table settles the
+#: fifth and confirms the rest: read as a 1-based index it puts ONERR at 21,
+#: ENTHAL at 48, RELTCU at 60 and DIM at 68 -- four exact agreements with an
+#: enum recovered independently, off the wire, by another project.
+#:
+#: Slot 49 in that table is **OIP**, where the enum has ``WHOPMMI``. They are
+#: one statement under two names: OIP is the Operator Interface Port and MMI
+#: is the Man-Machine Interface, which are the same port, and OIP is what the
+#: manuals document and what an engineer types. The enum needs reducing to
+#: source spellings anyway -- ``WHOPDBSWITCH`` to DBSWIT, ``WHOPRELEASE`` to
+#: RELEAS -- and this is the same reduction, just not a guessable one. It also
+#: clears up an anomaly recorded here earlier: OIP looked absent from a
+#: 71-member enum that ought to have carried it. It was there all along.
+#:
+#: So MMI is not a statement and is no longer listed. What would overturn
+#: this: a compiler table whose index base is not 1, which the four
+#: agreements make very unlikely, or a manual showing MMI and OIP doing
+#: different things.
+#:
+#: The same table gives an operand count for each of the four -- ONERR 1,
+#: ENTHAL 5, RELTCU 1, DIM 1 -- recorded in the notes below. A count is not
+#: an argument list, so none of them is promoted to ``spec.ALL`` and ``W121``
+#: still reports a line using one as unchecked.
 FIRMWARE_STATEMENT_TOKENS = {
     "ONERR": (21, "Suggests an error handler, by name alone. Nothing "
-                  "establishes what it traps or where control goes."),
+                  "establishes what it traps or where control goes. The "
+                  "compiler's table gives it one operand."),
     "ENTHAL": (48, "Suggests enthalpy, and the manuals do document enthalpy "
                    "economizer logic -- but they build it out of ordinary "
-                   "arithmetic, never with a statement of this name."),
-    "MMI": (49, "The manuals use MMI for the man-machine interface port "
-                "throughout, never as a statement. A statement token of the "
-                "same name is presumably for controlling that port."),
+                   "arithmetic, never with a statement of this name. The "
+                   "compiler's table gives it five operands, the last of "
+                   "which repeats."),
     "RELTCU": (60, "Reads as 'release TCU', a Terminal Control Unit -- the "
                    "FLN device generation that predates the documentation on "
-                   "hand."),
+                   "hand. The compiler's table shapes it like RELEAS: one "
+                   "operand, repeating, so a list of points."),
     "DIM": (68, "Reads as a dimension or array declaration, which would be "
-                "unlike anything else in the language. Nothing confirms it."),
+                "unlike anything else in the language. Nothing confirms it. "
+                "The compiler's table gives it one operand and gates it "
+                "behind the highest revision of any statement in the "
+                "table, so it is a late addition."),
 }
 
 
