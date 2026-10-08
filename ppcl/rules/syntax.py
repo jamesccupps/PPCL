@@ -21,7 +21,7 @@ from ..ast_nodes import (
     Unparsed,
 )
 from ..diagnostics import Diagnostic, Severity
-from ..linter import rule
+from ..linter import placeholder_key, rule
 
 _SIMPLE_NAME = re.compile(r"^[A-Z0-9]+$")
 
@@ -194,6 +194,8 @@ def unquoted_long_name(ctx):
                     continue
                 if upper in ctx.analysis.parameters:
                     continue
+                if placeholder_key(upper) in ctx.library_placeholders():
+                    continue    # W122 reports the template, once
                 bad_chars = not _SIMPLE_NAME.match(upper)
                 too_long = len(upper) > spec.UNQUOTED_NAME_MAX
                 if not (bad_chars or too_long):
@@ -676,6 +678,72 @@ def undefined_macro(ctx):
                     "lives in another program in this panel, this is fine.",
                     manual="Chapter 4, DEFINE",
                 )
+
+
+@rule("W122", "Library template with unsubstituted placeholders",
+      Severity.WARNING)
+def unsubstituted_library_placeholders(ctx):
+    """Siemens ships its application library as templates, not as programs.
+
+    A block of comments near the top declares every editable name between
+    backslashes -- a description, the token, a close -- and the engineer
+    substitutes them through the editor's replace-editable-variables command
+    before the program is loaded. Some prompts read "(SUBSTITUTE NUMBER)", so
+    the token stands in for a numeric literal rather than a point.
+
+    Loading one unsubstituted gives a program full of names that resolve to
+    nothing. The reason this needs its own rule is that an unsubstituted token
+    looks exactly like an ordinary point name: most are six characters or
+    fewer and lint perfectly clean. The few that are longer were reported as
+    over-length point names, which is a true statement about the text and
+    completely the wrong thing to tell somebody.
+
+    One finding per program, not one per placeholder -- there can be hundreds,
+    and they are all the same fact.
+    """
+    declared = ctx.library_placeholders()
+    if not declared:
+        return
+    # Scanned as text rather than walked as an AST, the way W116 scans for
+    # %macro% references. A placeholder reaches the program in three shapes --
+    # bare, quoted, and behind a DEFINE prefix -- and the prefixed form parses
+    # to a different node type depending on whether it is quoted. Matching the
+    # token with word boundaries catches all of them and cannot miss a fourth.
+    used = {}
+    for ln in ctx.program.lines:
+        if ln.is_comment or not ln.body:
+            continue
+        for token in declared:
+            if token in used:
+                continue
+            if re.search(r"\b" + re.escape(token) + r"\b", ln.body.upper()):
+                used[token] = ln.number
+    if not used:
+        return
+    names = sorted(used)
+    shown = ", ".join(names[:8])
+    if len(names) > 8:
+        shown += " and %d more" % (len(names) - 8)
+    yield _d(
+        "W122",
+        Severity.WARNING,
+        "this looks like a library template: %d name-exchange placeholder%s "
+        "%s not been substituted"
+        % (len(names), "" if len(names) == 1 else "s",
+           "has" if len(names) == 1 else "have"),
+        None,
+        detail="Still carrying: %s. Each is declared in a prompt comment "
+               "between backslashes and is meant to be replaced with the "
+               "point name -- or, where the prompt says SUBSTITUTE NUMBER, "
+               "the value -- used at this site. Loaded as it stands, every "
+               "one of them resolves to nothing. Most are short enough to "
+               "look like ordinary point names, which is why this is worth "
+               "saying once rather than leaving to the name rules."
+               % shown,
+        manual="Siemens application library, name-exchange prompt convention",
+        suggestion="Substitute them in the editor before loading, or treat "
+                   "this file as a template and not as a program.",
+    )
 
 
 @rule("E124", "Two DEFINEs for the same abbreviation", Severity.ERROR)

@@ -1264,3 +1264,118 @@ def test_two_different_DEFINE_abbreviations_stay_quiet():
             "20\tDEFINE(BB,ROOM2.TEMP)\n"
             "30\tDEFINE(CC,ROOM3.TEMP)\n40\tGOTO 10\n")
     assert "E124" not in codes(text)
+
+
+# --- W122: library name-exchange placeholders -------------------------------
+#
+# Siemens ships its application library as templates. Each editable name is
+# declared in a comment between backslashes and substituted before loading.
+# Backslashes and newlines are built from chr() rather than written as escapes,
+# because the format is backslash-delimited and escaping it twice is unreadable.
+
+_BS = chr(92)
+_NL = chr(10)
+
+
+def _prompt(description, token):
+    """One name-exchange prompt comment, as the library writes them."""
+    return _BS + description + "  " + _BS + token + _BS
+
+
+def test_a_library_template_reports_its_unsubstituted_placeholders():
+    """One finding for the file, not one per placeholder.
+
+    A template can declare hundreds. They are all the same fact, and the fact
+    is about the file: it is not a program yet.
+    """
+    text = _NL.join([
+        "100 C " + _prompt("DRY BULB TEMPERATURE...[LAI,DBT]", "DBT"),
+        "110 C " + _prompt("PERCENT RELATIVE HUMIDITY...[LAI,HUM]", "HUM"),
+        '120 IF(DBT .GT. 50.0) THEN ON("FAN")',
+        "130 CALC = HUM * 2.0",
+        "140 GOTO 100",
+        "",
+    ])
+    prog = parser.parse(text, name="t")
+    found = [d for d in linter.lint(prog) if d.code == "W122"]
+    assert len(found) == 1
+    assert "2 name-exchange placeholders" in found[0].message
+    assert "DBT" in found[0].detail and "HUM" in found[0].detail
+
+
+def test_a_placeholder_behind_a_DEFINE_prefix_is_still_found():
+    """The library writes the prefix separately and declares only the suffix.
+
+    A DEFINE supplies the site string and the program then references the
+    placeholder behind it. Unquoted that parses to a macro node and quoted to
+    an ordinary reference, which is why the scan is on text, not on the tree.
+    """
+    text = _NL.join([
+        "100 C " + _prompt("DRY BULB TEMPERATURE...[LAI,DBT]", "DBT"),
+        '110 DEFINE(P,"SITE.")',
+        '120 IF(%P%DBT .GT. 50.0) THEN ON("FAN")',
+        "130 GOTO 100",
+        "",
+    ])
+    prog = parser.parse(text, name="t")
+    found = [d for d in linter.lint(prog) if d.code == "W122"]
+    assert len(found) == 1
+    assert "1 name-exchange placeholder has" in found[0].message
+
+
+def test_the_prompt_blocks_own_header_lines_are_not_declarations():
+    """The header is prose wrapped in backslashes, with no token field.
+
+    Reading it as a declaration would invent placeholders out of the
+    instructions telling the engineer how to substitute them.
+    """
+    text = _NL.join([
+        "100 C " + _BS + "THE FOLLOWING ARE PROMPTS WHICH WILL ALLOW YOU" + _BS,
+        "110 C " + _BS + "TO EXCHANGE POINT NAMES USED IN THIS PROGRAM" + _BS,
+        '120 ON("FAN")',
+        "130 GOTO 100",
+        "",
+    ])
+    prog = parser.parse(text, name="t")
+    assert linter._scan_placeholders(prog) == frozenset()
+    assert "W122" not in codes(text)
+
+
+def test_a_declared_placeholder_never_used_in_code_is_not_reported():
+    """Substituting every live one is the goal. A spare declaration is not a
+    defect, and reporting it would make the rule impossible to clear."""
+    text = _NL.join([
+        "100 C " + _prompt("OPTIONAL OUTSIDE AIR POINT...[LAI,OAT]", "OAT"),
+        '110 ON("FAN")',
+        "120 GOTO 100",
+        "",
+    ])
+    assert "W122" not in codes(text)
+
+
+def test_an_ordinary_program_never_reports_a_template():
+    """No prompts, no finding. This must stay silent on real code."""
+    text = _NL.join([
+        "100 C AHU-1 SUPPLY FAN",
+        '110 IF("SAT" .GT. 80.0) THEN ON("FAN")',
+        "120 GOTO 100",
+        "",
+    ])
+    assert "W122" not in codes(text)
+
+
+def test_a_placeholder_is_not_also_reported_as_an_overlong_point_name():
+    """E105 is true about the text and the wrong thing to say.
+
+    An eight-character placeholder is not a point name that wants quoting; it
+    is a token that was never meant to survive to a panel. W122 says so once.
+    """
+    text = _NL.join([
+        "100 C " + _prompt("RATED KW OF PUMP 1 (SUBSTITUTE NUMBER)", "PMPKWRTG"),
+        "110 TOTLKW = PMPKWRTG * 2.0",
+        "120 GOTO 100",
+        "",
+    ])
+    got = codes(text)
+    assert "W122" in got
+    assert "E105" not in got

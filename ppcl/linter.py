@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from . import spec
@@ -26,12 +27,70 @@ class LintContext:
     #: program -- not a second way to switch rules off, which ``disabled``
     #: already does.
     options: dict = field(default_factory=dict)
+    #: Memoised :meth:`library_placeholders`; None until first asked.
+    _placeholders: object = field(default=None, repr=False, compare=False)
 
     def option(self, key, default=None):
         return self.options.get(key, default)
 
     def point_type(self, name: str):
         return self.point_types.get(name.upper().lstrip("$"))
+
+    def library_placeholders(self) -> frozenset:
+        """Name-exchange placeholders this program still carries, upper-cased.
+
+        Siemens' application library ships its programs as *templates*. A
+        block of comments near the top declares each editable name between
+        backslashes -- description, then the token, then a close -- and the
+        engineer substitutes them through the editor before loading. An
+        unsubstituted token looks exactly like an ordinary point name, so
+        without this every rule that checks names reports on text that was
+        never meant to survive to a panel.
+
+        Computed once per lint, because three rules want it.
+        """
+        if self._placeholders is None:
+            self._placeholders = _scan_placeholders(self.program)
+        return self._placeholders
+
+
+#: One backslash. Spelled this way because the thing being matched is a
+#: backslash-delimited format and a regex for it is otherwise unreadable.
+_BS = chr(92)
+
+#: A library name-exchange prompt: a comment whose last backslash-delimited
+#: field is a bare token. The prompt block's own header lines carry only an
+#: opening and closing backslash and no token, which is what separates a
+#: declaration from the prose around it.
+_PROMPT = re.compile(
+    _BS * 2 + r"([A-Za-z$][A-Za-z0-9$.]{0,13})" + _BS * 2 + r"\s*$"
+)
+
+
+#: A leading DEFINE macro reference, as in "%PFX%DBT". The library's templates
+#: declare the *suffix* as the editable name and write the prefix separately,
+#: because the prefix is usually the site's own building or panel string: a
+#: DEFINE binds it once, and every reference is then written behind it.
+_MACRO_PREFIX = re.compile(r"^%[A-Za-z0-9_.]+%")
+
+
+def placeholder_key(name: str) -> str:
+    """Normalise a reference for comparison against a declared placeholder."""
+    return _MACRO_PREFIX.sub("", name.upper())
+
+
+def _scan_placeholders(program) -> frozenset:
+    found = set()
+    for ln in program.lines:
+        if not ln.is_comment:
+            continue
+        body = ln.body or ""
+        if body.count(_BS) < 3:
+            continue
+        match = _PROMPT.search(body)
+        if match:
+            found.add(match.group(1).upper())
+    return frozenset(found)
 
 
 #: Registry of rule functions, populated by the @rule decorator.

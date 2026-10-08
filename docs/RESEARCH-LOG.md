@@ -3711,8 +3711,16 @@ was wrong:
 
 ### Still to do
 
-1. **Recognise library name-exchange placeholders** — the finding above. One
-   rule, and it reframes every other finding on a template.
+1. ~~**Recognise library name-exchange placeholders.**~~ **DONE, same day.**
+   `W122`. It reports once per file and names the tokens still live. On the
+   shipped library: 25 of 42 programs report, which is every program that
+   declares a placeholder and still uses one, and the 27 `E105` findings on
+   placeholder names drop to **zero** — they were true about the text and the
+   wrong thing to tell anybody. Silent on the reference site's programs and on
+   `samples/`. The matching is on text rather than on the parse tree because a
+   placeholder reaches the code in three shapes: bare, quoted, and behind a
+   DEFINE prefix, and the prefixed form parses to a different node type
+   depending on whether it is quoted.
 2. **Open question 12 (`EXP`)**: if `LOG` is base 10 then `EXP` is unpaired,
    and nothing available says whether it returns `e**x` or `10**x`. One line of
    PPCL settles it.

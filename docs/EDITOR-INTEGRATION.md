@@ -275,6 +275,18 @@ In order of value per line of code. The first four need no parser at all.
 10. **Two `DEFINE`s of the same abbreviation.** The compiler refuses it, and
     the dangerous case is silent: the second wins, so uses written *above* it
     resolve to the later point.
+11. **An unsubstituted library template.** Siemens ships its application
+    library as templates, not programs. A block of comments near the top
+    declares each editable name between backslashes — a description, then the
+    token, then a close — and the engineer substitutes them before loading.
+    Collect the tokens, then check whether any still appear in executable
+    lines; if so the file is not a program yet. Worth doing because an
+    unsubstituted token looks exactly like an ordinary point name — most are
+    six characters or fewer and pass every other check. Three shapes reach the
+    code: bare, quoted, and behind a `%PREFIX%` macro, so match the token with
+    word boundaries rather than walking a parse tree. Report once per file.
+    The prompt block's own header lines carry only an opening and closing
+    backslash with no token field — do not read those as declarations.
 
 ### Tier 3 — needs control flow
 
@@ -312,7 +324,7 @@ In order of value per line of code. The first four need no parser at all.
 ## 8. If you want deeper checking later
 
 The rest of this repository is a zero-dependency Python package implementing
-all of the above and considerably more — 89 lint rules, a simulator with real
+all of the above and considerably more — 90 lint rules, a simulator with real
 priority arbitration, and a renumberer with exact reference rewriting. Two ways
 to use it from an editor without embedding it:
 
