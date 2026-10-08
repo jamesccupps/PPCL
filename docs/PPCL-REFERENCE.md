@@ -822,6 +822,16 @@ Questions this toolkit does not answer, each with the test that would settle it:
     line, which `parser` reads into `Line.unknown` and `E123` reports. On
     APOGEE and BACnet ALN there is still no text representation -- the state
     lives in the panel, which is what `report.py` exists to read.
+12. **Is `EXP` base e or base 10?** `LOG` is settled: Siemens' shipped library
+    converts a natural log by multiplying the common log by 2.3026, which is
+    ln(10), so `LOG` is base 10 and the description here was wrong until
+    2026-10-08. That leaves `EXP` unpaired. Nothing available says whether it
+    returns `e**x` or `10**x`, and the two differ by a factor of ln(10) in the
+    exponent, so a psychrometric calculation written on the wrong assumption
+    will be quietly off. The description is left exactly as transcribed and
+    `spec.FUNCTIONS` marks it unconfirmed. *Test:* evaluate `EXP(1)` on a
+    panel or in the vendor's own offline simulator and read the result -- 2.718
+    means base e, 10 means base 10. One line of PPCL settles it.
 
 
 **Nothing here has been validated against a live panel** — no statement's

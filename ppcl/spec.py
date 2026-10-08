@@ -342,6 +342,11 @@ RESIDENT_POINTS = {
     "$PDL": "Peak Demand Limiting monitor",
     "SECNDS": "Seconds counter",
     "TIME": "Current time in military (24-hour) format",
+    # $TOTKW is carried in the evaluator's symbol table immediately after
+    # $BATT. Named for a totalised kW reading and grouped with the PDL
+    # points; the manual does not list it, so what it totalises is inferred
+    # from the name alone.
+    "$TOTKW": "Totalised kilowatt reading (inferred from the name)",
 }
 
 #: NODE0..NODE99 and SECND1..SECND7 are generated ranges.
@@ -351,7 +356,7 @@ RESIDENT_POINTS = {
 #: but the dedicated page in the same book states it in prose, "acceptable
 #: node numbers for the NODE resident point range from 0 through 99", says it
 #: again as "between 0 and 99", and carries NODE0 in its own title. The same
-#: book's glossary, the PPCL Debugger help and Desigo CC all say NODE0. Four
+#: book's glossary, Siemens' offline tooling and Desigo CC all say NODE0. Four
 #: sources to one, and the one is contradicted by its own book. Node 0 is
 #: also a real drop address on an RS-485 BLN, so the typo is in the table.
 RESIDENT_RANGES = [("NODE", 0, 99), ("SECND", 1, 7)]
@@ -373,6 +378,10 @@ STATUS_INDICATORS = {
     "ON",
     "PRFON",
     "SLOW",
+    # TROUBL sits between ALARM/FAILED and PRFON in the evaluator's own
+    # symbol table, among the alarm states, and is absent from the
+    # manual's indicator list.
+    "TROUBL",
 }
 
 #: BACnet object types PPCL can reference on a BACnet panel. Desigo CC
@@ -419,12 +428,35 @@ BACNET_REFERENCE = r"^BAC_(\d+)_([A-Z]{2})_(\d+)$"
 #: lists ATN and describes it as "a trigonometric function that calculates the
 #: arc-tangent of a value ... expressed in degrees". ARC is deliberately NOT
 #: accepted, so code using it is reported rather than passing review.
+#:
+#: LN, and the base of LOG, are settled by Siemens' own tooling rather than by
+#: the manual, so both are called out here.
+#:
+#: LN is in the shipped compiler's own function table, alongside COM, SQRT,
+#: LOG, EXP, TOTAL, unary plus and minus, SIN, COS, TAN, ATN and ALMPRI --
+#: every other entry in that table is already here. The manual does not list
+#: it, and Siemens' shipped library never calls it: eight of the psychrometric
+#: programs convert by hand instead, commenting that a natural log equals
+#: 2.3026 times the common log of the same value. That is what you would
+#: expect of code written before the function existed.
+#:
+#: That same comment is what fixes LOG, because 2.3026 is ln(10). The identity
+#: only holds if LOG is base 10; read with LOG as the natural log it reduces to
+#: LN(X) = 2.3026 * LN(X), which is false. The surrounding arithmetic is the
+#: ASHRAE saturation-pressure correlation, published in base 10 as well. LOG
+#: was described here as the natural log with no citation behind it, and the
+#: description was wrong.
+#:
+#: EXP is left exactly as transcribed. Nothing available establishes whether it
+#: is e**x or 10**x, so do not assume EXP and LOG invert each other. Open
+#: question 12 in docs/PPCL-REFERENCE.md records the test that would settle it.
 FUNCTIONS = {
     "ATN": "Arc-tangent (degrees)",
     "COM": "Complement",
     "COS": "Cosine (degrees)",
-    "EXP": "Natural antilog",
-    "LOG": "Natural log",
+    "EXP": "Antilog -- base unconfirmed, see note above",
+    "LN": "Natural log (base e)",
+    "LOG": "Common log (base 10)",
     "SIN": "Sine (degrees)",
     "SQRT": "Square root",
     "TAN": "Tangent (degrees)",
