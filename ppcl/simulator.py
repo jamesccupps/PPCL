@@ -34,11 +34,9 @@ import math
 from dataclasses import dataclass, field
 
 from . import spec
-from .analyzer import substatements
 from .ast_nodes import (
     Assignment,
     BinOp,
-    Comment,
     CommandCall,
     FuncCall,
     Gosub,
@@ -54,7 +52,6 @@ from .ast_nodes import (
     Sampled,
     TimeLit,
     UnaryOp,
-    Unparsed,
 )
 
 ON = 1.0
@@ -80,6 +77,10 @@ _MATH = {
     "ATN": lambda v: math.degrees(math.atan(v)),
     "COM": lambda v: OFF if v else ON,
 }
+
+#: The value each simple state command writes. Was a dict literal built inside
+#: the command handler, so every ON or OFF allocated a fresh one to look up.
+_STATE_VALUE = {"ON": ON, "OFF": OFF, "AUTO": ON, "FAST": ON, "SLOW": 0.5}
 
 #: Functions that read something a simulator does not have. ALMPRI is a
 #: point's alarm priority, which lives in the panel's alarm configuration.
@@ -244,15 +245,33 @@ class Simulator:
         self.panel = panel or Panel()
         self.clock = clock or Clock()
         self.firmware = firmware
-        self.trace_enabled = trace
+        #: Which event kinds to record: True for all, False for none, or a set
+        #: of kinds. The bench passes {"blocked"} because that is all it reads,
+        #: and recording every write cost a formatted string and an Event on
+        #: most lines of every pass -- ~340,000 of each per simulated hour,
+        #: built and then thrown away.
+        self._trace_kinds = (None if trace is True
+                             else frozenset() if not trace
+                             else frozenset(trace))
+        self.trace_enabled = bool(trace)
         self.events = []
         self.warnings = []
 
         self.index = program.by_number()
         self.numbers = sorted(self.index)
+        # Both fixed for this simulator's lifetime -- the debugger builds a
+        # fresh one rather than editing these -- so they are worked out once
+        # here instead of on every line of every pass. A branch used to find
+        # its target with numbers.index(), a scan of the whole program per GOTO.
+        self._pc_of = {number: pc for pc, number in enumerate(self.numbers)}
+        self._comment_at = [self.index[n].is_comment for n in self.numbers]
         self.disabled_lines = set()
         self.parameters = {}
         self.locals_declared = set()
+        #: How to read each point name, decided on its first read. See
+        #: _reader_for(). Filled lazily; must exist before the directives
+        #: below are evaluated.
+        self._readers = {}
 
         # Persistent execution state. A panel keeps running where it left off
         # rather than restarting the program on every tick, and time-based
@@ -270,13 +289,45 @@ class Simulator:
         self._holidays = set()
         self._pending_power_return = None
 
+        # Expression evaluation dispatches on the node's exact type. Every
+        # node class subclasses Expr directly and none subclasses another, so
+        # this picks the same branch the old isinstance chain did -- without
+        # the 81 million isinstance calls a two-hour bench run used to make.
+        self._eval_by_type = {
+            Num: self._eval_num,
+            TimeLit: self._eval_time,
+            Ref: self._eval_ref,
+            PriorityRef: self._eval_priority,
+            MacroRef: self._eval_macro,
+            UnaryOp: self._eval_unary,
+            FuncCall: self._eval_func,
+            BinOp: self._eval_binop,
+        }
+
+        # Statements dispatch the same way. Comment and Unparsed are absent
+        # on purpose: a missing type executes as nothing, which is what they do.
+        self._exec_by_type = {
+            ParameterDecl: self._exec_parameter,
+            Assignment: self._exec_assignment,
+            If: self._exec_if,
+            Goto: self._exec_goto,
+            Gosub: self._exec_gosub,
+            Return: self._exec_return,
+            Sampled: self._exec_sampled,
+            CommandCall: self._exec_call,
+        }
+
         for directive in program.directives:
             self.parameters[directive.name.upper()] = self._eval(directive.value)
 
     # -- tracing -----------------------------------------------------------
 
+    def _traces(self, kind) -> bool:
+        kinds = self._trace_kinds
+        return kinds is None or kind in kinds
+
     def _emit(self, line, kind, text):
-        if self.trace_enabled:
+        if self._traces(kind):
             self.events.append(Event(self.clock.hours, line, kind, text))
 
     def _warn(self, text):
@@ -374,7 +425,7 @@ class Simulator:
         old = pt.value
         pt.value = value
         pt.priority = priority
-        if old != value:
+        if old != value and self._traces("write"):
             self._emit(
                 line, "write",
                 "%s = %s (%s%s)"
@@ -406,7 +457,7 @@ class Simulator:
                 % (name, priority, pt.priority),
             )
             return False
-        if pt.priority != "@NONE":
+        if pt.priority != "@NONE" and self._traces("write"):
             self._emit(line, "write",
                        "%s released from %s to @NONE" % (name, pt.priority))
         pt.priority = "@NONE"
@@ -417,27 +468,77 @@ class Simulator:
     def _eval(self, node) -> float:
         if node is None:
             return 0.0
-        if isinstance(node, Num):
-            return node.value
-        if isinstance(node, TimeLit):
-            return node.as_decimal_hours
-        if isinstance(node, Ref):
-            upper = node.name.upper()
-            if upper in spec.STATUS_INDICATORS:
-                return _status_value(upper)
-            return self._read(node.name)
-        if isinstance(node, PriorityRef):
-            return float(spec.PRIORITY_RANK.get(node.name, 0))
-        if isinstance(node, MacroRef):
-            return 0.0
-        if isinstance(node, UnaryOp):
-            v = self._eval(node.operand)
-            return -v if node.op == "-" else v
-        if isinstance(node, FuncCall):
-            return self._eval_func(node)
-        if isinstance(node, BinOp):
-            return self._eval_binop(node)
+        handler = self._eval_by_type.get(node.__class__)
+        return handler(node) if handler is not None else 0.0
+
+    @staticmethod
+    def _eval_num(node) -> float:
+        return node.value
+
+    @staticmethod
+    def _eval_time(node) -> float:
+        return node.as_decimal_hours
+
+    def _eval_ref(self, node) -> float:
+        reader = self._readers.get(node.name)
+        if reader is None:
+            reader = self._readers[node.name] = self._reader_for(node.name)
+        return reader()
+
+    def _reader_for(self, name: str):
+        """A function that reads ``name`` the way _eval_ref + _read would.
+
+        Every read used to upper-case the name three times and walk a dozen
+        comparisons -- status indicator? clock? resident? parameter? -- to an
+        answer that never changes for a given name. That decision is made
+        once here. The branch order is _read's, exactly, and the golden
+        record of bench and trace output is byte-identical across the change.
+
+        Two things are deliberately still decided per read. Resident points
+        warn on every read, as before, so a consumer that clears warnings
+        sees them come back. And an ordinary name checks the parameters on
+        every read, because a PARAMETER statement can run mid-program.
+        """
+        upper = name.upper()
+        clock = self.clock
+        if upper in spec.STATUS_INDICATORS:
+            constant = _status_value(upper)
+            return lambda: constant
+        if upper in ("TIME", "CRTIME"):
+            return lambda: clock.hours
+        if upper == "DAY":
+            return lambda: float(clock.day_of_week)
+        if upper == "DAYOFM":
+            return lambda: float(clock.day_of_month)
+        if upper == "MONTH":
+            return lambda: float(clock.month)
+        if upper == "SECNDS" or (upper.startswith("SECND")
+                                 and upper[5:].isdigit()):
+            return lambda: float(int(clock.elapsed) % 60)
+        if (upper in ("LINK", "$BATT", "ALMCNT", "ALMCT2", "$PDL")
+                or (upper.startswith("NODE") and upper[4:].isdigit())):
+            return lambda: self._read(name)    # warns on every read
+        params = self.parameters
+        panel = self.panel
+
+        def ordinary():
+            if upper in params:
+                return params[upper]
+            point = panel.points.get(upper)
+            return point.value if point is not None else panel.value(name)
+        return ordinary
+
+    @staticmethod
+    def _eval_priority(node) -> float:
+        return float(spec.PRIORITY_RANK.get(node.name, 0))
+
+    @staticmethod
+    def _eval_macro(node) -> float:
         return 0.0
+
+    def _eval_unary(self, node) -> float:
+        v = self._eval(node.operand)
+        return -v if node.op == "-" else v
 
     def _eval_func(self, node: FuncCall) -> float:
         name = node.name
@@ -562,11 +663,11 @@ class Simulator:
                 self._pc = 0  # the documented wrap to the first line
 
             number = self.numbers[self._pc]
-            line = self.index[number]
 
-            if number in self.disabled_lines or line.is_comment:
+            if self._comment_at[self._pc] or number in self.disabled_lines:
                 self._pc += 1
                 continue
+            line = self.index[number]
 
             executed += 1
             self._executed_lines.add(number)
@@ -593,7 +694,7 @@ class Simulator:
                 )
                 self._pc = 0
                 continue
-            self._pc = self.numbers.index(target)
+            self._pc = self._pc_of[target]
         return executed
 
     @property
@@ -632,51 +733,53 @@ class Simulator:
 
     def _exec(self, stmt, line: int, call_stack: list):
         """Execute one statement. Returns None, a target line, or "return"."""
-        if stmt is None or isinstance(stmt, (Comment, Unparsed)):
+        if stmt is None:
             return None
+        handler = self._exec_by_type.get(stmt.__class__)
+        return handler(stmt, line, call_stack) if handler is not None else None
 
-        if isinstance(stmt, ParameterDecl):
-            self.parameters[stmt.name.upper()] = self._eval(stmt.value)
-            return None
-
-        if isinstance(stmt, Assignment):
-            value = self._eval(stmt.expr)
-            if isinstance(stmt.target, Ref):
-                self.command(stmt.target.name, value, "@NONE", line, "assign")
-            return None
-
-        if isinstance(stmt, If):
-            if self._eval(stmt.cond):
-                return self._exec(stmt.then_stmt, line, call_stack)
-            return self._exec(stmt.else_stmt, line, call_stack)
-
-        if isinstance(stmt, Goto):
-            self._emit(line, "branch", "GOTO %d" % stmt.target)
-            return stmt.target
-
-        if isinstance(stmt, Gosub):
-            for i, arg in enumerate(stmt.args[:15], start=1):
-                self.panel.get("$ARG%d" % i).value = self._eval(arg)
-            idx = self.numbers.index(line)
-            call_stack.append(idx + 1)
-            self._emit(line, "branch", "GOSUB %d" % stmt.target)
-            return stmt.target
-
-        if isinstance(stmt, Return):
-            return "return"
-
-        if isinstance(stmt, Sampled):
-            interval = self._eval(stmt.seconds)
-            last = self._sample_last.get(line)
-            if last is None or self.clock.elapsed - last >= interval:
-                self._sample_last[line] = self.clock.elapsed
-                return self._exec(stmt.statement, line, call_stack)
-            return None
-
-        if isinstance(stmt, CommandCall):
-            return self._exec_command(stmt, line)
-
+    def _exec_parameter(self, stmt, line, call_stack):
+        self.parameters[stmt.name.upper()] = self._eval(stmt.value)
         return None
+
+    def _exec_assignment(self, stmt, line, call_stack):
+        value = self._eval(stmt.expr)
+        if isinstance(stmt.target, Ref):
+            self.command(stmt.target.name, value, "@NONE", line, "assign")
+        return None
+
+    def _exec_if(self, stmt, line, call_stack):
+        if self._eval(stmt.cond):
+            return self._exec(stmt.then_stmt, line, call_stack)
+        return self._exec(stmt.else_stmt, line, call_stack)
+
+    def _exec_goto(self, stmt, line, call_stack):
+        if self._traces("branch"):
+            self._emit(line, "branch", "GOTO %d" % stmt.target)
+        return stmt.target
+
+    def _exec_gosub(self, stmt, line, call_stack):
+        for i, arg in enumerate(stmt.args[:15], start=1):
+            self.panel.get("$ARG%d" % i).value = self._eval(arg)
+        call_stack.append(self._pc_of[line] + 1)
+        if self._traces("branch"):
+            self._emit(line, "branch", "GOSUB %d" % stmt.target)
+        return stmt.target
+
+    @staticmethod
+    def _exec_return(stmt, line, call_stack):
+        return "return"
+
+    def _exec_sampled(self, stmt, line, call_stack):
+        interval = self._eval(stmt.seconds)
+        last = self._sample_last.get(line)
+        if last is None or self.clock.elapsed - last >= interval:
+            self._sample_last[line] = self.clock.elapsed
+            return self._exec(stmt.statement, line, call_stack)
+        return None
+
+    def _exec_call(self, stmt, line, call_stack):
+        return self._exec_command(stmt, line)
 
     def _exec_command(self, call: CommandCall, line: int):
         name = call.name
@@ -694,7 +797,7 @@ class Simulator:
             return None  # only relevant on a simulated power cycle
 
         if name in ("ON", "OFF", "AUTO", "FAST", "SLOW"):
-            value = {"ON": ON, "OFF": OFF, "AUTO": ON, "FAST": ON, "SLOW": 0.5}[name]
+            value = _STATE_VALUE[name]
             for arg in args:
                 if isinstance(arg, Ref):
                     self.command(arg.name, value, prio, line, name)

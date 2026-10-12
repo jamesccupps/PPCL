@@ -359,7 +359,10 @@ class TestBench:
         self.bindings = list(bindings)
         self.panel = panel or Panel()
         self.clock = clock or Clock(hours=6.0)
-        self.simulator = Simulator(program, panel=self.panel, clock=self.clock)
+        # Only blocked commands are read back out of the trace (see run()),
+        # so only those are recorded.
+        self.simulator = Simulator(program, panel=self.panel, clock=self.clock,
+                                   trace={"blocked"})
         self.faults = []
         self.checks = []
         #: Sample the history every N seconds of simulated time.
