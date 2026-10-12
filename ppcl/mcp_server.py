@@ -602,12 +602,16 @@ def handle(message, workspace=None):
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {"tools": {}},
             "serverInfo": {"name": SERVER_NAME, "version": _version()},
+            # The second place the rule count lived. The tool description
+            # was made to ask the registry; this one, which every client reads
+            # at connect, still said 75 against 90 -- missed by the test meant
+            # to catch it because the phrase was split across two literals.
             "instructions": (
                 "PPCL tooling for Siemens APOGEE and PXC field panels. Run "
-                "ppcl_lint before judging any program correct -- it checks 75 "
+                "ppcl_lint before judging any program correct -- it checks %d "
                 "rules and cites the manual for each. Use ppcl_explain rather "
                 "than recalling a command signature. Nothing here touches a "
-                "building system; it reads and writes text."
+                "building system; it reads and writes text." % _rule_count()
             ),
         })
 

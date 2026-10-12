@@ -771,21 +771,27 @@ def test_no_runtime_string_hardcodes_a_count_the_code_can_compute():
 
     Both now ask. This stops the next one being written.
     """
+    import ast
     import pathlib
     import re
 
+    # Scanned as Python sees the strings, not as source lines. The MCP
+    # instructions said "it checks 75 " / "rules and cites..." -- one phrase
+    # split across two literals, so a line-by-line scan saw neither half
+    # match and this test passed while the count was fifteen short. The
+    # parser merges adjacent literals into one constant, so a split phrase
+    # cannot hide here.
     pattern = re.compile(
-        r"[^%d](" + r"[0-9]{2,3})" + r"[ ]+(lint rules|rules|commands|"
-        r"point types|block types|help pages|settings)" + r"[^a-z]")
+        r"(?<![%d0-9])([0-9]{2,3})[ ]+(lint rules|rules|commands|"
+        r"point types|block types|help pages|settings)(?![a-z])")
     offenders = []
     for path in sorted(pathlib.Path("ppcl").rglob("*.py")):
-        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            stripped = line.strip()
-            if stripped.startswith("#"):
-                continue          # a comment is a note to a reader, not output
-            m = pattern.search(line)
-            if m:
-                offenders.append("%s:%d %s" % (path, n, stripped[:70]))
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                for m in pattern.finditer(node.value):
+                    offenders.append("%s:%d %r" % (
+                        path, node.lineno, node.value[max(0, m.start() - 30):m.end()]))
     assert offenders == [], (
         "counts written by hand in runtime text:" + chr(10)
         + chr(10).join(offenders))
