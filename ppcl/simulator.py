@@ -29,6 +29,8 @@ Times are handled throughout in decimal hours, so ``TIME``, ``CRTIME`` and a
 
 from __future__ import annotations
 
+import math
+
 from dataclasses import dataclass, field
 
 from . import spec
@@ -57,6 +59,31 @@ from .ast_nodes import (
 
 ON = 1.0
 OFF = 0.0
+
+#: The arithmetic functions, by PPCL name. Trig works in degrees, as PPCL does.
+#:
+#: LOG is the COMMON log. spec.FUNCTIONS was corrected to say so on 2026-10-08
+#: -- Siemens' shipped library computes a natural log as 2.3026 times LOG,
+#: which only holds in base 10 -- and this table was not, so for three days
+#: the simulator ran every psychrometric program with LOG as the natural log,
+#: off by a factor of ln(10), and returned a silent 0.0 for LN, which it did
+#: not implement at all. A test now checks every name in spec.FUNCTIONS
+#: resolves here or is handled explicitly, so the next one cannot slip past.
+_MATH = {
+    "SQRT": lambda v: math.sqrt(v) if v >= 0 else 0.0,
+    "LOG": lambda v: math.log10(v) if v > 0 else 0.0,
+    "LN": lambda v: math.log(v) if v > 0 else 0.0,
+    "EXP": math.exp,
+    "SIN": lambda v: math.sin(math.radians(v)),
+    "COS": lambda v: math.cos(math.radians(v)),
+    "TAN": lambda v: math.tan(math.radians(v)),
+    "ATN": lambda v: math.degrees(math.atan(v)),
+    "COM": lambda v: OFF if v else ON,
+}
+
+#: Functions that read something a simulator does not have. ALMPRI is a
+#: point's alarm priority, which lives in the panel's alarm configuration.
+_UNKNOWABLE_FUNCTIONS = {"ALMPRI": "a point's alarm priority, 0 here"}
 
 #: Commands the simulator recognises but does not model.
 UNMODELLED = frozenset(
@@ -413,37 +440,32 @@ class Simulator:
         return 0.0
 
     def _eval_func(self, node: FuncCall) -> float:
-        import math
-
         name = node.name
-        if name == "ALMPRI":
-            return 0.0
         if name == "TOTAL":
             if isinstance(node.arg, Ref):
                 return self.panel.get(node.arg.name).runtime
             return 0.0
-
-        v = self._eval(node.arg)
-        try:
-            if name == "SQRT":
-                return math.sqrt(v) if v >= 0 else 0.0
-            if name == "LOG":
-                return math.log(v) if v > 0 else 0.0
-            if name == "EXP":
-                return math.exp(v)
-            if name == "SIN":
-                return math.sin(math.radians(v))
-            if name == "COS":
-                return math.cos(math.radians(v))
-            if name == "TAN":
-                return math.tan(math.radians(v))
-            if name == "ATN":
-                return math.degrees(math.atan(v))
-            if name == "COM":
-                return OFF if v else ON
-        except (ValueError, OverflowError):
+        if name in _UNKNOWABLE_FUNCTIONS:
+            self._warn("%s cannot be simulated (%s); anything computed from "
+                       "it is only as sound as that assumption"
+                       % (name, _UNKNOWABLE_FUNCTIONS[name]))
             return 0.0
-        return 0.0
+
+        fn = _MATH.get(name)
+        if fn is None:
+            # Used to be a silent fall-through to 0.0, which is how LN went
+            # unimplemented without anybody noticing.
+            self._warn("function %s is not simulated; it evaluated to 0" % name)
+            return 0.0
+        if name == "EXP":
+            self._warn("EXP is simulated as e**x, but whether PPCL's EXP is "
+                       "base e or base 10 is not established -- see open "
+                       "question 12 in docs/PPCL-REFERENCE.md. Treat results "
+                       "built on it as unconfirmed")
+        try:
+            return fn(self._eval(node.arg))
+        except (ValueError, OverflowError, ZeroDivisionError):
+            return 0.0
 
     def _eval_binop(self, node: BinOp) -> float:
         op = node.op

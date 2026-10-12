@@ -761,6 +761,63 @@ def test_the_five_PPCL_priorities_still_arbitrate_silently():
     assert sim.warnings == []                    # and quietly
 
 
+def _simulate(*lines, passes=1):
+    from ppcl import parser
+    from ppcl.simulator import Simulator
+
+    sim = Simulator(parser.parse(chr(10).join(lines) + chr(10)))
+    sim.run(passes=passes, seconds_per_pass=1.0)
+    return sim
+
+
+def test_the_simulator_computes_LOG_in_base_ten_and_LN_in_base_e():
+    """spec.FUNCTIONS was corrected; the simulator was not, for three days.
+
+    LOG ran as the natural log and LN was not implemented at all -- it fell
+    through to a silent 0.0. A psychrometric program simulated in that state
+    was off by a factor of ln(10).
+    """
+    sim = _simulate("10 A = LOG(100.0)", "20 B = LN(2.718281828)", "30 GOTO 10")
+    assert sim.panel.value("A") == pytest.approx(2.0)
+    assert sim.panel.value("B") == pytest.approx(1.0, abs=1e-6)
+
+
+def test_the_simulator_satisfies_the_identity_siemens_library_relies_on():
+    """Eight library programs compute a natural log as 2.3026 times LOG.
+
+    That conversion is how LOG was established as base 10 in the first
+    place, so the simulator has to agree with it or it is simulating a
+    different language from the one those programs were written in.
+    """
+    sim = _simulate("10 X = 2.3026*LOG(50.0)", "20 Y = LN(50.0)", "30 GOTO 10")
+    assert sim.panel.value("X") == pytest.approx(sim.panel.value("Y"), abs=1e-3)
+
+
+def test_every_PPCL_function_is_simulated_or_says_why_not():
+    """A function added to spec and not to the simulator returned 0, silently.
+
+    That is how LN went unimplemented. Each name must be computed, or be
+    handled explicitly -- TOTAL reads runtime, ALMPRI warns it is unknowable.
+    """
+    from ppcl import simulator
+
+    handled = set(simulator._MATH) | set(simulator._UNKNOWABLE_FUNCTIONS) | {"TOTAL"}
+    assert set(spec.FUNCTIONS) <= handled, sorted(set(spec.FUNCTIONS) - handled)
+
+
+def test_EXP_says_its_base_is_unconfirmed():
+    """Open question 12. The simulator must not present a guess as a result."""
+    sim = _simulate("10 Z = EXP(1.0)", "20 GOTO 10", passes=3)
+    assert sim.panel.value("Z") == pytest.approx(2.718281828)
+    assert len([w for w in sim.warnings if "EXP" in w]) == 1
+
+
+def test_the_ordinary_functions_stay_quiet():
+    """SQRT and the trig functions are fully specified, so no warning."""
+    sim = _simulate("10 A = SQRT(16.0) + SIN(90.0) + ATN(1.0)", "20 GOTO 10")
+    assert sim.panel.value("A") == pytest.approx(4.0 + 1.0 + 45.0)
+    assert sim.warnings == []
+
 def test_redaction_keeps_an_OIP_keystroke_sequence_intact():
     """An OIP sequence is keystrokes, not a point name.
 
