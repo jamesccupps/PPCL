@@ -229,6 +229,7 @@ def api_renumber(body, ws=None):
     return {
         "text": result.text,
         "ok": bool(result.text),
+        "refused": result.refused,
         "warnings": result.warnings,
         "rewritten": result.rewritten_references,
     }

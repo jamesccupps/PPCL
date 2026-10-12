@@ -178,6 +178,30 @@ def test_renumber_reports_refusal_rather_than_guessing(ws):
     assert any("refusing" in w for w in payload["warnings"])
 
 
+@pytest.mark.parametrize("text, reason", [
+    ("10 ON(A)" + chr(10) + "10 OFF(B)" + chr(10) + "20 GOTO 10" + chr(10),
+     "duplicates"),
+    ("100 IF(" + chr(34) + "FAN .EQ. ON) THEN GOTO 200" + chr(10) +
+     "200 GOTO 100" + chr(10), "unreadable"),
+])
+def test_a_renumber_refusal_says_which_kind_it_is(ws, text, reason):
+    """The UI offers the split-or-drop choice only for duplicates.
+
+    Every other refusal needs the code fixed, and asking "how should
+    duplicates be handled?" about an unreadable line -- which is what the UI
+    did, because it treated every refusal as that one -- is nonsense.
+    """
+    status, payload = api.dispatch("/api/renumber", {"text": text}, ws)
+    assert status == 200
+    assert payload["ok"] is False
+    assert payload["refused"] == reason
+
+
+def test_a_successful_renumber_reports_no_refusal(ws):
+    status, payload = api.dispatch(
+        "/api/renumber", {"text": "10 X = 1" + chr(10) + "20 GOTO 10" + chr(10)}, ws)
+    assert payload["ok"] is True and payload["refused"] is None
+
 def test_renumber_rewrites_references(ws):
     text = "00100\tONPWRT(300)\n00200\tGOTO 300\n00300\tON(A)\n00400\tGOTO 100\n"
     _s, payload = api.dispatch("/api/renumber", {"text": text}, ws)

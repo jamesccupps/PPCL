@@ -9,12 +9,13 @@ survives unchanged.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from . import spec
 from .analyzer import LINE_REFERENCING
 from .ast_nodes import Line, Program
-from .lexer import Tok, tokenize
+from .lexer import LexError, Tok, tokenize
 from .unparse import line_to_text, stmt_to_text
 
 
@@ -26,6 +27,10 @@ class RenumberResult:
     mapping: dict = field(default_factory=dict)
     warnings: list = field(default_factory=list)
     rewritten_references: int = 0
+    #: Why nothing was produced, when nothing was: "duplicates", "unreadable"
+    #: or "line_max". The UI offers a choice only for duplicates, the one case
+    #: with more than one legitimate answer; the others need the code fixed.
+    refused: str = None
 
 
 # --------------------------------------------------------------------------
@@ -113,7 +118,11 @@ def line_reference_tokens(body: str):
     """
     try:
         tokens = tokenize(body)
-    except Exception:
+    except LexError:
+        # No tokens, so no references can be found -- which is only safe if
+        # the caller already knows the line holds none. renumber() checks
+        # that first with unreadable_references() and refuses otherwise.
+        # Narrowed from a bare Exception, which also hid real bugs.
         return []
 
     refs = []
@@ -156,6 +165,41 @@ def line_reference_tokens(body: str):
                     continue
         i += 1
     return refs
+
+
+#: Every word that can introduce a line reference. Matched on raw text, for
+#: lines the lexer cannot read, so it errs towards finding one: a false match
+#: makes renumber refuse, which is the safe direction.
+_REFERENCE_WORD = re.compile(
+    r"\b(GOTO|GOSUB|%s|LSQ2|PDL)\b" % "|".join(sorted(LINE_REFERENCING)),
+    re.IGNORECASE,
+)
+
+
+def unreadable_references(program: Program):
+    """Lines that may hold a line reference but cannot be tokenized.
+
+    The reference scanner works on tokens, so a line the lexer rejects -- one
+    unterminated quote is enough -- yields none. Renumbering such a line used
+    to keep its old GOTO target while every other reference moved, reported
+    success, and exited 0: the output looked cleanly renumbered and branched
+    somewhere else. Returns ``[(line_number, lexer_message), ...]``.
+
+    Comment lines are skipped. Their bodies are prose that often will not
+    lex, and a stale number in a comment does not change what a panel runs.
+    """
+    out = []
+    for ln in program.lines:
+        if ln.is_comment:
+            continue
+        body = ln.body or ""
+        if not _REFERENCE_WORD.search(body):
+            continue
+        try:
+            tokenize(body)
+        except LexError as exc:
+            out.append((ln.number, str(exc)))
+    return out
 
 
 def rewrite_references(body: str, mapping: dict):
@@ -279,6 +323,23 @@ def renumber(program: Program, start: int = 10, step: int = 10,
             "number) or --allow-duplicates (keep only the first of each, "
             "matching what the panel actually executes)." % detail
         )
+        result.refused = "duplicates"
+        return result
+
+    unreadable = unreadable_references(program)
+    if unreadable:
+        result.warnings.append(
+            "refusing to renumber: %s %s a branch or line reference but "
+            "cannot be read, so the reference could not be found and would be "
+            "left pointing at the old line number while every other reference "
+            "moved. Fix %s first: %s."
+            % ("line" if len(unreadable) == 1 else "lines",
+               ", ".join(str(n) for n, _ in unreadable)
+               + (" contains" if len(unreadable) == 1 else " contain"),
+               "it" if len(unreadable) == 1 else "them",
+               "; ".join("line %d, %s" % (n, msg) for n, msg in unreadable))
+        )
+        result.refused = "unreadable"
         return result
 
     assignments, mapping = plan_renumber(
@@ -318,6 +379,7 @@ def renumber(program: Program, start: int = 10, step: int = 10,
             "use a smaller step or --preserve-blocks"
             % (len(over), spec.LINE_MAX)
         )
+        result.refused = "line_max"
         return result
 
     if duplicates and split_duplicates:

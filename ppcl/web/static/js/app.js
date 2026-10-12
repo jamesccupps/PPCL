@@ -362,6 +362,13 @@ async function boot() {
       step: Number($('rn-step').value),
       preserve_blocks: $('rn-blocks').checked,
     });
+    // Only duplicates have more than one right answer, so only duplicates get
+    // a choice. Every other refusal needs the code fixed, and asking "how
+    // should duplicates be handled?" about one would be nonsense.
+    if (!r.ok && r.refused !== 'duplicates') {
+      toast((r.warnings || []).join(' ') || 'renumbering refused', 'bad');
+      return;
+    }
     if (!r.ok) {
       const answer = await ask('Renumbering refused', [
         { name: 'how', label: 'How should duplicates be handled?',

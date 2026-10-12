@@ -88,6 +88,54 @@ def test_renumber_refuses_duplicates_by_default():
     assert "refusing to renumber" in result.warnings[0]
 
 
+def test_renumber_refuses_a_branch_it_cannot_read():
+    """One typo hid a GOTO from the reference scanner, and nothing said so.
+
+    The unterminated quote makes line 110 unreadable, so its GOTO 200 was
+    never found. Every other reference moved, 200 became 40, and line 110
+    kept branching to 200 -- a line that no longer existed. The result
+    reported "2 line references rewritten" (there were three) and exited 0.
+    """
+    q = chr(34)
+    prog = parser.parse(chr(10).join([
+        "100 X = 1",
+        "110 IF(" + q + "FAN .EQ. ON) THEN GOTO 200",
+        "120 GOTO 100",
+        "200 Y = 2",
+        "210 GOTO 100",
+        "",
+    ]))
+    result = formatter.renumber(prog)
+    assert result.text == ""
+    assert "refusing to renumber" in result.warnings[0]
+    assert "line 110" in result.warnings[0]
+
+
+def test_renumber_still_handles_an_unreadable_line_with_no_reference():
+    """Nothing to rewrite, so nothing to refuse. The body survives as is."""
+    q = chr(34)
+    prog = parser.parse(chr(10).join([
+        "100 X = 1",
+        "110 Y = " + q + "UNCLOSED",
+        "120 GOTO 100",
+        "",
+    ]))
+    result = formatter.renumber(prog)
+    assert result.text, result.warnings
+    assert "GOTO 10" in result.text
+    assert q + "UNCLOSED" in result.text
+
+
+def test_a_word_containing_ACT_is_not_mistaken_for_a_reference():
+    """FACTOR contains ACT; only whole words introduce a line reference."""
+    q = chr(34)
+    prog = parser.parse(chr(10).join([
+        "100 FACTOR = " + q + "UNCLOSED",
+        "110 GOTO 100",
+        "",
+    ]))
+    assert formatter.unreadable_references(prog) == []
+
 def test_split_duplicates_keeps_every_line():
     prog = parser.parse("10\tON(A)\n10\tOFF(B)\n20\tGOTO 10\n")
     result = formatter.renumber(prog, split_duplicates=True)
