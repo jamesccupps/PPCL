@@ -17,7 +17,6 @@ from ppcl.sequence import (
     CompileError,
     Compare,
     Interlock,
-    Loop,
     Mode,
     Point,
     Reset,

@@ -84,14 +84,12 @@ def cmd_lint(args):
                   "REPORT?" % args.report, file=sys.stderr)
             return 2
 
-    sizes = {}
     programs = {}
     for path in files:
         prog = ppcl_parser.parse_file(path)
         if panel_report is not None:
             report_mod.apply_to(panel_report, prog)
         programs[path] = prog
-        sizes[path] = len(prog.executable_lines())
 
     all_diags = []
     threshold = _min_rank(args.min_severity)
@@ -100,7 +98,6 @@ def cmd_lint(args):
     for path in files:
         prog = programs[path]
         analysis = analyzer.analyze(prog)
-        ctx_extra = {k: v for k, v in sizes.items() if k != path}
         diags = linter.lint(
             prog,
             firmware=firmware,
@@ -333,7 +330,6 @@ def _fmt(value):
 def cmd_bench(args):
     from .plant import (
         AHU_PRESETS,
-        Check,
         Fault,
         FAULT_KINDS,
         TestBench,

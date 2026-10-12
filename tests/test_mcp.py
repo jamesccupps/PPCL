@@ -6,7 +6,6 @@ renderer that raises would otherwise turn a good result into a silent failure
 inside someone else's session.
 """
 
-import json
 
 import pytest
 

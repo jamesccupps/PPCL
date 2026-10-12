@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from .. import spec
-from ..analyzer import expr_refs, substatements, walk_expr
+from ..analyzer import substatements, walk_expr
 from ..ast_nodes import (
     Assignment,
     BinOp,
     CommandCall,
     FuncCall,
-    Gosub,
     If,
     Num,
     PriorityRef,

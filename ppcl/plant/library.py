@@ -9,7 +9,7 @@ bindings for real equipment is a matter of changing numbers.
 from __future__ import annotations
 
 from .bench import Binding, Check
-from .components import Coil, Damper, Fan, FreezeStat, MixingBox, Sensor, Valve, Zone
+from .components import Coil, Damper, Fan, FreezeStat, MixingBox, Valve, Zone
 from .systems import AirHandler, HotWaterPlant, Plant, Weather
 
 

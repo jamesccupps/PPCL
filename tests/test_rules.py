@@ -4,7 +4,6 @@ Each rule gets a case that must fire and, where a false positive is plausible,
 a case that must stay quiet.
 """
 
-import pytest
 
 from ppcl import linter, parser, spec
 

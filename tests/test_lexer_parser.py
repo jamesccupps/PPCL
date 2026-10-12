@@ -9,14 +9,10 @@ from ppcl.ast_nodes import (
     CommandCall,
     Comment,
     Gosub,
-    Goto,
     If,
-    Num,
     ParameterDecl,
-    Ref,
     Return,
     Sampled,
-    TimeLit,
 )
 from ppcl.lexer import LexError, Tok, tokenize
 

@@ -9,14 +9,12 @@ and SAMPLE in it.
 from __future__ import annotations
 
 from .. import spec
-from ..analyzer import LINE_REFERENCING, substatements
+from ..analyzer import substatements
 from ..ast_nodes import (
     CommandCall,
-    Comment,
     Gosub,
     Goto,
     If,
-    Num,
     Return,
     Sampled,
 )
@@ -509,7 +507,6 @@ def uncalled_subroutine(ctx):
 
 @rule("W220", "ONPWRT is not the first statement", Severity.WARNING)
 def onpwrt_placement(ctx):
-    a = ctx.analysis
     first_exec = None
     for ln in ctx.program.lines:
         if ln.is_executable:

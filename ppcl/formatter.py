@@ -16,7 +16,7 @@ from . import spec
 from .analyzer import LINE_REFERENCING
 from .ast_nodes import Line, Program
 from .lexer import LexError, Tok, tokenize
-from .unparse import line_to_text, stmt_to_text
+from .unparse import stmt_to_text
 
 
 @dataclass

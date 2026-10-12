@@ -9,16 +9,11 @@ from ..analyzer import LINE_REFERENCING, substatements
 from ..ast_nodes import (
     Assignment,
     CommandCall,
-    Comment,
     Gosub,
-    Goto,
-    MacroRef,
     Num,
-    ParameterDecl,
     Ref,
     Sampled,
     TimeLit,
-    Unparsed,
 )
 from ..diagnostics import Diagnostic, Severity
 from ..linter import placeholder_key, rule

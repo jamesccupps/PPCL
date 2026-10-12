@@ -24,7 +24,7 @@ import io
 import json
 import os
 import re
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 
 from . import spec
 

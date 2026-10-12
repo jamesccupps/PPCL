@@ -18,26 +18,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from . import spec
 from .ast_nodes import (
     Assignment,
     BinOp,
     Comment,
     CommandCall,
-    Expr,
     FuncCall,
     Gosub,
     Goto,
     If,
     Line,
-    MacroRef,
     ParameterDecl,
-    PriorityRef,
     Program,
     Ref,
     Return,
     Sampled,
-    Stmt,
     UnaryOp,
     Unparsed,
 )

@@ -1,6 +1,5 @@
 """Tests for the formatter, simulator, generator and redactor."""
 
-import json
 
 import pytest
 

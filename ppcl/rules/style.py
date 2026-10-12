@@ -6,9 +6,6 @@ review can filter them out with ``--min-severity warning``.
 
 from __future__ import annotations
 
-from .. import spec
-from ..analyzer import substatements
-from ..ast_nodes import CommandCall, Comment
 from ..diagnostics import Diagnostic, Severity
 from ..linter import rule
 

@@ -34,7 +34,7 @@ so in a comment.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .. import linter, spec
 from .. import parser as ppcl_parser

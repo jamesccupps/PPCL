@@ -25,11 +25,10 @@ simulated panel; it does not open a socket.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from . import spec
 from . import parser as ppcl_parser
-from .ast_nodes import Comment, Unparsed
 from .simulator import Clock, Panel, Simulator
 
 

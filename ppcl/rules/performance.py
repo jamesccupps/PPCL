@@ -14,14 +14,9 @@ from ..ast_nodes import (
     Assignment,
     BinOp,
     CommandCall,
-    Comment,
-    Gosub,
-    Goto,
     If,
     Num,
     Ref,
-    Return,
-    Sampled,
     TimeLit,
 )
 from ..diagnostics import Diagnostic, Severity

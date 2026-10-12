@@ -130,9 +130,17 @@ def rule(code: str, summary: str, severity: Severity = Severity.WARNING):
     return wrap
 
 
+#: The rule modules. Importing one is what registers its rules, through the
+#: @rule decorator, so nothing ever refers to them by name afterwards.
+_RULE_MODULES = ("flow", "performance", "semantics", "style", "syntax")
+
+
 def _load_rules() -> None:
     """Import the rule modules so their decorators run."""
-    from .rules import flow, performance, semantics, style, syntax  # noqa: F401
+    import importlib
+
+    for name in _RULE_MODULES:
+        importlib.import_module(".rules." + name, __package__)
 
 
 def lint(

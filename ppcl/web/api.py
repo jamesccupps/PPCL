@@ -19,7 +19,6 @@ import traceback
 
 from .. import analyzer, formatter, linter, sequence, spec
 from .. import parser as ppcl_parser
-from ..diagnostics import Severity
 
 MAX_UPLOAD = 4 * 1024 * 1024  # a PPCL program is never megabytes
 

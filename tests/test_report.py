@@ -6,7 +6,6 @@ and whether executing it failed. Everything here is checked against the format
 printed in the BACnet ALN Field Panel User's Manual (125-3020).
 """
 
-import pytest
 
 from ppcl import analyzer, parser, report
 from ppcl.diagnostics import Severity

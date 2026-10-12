@@ -42,7 +42,6 @@ from .model import (
     Any,
     Between,
     Compare,
-    DecisionTable,
     Interlock,
     Loop,
     Mode,
