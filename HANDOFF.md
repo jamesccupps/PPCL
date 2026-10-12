@@ -98,7 +98,7 @@ python -m ppcl.cli help            # the built-in documentation
 **560 tests passing**, and CI runs them on Python 3.10-3.14 on Linux plus
 3.10 and 3.14 on Windows. ~22,500 lines Python, ~5,000 lines UI, ~6,300
 lines tests. 90 lint rules, 66 commands, 99 BACnet properties, 30 block types,
-17 CLI subcommands, 11 MCP tools, 12 help pages, 20 settings, 6 firmware
+17 CLI subcommands, 11 MCP tools, 12 help pages, 21 settings, 6 firmware
 families, 29 panel error codes.
 
 | Layer | Module | State |

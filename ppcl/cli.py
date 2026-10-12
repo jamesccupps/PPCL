@@ -725,12 +725,42 @@ def cmd_seq(args):
 # --------------------------------------------------------------------------
 
 
+DEFAULT_PORT = 8765
+
+
+def serve_port(cli_port, workspace):
+    """The port to serve on: --port if given, else the setting, else 8765.
+
+    The setting is read from the workspace's settings file, so a port picked
+    in the Settings pane is the one a double-clicked ppcl.bat uses next time.
+    """
+    if cli_port is not None:
+        return cli_port, "--port"
+    from .settings import Settings
+
+    settings = Settings(workspace).load()
+    port = settings.get("port")
+    if isinstance(port, int) and port != DEFAULT_PORT:
+        return port, "the Port setting"
+    return DEFAULT_PORT, None
+
+
 def cmd_serve(args):
     from .web import serve
 
+    port, source = serve_port(args.port, args.workspace)
+    if not 1 <= port <= 65535:
+        # The socket layer raises OverflowError for this, which is not an
+        # OSError, so it used to escape serve() as a bare traceback.
+        print("ppcl serve: %d is not a port; use a number from 1024 to 65535"
+              % port, file=sys.stderr)
+        return 2
+    if source == "the Port setting":
+        print("Using port %d from the Port setting. Pass --port to override."
+              % port)
     return serve(
         host=args.host,
-        port=args.port,
+        port=port,
         workspace=args.workspace,
         open_browser=not args.no_browser,
         quiet=args.quiet,
@@ -1384,7 +1414,9 @@ def build_parser():
         "serve",
         help="open the workbench UI in a browser (editor, builder, bench)",
     )
-    sp.add_argument("--port", type=int, default=8765)
+    sp.add_argument("--port", type=int, default=None,
+                    help="port to serve on; default is the Port setting, "
+                         "or %d" % DEFAULT_PORT)
     sp.add_argument("--host", default="127.0.0.1",
                     help="bind address; anything but localhost is unauthenticated")
     sp.add_argument("-w", "--workspace", default=".",

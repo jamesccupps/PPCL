@@ -102,6 +102,14 @@ SETTINGS = [
             "workspace. Turns on unresolved-point marking and type-aware "
             "rules.", group="Files"),
 
+    # -- workbench ---------------------------------------------------------
+    Setting("port", "Server port", "int", 8765,
+            "The port the workbench serves on, used the next time it starts. "
+            "Change it if something else already uses 8765 or you want two "
+            "workbenches open at once. A --port on the command line, or a "
+            "number after ppcl.bat, overrides this for that one launch.",
+            minimum=1024, maximum=65535, group="Workbench"),
+
     # -- appearance --------------------------------------------------------
     Setting("theme", "Theme", "choice", "dark", "",
             choices=("dark", "light"), group="Appearance"),

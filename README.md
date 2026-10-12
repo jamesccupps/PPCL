@@ -42,6 +42,17 @@ python -m ppcl help                         # the built-in documentation
 
 `--help` works on the top level and on every subcommand.
 
+**Changing the port.** The workbench serves on 8765 unless told otherwise,
+and there are three ways to tell it, in order of precedence:
+
+- `ppcl.bat 8800` or `python -m ppcl serve --port 8800` -- for that launch only
+- **Settings -> Workbench -> Server port** -- saved with the workspace, and
+  used every time after, including by a double-clicked `ppcl.bat`
+- otherwise 8765
+
+If the port is already taken the workbench says so and stops, rather than
+quietly starting somewhere else -- usually it means one is already running.
+
 If your programs only ever reach a panel from a workstation and are never
 typed at a panel's serial port, add `--workstation-only` to `lint`. It drops
 the line-length findings, which are usually most of the output on anything

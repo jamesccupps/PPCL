@@ -1055,3 +1055,53 @@ def test_the_siemens_categories_stay_a_verbatim_transcription():
         "Program Control", "Energy Management", "Special Function",
         "Arithmetic Function",
     })
+
+
+# --- choosing the server port ------------------------------------------------
+
+
+def test_the_port_comes_from_the_command_line_first(tmp_path):
+    from ppcl import settings
+    from ppcl.cli import serve_port
+
+    s = settings.Settings(str(tmp_path))
+    s.update({"port": 9100})
+    s.save()
+    assert serve_port(8800, str(tmp_path)) == (8800, "--port")
+
+
+def test_the_port_setting_is_used_when_no_port_is_given(tmp_path):
+    """So a double-clicked ppcl.bat uses whatever was picked in Settings."""
+    from ppcl import settings
+    from ppcl.cli import serve_port
+
+    s = settings.Settings(str(tmp_path))
+    s.update({"port": 9100})
+    s.save()
+    assert serve_port(None, str(tmp_path)) == (9100, "the Port setting")
+
+
+def test_with_neither_the_port_is_8765(tmp_path):
+    from ppcl.cli import DEFAULT_PORT, serve_port
+
+    assert serve_port(None, str(tmp_path)) == (DEFAULT_PORT, None) == (8765, None)
+
+
+@pytest.mark.parametrize("bad", [80, 70000, -1])
+def test_the_port_setting_refuses_a_port_out_of_range(tmp_path, bad):
+    from ppcl import settings
+
+    s = settings.Settings(str(tmp_path))
+    assert s.update({"port": bad}), "a port of %d was accepted" % bad
+    assert s.get("port") == 8765
+
+
+def test_serve_refuses_a_number_that_is_not_a_port(tmp_path, capsys):
+    """The socket layer raises OverflowError, not OSError, so it used to be a
+    bare traceback."""
+    from ppcl import cli
+
+    rc = cli.main(["serve", "--port", "70000", "--no-browser",
+                   "--workspace", str(tmp_path)])
+    assert rc == 2
+    assert "not a port" in capsys.readouterr().err

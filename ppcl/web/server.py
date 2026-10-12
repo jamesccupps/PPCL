@@ -255,8 +255,9 @@ def serve(host="127.0.0.1", port=8765, workspace=".", open_browser=True,
         raise SystemExit(
             "cannot bind %s:%d (%s).\n"
             "A workbench is probably already running there -- open "
-            "http://localhost:%d/ instead, or pass --port for a second one."
-            % (host, port, exc, port)
+            "http://localhost:%d/ instead. For a second one, pass --port, run "
+            "ppcl.bat with a port number (ppcl.bat 8800), or change Port in "
+            "the Settings pane." % (host, port, exc, port)
         )
 
     url = "http://%s:%d/" % ("localhost" if host == "127.0.0.1" else host, port)
