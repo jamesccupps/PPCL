@@ -34,25 +34,7 @@ import math
 from dataclasses import dataclass, field
 
 from . import spec
-from .ast_nodes import (
-    Assignment,
-    BinOp,
-    CommandCall,
-    FuncCall,
-    Gosub,
-    Goto,
-    If,
-    MacroRef,
-    Num,
-    ParameterDecl,
-    PriorityRef,
-    Program,
-    Ref,
-    Return,
-    Sampled,
-    TimeLit,
-    UnaryOp,
-)
+from .ast_nodes import Program, Ref
 
 ON = 1.0
 OFF = 0.0
@@ -81,6 +63,17 @@ _MATH = {
 #: The value each simple state command writes. Was a dict literal built inside
 #: the command handler, so every ON or OFF allocated a fresh one to look up.
 _STATE_VALUE = {"ON": ON, "OFF": OFF, "AUTO": ON, "FAST": ON, "SLOW": 0.5}
+
+#: Warnings for functions the simulator cannot compute exactly. Constants,
+#: because the compiler (ppcl/simcompile.py) is what raises them.
+UNKNOWABLE_FUNCTION_WARNING = (
+    "%s cannot be simulated (%s); anything computed from it is only as sound "
+    "as that assumption")
+UNSIMULATED_FUNCTION_WARNING = "function %s is not simulated; it evaluated to 0"
+EXP_WARNING = (
+    "EXP is simulated as e**x, but whether PPCL's EXP is base e or base 10 is "
+    "not established -- see open question 12 in docs/PPCL-REFERENCE.md. Treat "
+    "results built on it as unconfirmed")
 
 #: Functions that read something a simulator does not have. ALMPRI is a
 #: point's alarm priority, which lives in the panel's alarm configuration.
@@ -300,33 +293,19 @@ class Simulator:
         self._holidays = set()
         self._pending_power_return = None
 
-        # Expression evaluation dispatches on the node's exact type. Every
-        # node class subclasses Expr directly and none subclasses another, so
-        # this picks the same branch the old isinstance chain did -- without
-        # the 81 million isinstance calls a two-hour bench run used to make.
-        self._eval_by_type = {
-            Num: self._eval_num,
-            TimeLit: self._eval_time,
-            Ref: self._eval_ref,
-            PriorityRef: self._eval_priority,
-            MacroRef: self._eval_macro,
-            UnaryOp: self._eval_unary,
-            FuncCall: self._eval_func,
-            BinOp: self._eval_binop,
-        }
+        # Every line compiled once, to a closure that does what the statement
+        # does -- see ppcl/simcompile.py, which is the only implementation of
+        # PPCL execution there is. _expr_code maps a program expression's id
+        # to its compiled form, for the handlers that evaluate their own
+        # arguments.
+        from . import simcompile
 
-        # Statements dispatch the same way. Comment and Unparsed are absent
-        # on purpose: a missing type executes as nothing, which is what they do.
-        self._exec_by_type = {
-            ParameterDecl: self._exec_parameter,
-            Assignment: self._exec_assignment,
-            If: self._exec_if,
-            Goto: self._exec_goto,
-            Gosub: self._exec_gosub,
-            Return: self._exec_return,
-            Sampled: self._exec_sampled,
-            CommandCall: self._exec_call,
-        }
+        self._expr_code = {}
+        self._line_code = [
+            None if skip else simcompile.compile_stmt(
+                self, self.index[n].stmt, n, self._expr_code)
+            for n, skip in zip(self.numbers, self._skip_at)
+        ]
 
         for directive in program.directives:
             self.parameters[directive.name.upper()] = self._eval(directive.value)
@@ -477,24 +456,27 @@ class Simulator:
     # -- expression evaluation --------------------------------------------
 
     def _eval(self, node) -> float:
+        """The value of an expression.
+
+        A program's own expressions were compiled with it. Anything else -- a
+        debugger's condition, parsed afresh on every check -- is compiled here
+        and not kept, because a temporary node's id can be reused by the next.
+        """
         if node is None:
             return 0.0
-        handler = self._eval_by_type.get(node.__class__)
-        return handler(node) if handler is not None else 0.0
+        fn = self._expr_code.get(id(node))
+        if fn is None:
+            from . import simcompile
 
-    @staticmethod
-    def _eval_num(node) -> float:
-        return node.value
+            fn = simcompile.compile_expr(self, node, {})
+        return fn()
 
-    @staticmethod
-    def _eval_time(node) -> float:
-        return node.as_decimal_hours
-
-    def _eval_ref(self, node) -> float:
-        reader = self._readers.get(node.name)
+    def _reader(self, name: str):
+        """The function that reads ``name``, made on first use. See below."""
+        reader = self._readers.get(name)
         if reader is None:
-            reader = self._readers[node.name] = self._reader_for(node.name)
-        return reader()
+            reader = self._readers[name] = self._reader_for(name)
+        return reader
 
     def _reader_for(self, name: str):
         """A function that reads ``name`` the way _eval_ref + _read would.
@@ -538,101 +520,6 @@ class Simulator:
             point = panel.points.get(upper)
             return point.value if point is not None else panel.value(name)
         return ordinary
-
-    @staticmethod
-    def _eval_priority(node) -> float:
-        return float(spec.PRIORITY_RANK.get(node.name, 0))
-
-    @staticmethod
-    def _eval_macro(node) -> float:
-        return 0.0
-
-    def _eval_unary(self, node) -> float:
-        v = self._eval(node.operand)
-        return -v if node.op == "-" else v
-
-    def _eval_func(self, node: FuncCall) -> float:
-        name = node.name
-        if name == "TOTAL":
-            if isinstance(node.arg, Ref):
-                return self.panel.get(node.arg.name).runtime
-            return 0.0
-        if name in _UNKNOWABLE_FUNCTIONS:
-            self._warn("%s cannot be simulated (%s); anything computed from "
-                       "it is only as sound as that assumption"
-                       % (name, _UNKNOWABLE_FUNCTIONS[name]))
-            return 0.0
-
-        fn = _MATH.get(name)
-        if fn is None:
-            # Used to be a silent fall-through to 0.0, which is how LN went
-            # unimplemented without anybody noticing.
-            self._warn("function %s is not simulated; it evaluated to 0" % name)
-            return 0.0
-        if name == "EXP":
-            self._warn("EXP is simulated as e**x, but whether PPCL's EXP is "
-                       "base e or base 10 is not established -- see open "
-                       "question 12 in docs/PPCL-REFERENCE.md. Treat results "
-                       "built on it as unconfirmed")
-        try:
-            return fn(self._eval(node.arg))
-        except (ValueError, OverflowError, ZeroDivisionError):
-            return 0.0
-
-    def _eval_binop(self, node: BinOp) -> float:
-        op = node.op
-
-        # Comparing a point against an @priority tests the point's priority
-        # rather than its value. This is the distinction that makes priority
-        # bugs so hard to see by reading.
-        if op in (".EQ.", ".NE."):
-            for side, other in ((node.left, node.right), (node.right, node.left)):
-                if isinstance(other, PriorityRef) and isinstance(side, Ref):
-                    actual = self.panel.get(side.name).priority
-                    same = actual == other.name
-                    return _b(same if op == ".EQ." else not same)
-
-        if op == ".ROOT.":
-            base, power = self._eval(node.left), self._eval(node.right)
-            if power == 0:
-                return 0.0
-            try:
-                return base ** (1.0 / power)
-            except (ValueError, ZeroDivisionError, OverflowError):
-                return 0.0
-
-        left = self._eval(node.left)
-        right = self._eval(node.right)
-
-        if op == "+":
-            return left + right
-        if op == "-":
-            return left - right
-        if op == "*":
-            return left * right
-        if op == "/":
-            return left / right if right else 0.0
-        if op == ".EQ.":
-            return _b(left == right)
-        if op == ".NE.":
-            return _b(left != right)
-        if op == ".GT.":
-            return _b(left > right)
-        if op == ".GE.":
-            return _b(left >= right)
-        if op == ".LT.":
-            return _b(left < right)
-        if op == ".LE.":
-            return _b(left <= right)
-        if op == ".AND.":
-            return _b(bool(left) and bool(right))
-        if op == ".NAND.":
-            return _b(not (bool(left) and bool(right)))
-        if op == ".OR.":
-            return _b(bool(left) or bool(right))
-        if op == ".XOR.":
-            return _b(bool(left) != bool(right))
-        return 0.0
 
     # -- execution ---------------------------------------------------------
 
@@ -678,11 +565,10 @@ class Simulator:
             if self._skip_at[self._pc] or number in self.disabled_lines:
                 self._pc += 1
                 continue
-            line = self.index[number]
 
             executed += 1
             self._executed_lines.add(number)
-            jump = self._exec(line.stmt, number, self._call_stack)
+            jump = self._line_code[self._pc](self._call_stack)
 
             if jump is None:
                 self._pc += 1
@@ -742,213 +628,10 @@ class Simulator:
                 return n
         return None
 
-    def _exec(self, stmt, line: int, call_stack: list):
-        """Execute one statement. Returns None, a target line, or "return"."""
-        if stmt is None:
-            return None
-        handler = self._exec_by_type.get(stmt.__class__)
-        return handler(stmt, line, call_stack) if handler is not None else None
-
-    def _exec_parameter(self, stmt, line, call_stack):
-        self.parameters[stmt.name.upper()] = self._eval(stmt.value)
-        return None
-
-    def _exec_assignment(self, stmt, line, call_stack):
-        value = self._eval(stmt.expr)
-        if isinstance(stmt.target, Ref):
-            self.command(stmt.target.name, value, "@NONE", line, "assign")
-        return None
-
-    def _exec_if(self, stmt, line, call_stack):
-        if self._eval(stmt.cond):
-            return self._exec(stmt.then_stmt, line, call_stack)
-        return self._exec(stmt.else_stmt, line, call_stack)
-
-    def _exec_goto(self, stmt, line, call_stack):
-        if self._traces("branch"):
-            self._emit(line, "branch", "GOTO %d" % stmt.target)
-        return stmt.target
-
-    def _exec_gosub(self, stmt, line, call_stack):
-        for i, arg in enumerate(stmt.args[:15], start=1):
-            self.panel.get("$ARG%d" % i).value = self._eval(arg)
-        call_stack.append(self._pc_of[line] + 1)
-        if self._traces("branch"):
-            self._emit(line, "branch", "GOSUB %d" % stmt.target)
-        return stmt.target
-
-    @staticmethod
-    def _exec_return(stmt, line, call_stack):
-        return "return"
-
-    def _exec_sampled(self, stmt, line, call_stack):
-        interval = self._eval(stmt.seconds)
-        last = self._sample_last.get(line)
-        if last is None or self.clock.elapsed - last >= interval:
-            self._sample_last[line] = self.clock.elapsed
-            return self._exec(stmt.statement, line, call_stack)
-        return None
-
-    def _exec_call(self, stmt, line, call_stack):
-        return self._exec_command(stmt, line)
-
-    def _exec_command(self, call: CommandCall, line: int):
-        name = call.name
-        prio = call.priority.name if call.priority else "@NONE"
-        args = call.args
-
-        if name == "LOCAL":
-            for arg in args:
-                if isinstance(arg, Ref):
-                    self.locals_declared.add(arg.bare_name.upper())
-                    self.panel.get("$" + arg.bare_name)
-            return None
-
-        if name == "ONPWRT":
-            return None  # only relevant on a simulated power cycle
-
-        if name in ("ON", "OFF", "AUTO", "FAST", "SLOW"):
-            value = _STATE_VALUE[name]
-            for arg in args:
-                if isinstance(arg, Ref):
-                    self.command(arg.name, value, prio, line, name)
-            return None
-
-        if name in ("EMON", "EMOFF", "EMAUTO", "EMFAST", "EMSLOW"):
-            value = OFF if name == "EMOFF" else ON
-            for arg in args:
-                if isinstance(arg, Ref):
-                    self.command(arg.name, value, "@EMER", line, name)
-            return None
-
-        if name in ("SET", "EMSET"):
-            if not args:
-                return None
-            value = self._eval(args[0])
-            level = "@EMER" if name == "EMSET" else prio
-            for arg in args[1:]:
-                if isinstance(arg, Ref):
-                    self.command(arg.name, value, level, line, name)
-            return None
-
-        if name == "STATE":
-            if not args:
-                return None
-            value = self._eval(args[0])
-            for arg in args[1:]:
-                if isinstance(arg, Ref):
-                    self.command(arg.name, value, prio, line, name)
-            return None
-
-        if name == "RELEAS":
-            for arg in args:
-                if isinstance(arg, Ref):
-                    self.release(arg.name, call.priority.name if call.priority else None,
-                                 line)
-            return None
-
-        if name in ("MAX", "MIN"):
-            if len(args) < 2:
-                return None
-            values = [self._eval(a) for a in args[1:]]
-            result = max(values) if name == "MAX" else min(values)
-            if isinstance(args[0], Ref):
-                self.command(args[0].name, result, "@NONE", line, name)
-            return None
-
-        if name == "TABLE":
-            return self._exec_table(args, line)
-
-        if name == "DBSWIT":
-            return self._exec_dbswit(args, line)
-
-        if name == "TIMAVG":
-            return self._exec_timavg(args, line)
-
-        if name == "WAIT":
-            return self._exec_wait(args, line)
-
-        if name == "LOOP":
-            return self._exec_loop(args, line)
-
-        if name in ("ACT", "ENABLE"):
-            for arg in args:
-                if isinstance(arg, Num):
-                    self.disabled_lines.discard(int(arg.value))
-            return None
-
-        if name in ("DEACT", "DISABL"):
-            for arg in args:
-                if isinstance(arg, Num):
-                    self.disabled_lines.add(int(arg.value))
-            return None
-
-        if name == "TODMOD":
-            modes = [int(self._eval(a)) for a in args[:7]]
-            if len(modes) == 7:
-                # day_of_week 1 = Sunday; TODMOD lists Monday first.
-                order = [modes[6]] + modes[:6]
-                self._tod_mode = order[(self.clock.day_of_week - 1) % 7]
-            return None
-
-        if name == "HOLIDA":
-            for i in range(0, len(args) - 1, 2):
-                self._holidays.add(
-                    (int(self._eval(args[i])), int(self._eval(args[i + 1])))
-                )
-            if (self.clock.month, self.clock.day_of_month) in self._holidays:
-                self._tod_mode = 16
-            return None
-
-        if name in ("TOD", "TODSET"):
-            return self._exec_tod(name, args, line)
-
-        if name in UNMODELLED:
-            written = []
-            for index in UNMODELLED_OUTPUTS.get(name, ()):
-                if index < len(args) and isinstance(args[index], Ref):
-                    written.append(args[index].name)
-            extra = ""
-            if written:
-                extra = ("; %s %s not written, so %s value%s here %s whatever "
-                         "the panel was loaded with"
-                         % (", ".join(written),
-                            "is" if len(written) == 1 else "are",
-                            "its" if len(written) == 1 else "their",
-                            "" if len(written) == 1 else "s",
-                            "is" if len(written) == 1 else "are"))
-            self._warn(
-                "%s at line %d is recognised but not simulated; it is treated "
-                "as a no-op%s" % (name, line, extra)
-            )
-            return None
-
-        return None
-
-    # -- individual command implementations --------------------------------
-
-    def _exec_table(self, args, line):
-        if len(args) < 4 or not isinstance(args[1], Ref):
-            return None
-        x = self._eval(args[0])
-        pairs = []
-        for i in range(2, len(args) - 1, 2):
-            pairs.append((self._eval(args[i]), self._eval(args[i + 1])))
-        if not pairs:
-            return None
-        if x <= pairs[0][0]:
-            y = pairs[0][1]
-        elif x >= pairs[-1][0]:
-            y = pairs[-1][1]
-        else:
-            y = pairs[-1][1]
-            for (x0, y0), (x1, y1) in zip(pairs, pairs[1:]):
-                if x0 <= x <= x1:
-                    span = x1 - x0
-                    y = y0 if span == 0 else y0 + (y1 - y0) * (x - x0) / span
-                    break
-        self.command(args[1].name, y, "@NONE", line, "TABLE")
-        return None
+    # -- command implementations kept as methods ---------------------------
+    #
+    # The compiler binds these directly. Everything else a statement can do
+    # lives in ppcl/simcompile.py.
 
     def _exec_dbswit(self, args, line):
         if len(args) < 5:
@@ -1110,10 +793,6 @@ class Simulator:
 # --------------------------------------------------------------------------
 # Helpers
 # --------------------------------------------------------------------------
-
-
-def _b(flag: bool) -> float:
-    return ON if flag else OFF
 
 
 def _status_value(word: str) -> float:

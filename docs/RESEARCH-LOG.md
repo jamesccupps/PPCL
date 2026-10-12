@@ -3810,3 +3810,45 @@ never been run at all.
 
 The roadmap's read-only BACnet adapter contradicts CLAUDE.md's "no BACnet/P2
 client" invariant outright. HANDOFF now marks it blocked on that decision.
+
+### Addendum — the interpreter became a compiler
+
+Offered at the end of the audit as the next step change, and taken. Each line
+is now compiled once, when the simulator is built, into a closure that does
+what the statement does: the operator, the command, and how each point is read
+are all decided ahead of time, and what runs per line is a chain of direct
+calls. `ppcl/simcompile.py`.
+
+The decision that mattered more than the speed: **the tree-walking interpreter
+was removed, not kept alongside.** Two implementations of the same semantics
+is the exact shape of defect this audit kept finding — `LOG` corrected in
+`spec.py` and left wrong in the simulator. So the compiler is the only
+implementation of execution. The one other caller, the debugger's conditional
+breakpoints, compiles its expression on the spot instead of keeping a second
+walker alive.
+
+Three constraints shaped it, each now held by a test:
+
+- **The debugger re-parses a condition on every check**, so `_eval` receives a
+  brand-new temporary node each time. A cache keyed on `id(node)` would hand
+  a stale closure to the next temporary that reused a freed address. Only a
+  program's own nodes, which live as long as it does, are cached.
+- **The debugger replaces `command` on the instance** to catch writes, after
+  the program is compiled. A closure that captured `command` while compiling
+  would skip the hook and silently disable every write breakpoint.
+- **PPCL does not short-circuit.** Both sides of `.AND.` and `.OR.` are
+  evaluated, and the right side can carry a warning. The test for this was
+  too weak as first written — its second line evaluated the right side anyway
+  — and only failed once rewritten to use the one left value that would let
+  each operator skip. Shown to fail with a short-circuiting `.AND.` before it
+  was trusted.
+
+Held to the same 4 MB golden record throughout: byte-identical. Interleaved
+A/B, three rounds: **~1.9× over the first pass, ~2.7× over the code before
+the audit.** The suite went from about two minutes to about one on the same
+machine; the slowest test from ~100 s to ~10 s.
+
+Reading the line loop for the rewrite also turned up one more correctness
+defect, fixed separately and first: the simulator ran PXC.A lines disabled
+with `# `. They now start in the runtime disabled set, so `ENABLE` can turn
+them back on, as it does on a panel.

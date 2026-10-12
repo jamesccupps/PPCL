@@ -20,7 +20,8 @@ so it runs on any engineering workstation without a package install.
 | `ppcl/analyzer.py` | Control flow (incl. the wrap edge and Tarjan SCC for steady state) and point read/write tracking. |
 | `ppcl/linter.py` + `ppcl/rules/` | 90 rules across syntax, flow, semantics, style, performance. |
 | `ppcl/formatter.py` | Format and renumber with exact reference rewriting. |
-| `ppcl/simulator.py` | Interpreter with real priority arbitration. |
+| `ppcl/simulator.py` | The simulated panel: points, clock, priority arbitration, the line loop. |
+| `ppcl/simcompile.py` | Compiles each line to a closure once. **The only implementation of what a PPCL statement does** -- there is no tree-walker beside it to drift. |
 | `ppcl/generator.py` | `Builder` (symbolic labels) plus fixed program templates. |
 | `ppcl/redact.py` | Anonymise site-identifying names. |
 | `ppcl/sequence/` | Document model, text DSL, and the compiler that turns a decision table into PPCL. |
@@ -57,6 +58,14 @@ so it runs on any engineering workstation without a package install.
   posture for any transform that could silently change what the panel runs.
 - **`LOOP` simulation is approximate and must keep saying so at runtime.**
   Siemens does not publish the PID internals.
+- **`simcompile.py` is the one implementation of execution.** Do not add a
+  second path that walks the tree. Compiled closures look up `sim.command`,
+  `sim.release` and `sim.panel` when they run -- the debugger replaces
+  `command` after compilation to catch writes. Only a program's own nodes go
+  in the expression cache; the debugger's temporary conditions are compiled
+  per use, because their ids get reused. `tests/test_simcompile.py` holds
+  all three. Change it against a golden record of bench and trace output,
+  byte for byte, not against the tests alone.
 - **Read-only with respect to building systems.** No panel writes, no network
   code, no BACnet/P2 client. This tool reads and writes files; the engineer
   loads them.
@@ -130,7 +139,7 @@ on idiomatic PPCL gets turned off.
 ## Testing
 
 ```bash
-python -m pytest tests -q          # 560 tests; CI runs 3.10-3.14
+python -m pytest tests -q          # 578 tests, ~1 min; CI runs 3.10-3.14
 python -m ppcl.cli lint samples    # exercises the CLI against real programs
 ```
 

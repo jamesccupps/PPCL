@@ -630,16 +630,12 @@ def test_every_command_is_either_simulated_or_declared_unsimulated():
     confident wrong number, which is what LOOP's standing disclaimer exists to
     avoid. Saying so is the right one.
     """
-    import pathlib
-    import re
-    from ppcl import simulator, spec
+    from ppcl import simcompile, simulator, spec
 
-    src = pathlib.Path("ppcl/simulator.py").read_text(encoding="utf-8")
-    body = src[src.index("def _exec_command"):
-               src.index("# -- individual command implementations")]
-    modelled = set(re.findall(r'name == "([A-Z0-9]+)"', body))
-    for grp in re.findall(r"name in \(([^)]*)\)", body):
-        modelled |= set(re.findall(r'"([A-Z0-9]+)"', grp))
+    # Read off the compiler's own command table. This used to regex the
+    # source of a 130-line if-chain, which the compiler replaced; a table is
+    # data, and asking it is more honest than pattern-matching the code.
+    modelled = set(simcompile.COMMANDS)
 
     # GOTO/GOSUB/RETURN/SAMPLE are their own AST nodes, handled before this
     # ever sees a CommandCall.
@@ -647,6 +643,9 @@ def test_every_command_is_either_simulated_or_declared_unsimulated():
     unaccounted = (set(spec.ALL) - modelled - set(simulator.UNMODELLED)
                    - branch_nodes)
     assert unaccounted == set(), sorted(unaccounted)
+
+    # And nothing is both: an explicit implementation would silently win.
+    assert not (modelled & set(simulator.UNMODELLED))
 
 
 def test_an_unsimulated_command_names_the_points_it_did_not_write():

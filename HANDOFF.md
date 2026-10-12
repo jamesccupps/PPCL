@@ -85,7 +85,7 @@ runs on any engineering workstation with no install. Windows is the primary
 platform.
 
 ```bash
-python -m pytest tests -q          # 560 tests, ~4 min
+python -m pytest tests -q          # 578 tests, ~1 min
 python -m ppcl.cli serve           # the app
 python -m ppcl.cli lint samples    # exercises the CLI on real programs
 python -m ppcl.cli help            # the built-in documentation
@@ -95,7 +95,7 @@ python -m ppcl.cli help            # the built-in documentation
 
 ## 2. Current state
 
-**560 tests passing**, and CI runs them on Python 3.10-3.14 on Linux plus
+**578 tests passing**, and CI runs them on Python 3.10-3.14 on Linux plus
 3.10 and 3.14 on Windows. ~22,500 lines Python, ~5,000 lines UI, ~6,300
 lines tests. 90 lint rules, 66 commands, 99 BACnet properties, 30 block types,
 17 CLI subcommands, 11 MCP tools, 12 help pages, 21 settings, 6 firmware
@@ -596,6 +596,13 @@ write-up in RESEARCH-LOG.md, thirty-seventh pass.
   record. The profile blamed isinstance and was wrong; the cost was trace
   records nobody read and per-read name handling.
 - **pyflakes clean**, **CI on 3.10-3.14**. 3.10 and 3.11 had never run.
+- **The interpreter is now a compiler** (`ppcl/simcompile.py`): each line
+  becomes a closure once, and the tree-walker is gone rather than kept beside
+  it. ~2.7x faster than before the audit, output still byte-identical; the
+  suite runs in about a minute.
+- **The simulator ran PXC.A lines disabled with "# "**; they now start
+  disabled, and ENABLE/ACT can turn them back on.
+- **Server port** is a setting, and `ppcl.bat 8800` works.
 
 ### Tier 3.5 — the reference deliverable (the user has asked for this)
 
