@@ -381,3 +381,111 @@ def test_save_outside_the_workspace_is_refused(ws, tmp_path):
     )
     assert status == 400
     assert not (tmp_path.parent / "escaped.ppcl").exists()
+
+
+# --------------------------------------------------------------------------
+# The HTTP layer: what another web page can and cannot make it do
+# --------------------------------------------------------------------------
+#
+# Everything above calls dispatch() directly, which is why this went untested:
+# the request checks live in the server, not the API. Before them, a page on
+# another domain overwrote a program in the workspace with a text/plain POST,
+# and a DNS-rebound request listed every program and the absolute path. These
+# run the real server on an ephemeral port and send what a browser would.
+
+
+@pytest.fixture
+def live(tmp_path):
+    import threading
+
+    from ppcl.web import server
+
+    (tmp_path / "AHU1.ppcl").write_text("10 C ORIGINAL" + chr(10), encoding="utf-8")
+    saved = server.Handler.workspace, server.Handler.quiet
+    server.Handler.workspace = api.Workspace(str(tmp_path))
+    server.Handler.quiet = True
+    httpd = server.ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        yield httpd.server_address[1], tmp_path
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        server.Handler.workspace, server.Handler.quiet = saved
+
+
+def _request(port, path, body=None, headers=None, method=None):
+    import urllib.error
+    import urllib.request
+
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(
+        "http://127.0.0.1:%d%s" % (port, path), data=data,
+        method=method or ("POST" if data is not None else "GET"),
+        headers=headers or {},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status, json.loads(resp.read() or b"{}")
+    except urllib.error.HTTPError as err:
+        return err.code, json.loads(err.read() or b"{}")
+
+
+_TAMPER = {"path": "AHU1.ppcl", "text": "10 C TAMPERED" + chr(10)}
+
+
+def test_another_page_cannot_save_with_a_simple_cross_site_post(live):
+    """text/plain needs no preflight, so a browser sends it from any page."""
+    port, root = live
+    status, payload = _request(port, "/api/save", _TAMPER, {
+        "Origin": "https://evil.example", "Content-Type": "text/plain"})
+    assert status == 415
+    assert (root / "AHU1.ppcl").read_text(encoding="utf-8").startswith("10 C ORIGINAL")
+
+
+def test_another_page_cannot_save_even_with_a_json_content_type(live):
+    """The Origin check stands on its own, not only behind the content type."""
+    port, root = live
+    status, payload = _request(port, "/api/save", _TAMPER, {
+        "Origin": "https://evil.example", "Content-Type": "application/json"})
+    assert status == 403
+    assert "evil.example" in payload["error"]
+    assert (root / "AHU1.ppcl").read_text(encoding="utf-8").startswith("10 C ORIGINAL")
+
+
+def test_a_dns_rebound_request_cannot_read_the_workspace(live):
+    """The rebound page arrives under its own domain, and only Host shows it."""
+    port, _ = live
+    status, payload = _request(port, "/api/files", headers={
+        "Host": "attacker.example:%d" % port})
+    assert status == 403
+    assert "files" not in payload and "root" not in payload
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "LOCALHOST"])
+def test_the_workbench_own_ui_still_saves(live, host):
+    """Exactly what core.js sends. If this fails the UI cannot save."""
+    port, root = live
+    status, payload = _request(port, "/api/save", _TAMPER, {
+        "Host": "%s:%d" % (host, port),
+        "Origin": "http://%s:%d" % (host.lower(), port),
+        "Content-Type": "application/json"})
+    assert status == 200, payload
+    assert (root / "AHU1.ppcl").read_text(encoding="utf-8").startswith("10 C TAMPERED")
+
+
+def test_a_script_with_no_origin_still_works(live):
+    """curl and scripts send no Origin; they were never the threat."""
+    port, _ = live
+    status, payload = _request(port, "/api/lint", {"text": "10 GOTO 10" + chr(10)},
+                               {"Content-Type": "application/json"})
+    assert status == 200, payload
+
+
+def test_no_other_page_may_frame_the_ui(live):
+    """Framing the UI is how a page would steer a click onto Save."""
+    import urllib.request
+
+    port, _ = live
+    with urllib.request.urlopen("http://127.0.0.1:%d/" % port, timeout=10) as resp:
+        assert "frame-ancestors 'none'" in resp.headers["Content-Security-Policy"]

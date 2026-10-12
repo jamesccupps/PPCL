@@ -12,6 +12,13 @@ Deliberate limits, because this process writes files:
   rejects absolute paths and anything escaping the root.
 * Request bodies are capped, and a handler that raises returns a 500 rather
   than killing the server.
+* **Other web pages cannot drive it.** Binding to localhost is not, on its
+  own, a boundary: any page open in the same browser can send a POST to
+  127.0.0.1, and a "simple" one -- text/plain, no preflight -- goes straight
+  through. A page that rebinds its own domain to 127.0.0.1 gets further still,
+  and can read the replies. So every request must name this server in its
+  ``Host``, and every POST must be ``application/json`` and, when a browser
+  sent an ``Origin``, come from this server's own. See :meth:`Handler._refuse`.
 * No shell execution, no outbound connections, no building-system access.
 """
 
@@ -55,6 +62,68 @@ class Handler(BaseHTTPRequestHandler):
     workspace = None
     quiet = False
 
+    # -- request validation ------------------------------------------------
+
+    _LOOPBACK = ("127.0.0.1", "::1", "localhost")
+
+    def _own_hosts(self):
+        """Every spelling of this server's address a browser might send."""
+        host, port = self.server.server_address[:2]
+        names = {"127.0.0.1", "localhost", "[::1]"}
+        if host not in self._LOOPBACK:
+            names.add("[%s]" % host if ":" in host else host)
+        return {"%s:%d" % (name, port) for name in names}
+
+    def _refuse(self, method):
+        """Why this request must not be served, or None if it may be.
+
+        Reproduced before this existed: from a page on another domain, a
+        text/plain POST to /api/save overwrote a program in the workspace and
+        came back 200; with the Host header of a rebound domain, /api/files
+        listed every program and the absolute workspace path. The programs in
+        that workspace are what gets loaded onto building controllers.
+
+        Three checks, each closing a different door:
+
+        ``Host`` must name this server. A DNS-rebinding page reaches us under
+        its own domain name, and this is the only place that shows. Only
+        enforced on a loopback bind: someone who deliberately serves on a LAN
+        address may reach it under names we cannot list, and has already been
+        warned that the port is open and unauthenticated.
+
+        A POST must be ``application/json``. A browser will only send that
+        cross-origin after a CORS preflight, and this server answers no
+        preflight, so the browser never sends the request at all.
+
+        A POST that carries an ``Origin`` must carry ours. Browsers attach one
+        to every POST, so this refuses another page outright. A request with
+        no ``Origin`` is not from a browser page -- a script, curl, a test --
+        and those were never the threat.
+        """
+        bound = self.server.server_address[0]
+        if bound in self._LOOPBACK:
+            host = (self.headers.get("Host") or "").strip().lower()
+            if host not in self._own_hosts():
+                return (403, "refused: Host %r is not this workbench. Open it "
+                        "at http://localhost:%d/ instead."
+                        % (host, self.server.server_address[1]))
+        if method != "POST":
+            return None
+        ctype = (self.headers.get("Content-Type") or "").split(";")[0]
+        if ctype.strip().lower() != "application/json":
+            return (415, "refused: the API only accepts application/json")
+        origin = self.headers.get("Origin")
+        if origin is not None:
+            # Same-origin means the page's origin is the address the request
+            # arrived at. On loopback the Host check above has already pinned
+            # that to this server; on a deliberate LAN bind it is whatever name
+            # the engineer typed, which is why this compares rather than lists.
+            here = "http://" + (self.headers.get("Host") or "").strip().lower()
+            if origin.strip().lower() != here:
+                return (403, "refused: a request from %s cannot use this "
+                        "workbench" % origin)
+        return None
+
     # -- plumbing ----------------------------------------------------------
 
     def log_message(self, fmt, *args):
@@ -72,10 +141,12 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
         # This UI loads nothing from anywhere else, so say so.
+        # frame-ancestors: no other page may frame the UI and steer a click
+        # onto Save.
         self.send_header(
             "Content-Security-Policy",
             "default-src 'self'; style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data:; connect-src 'self'",
+            "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'",
         )
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
@@ -87,6 +158,9 @@ class Handler(BaseHTTPRequestHandler):
     # -- routes ------------------------------------------------------------
 
     def do_GET(self):
+        refusal = self._refuse("GET")
+        if refusal:
+            return self._send(refusal[0], {"error": refusal[1]})
         path = self.path.split("?", 1)[0]
         if path == "/":
             return self._static("index.html")
@@ -109,6 +183,12 @@ class Handler(BaseHTTPRequestHandler):
         if length > MAX_UPLOAD:
             return self._send(413, {"error": "request too large"})
         raw = self.rfile.read(length) if length else b"{}"
+        # Refused only after the body is off the socket. Answering first and
+        # closing with unread bytes queued makes Windows send a TCP reset, and
+        # the client sees a dropped connection instead of the reason.
+        refusal = self._refuse("POST")
+        if refusal:
+            return self._send(refusal[0], {"error": refusal[1]})
         try:
             body = json.loads(raw.decode("utf-8") or "{}")
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
