@@ -849,6 +849,18 @@ def test_the_line_after_a_disabled_one_still_runs():
     assert sim.panel.value("Y") == 5.0
     assert sim.panel.value("X") == 0.0
 
+def test_a_line_disabled_in_the_text_can_be_enabled_by_the_program():
+    """On PXC.A the "# " is the disabled state, so ENABLE turns it back on."""
+    from ppcl.simulator import Simulator
+
+    tab = chr(9)
+    text = chr(10).join(["00010" + tab + "ENABLE(20)",
+                         "00020" + tab + "# X = 99",
+                         "00030" + tab + "GOTO 10", ""])
+    sim = Simulator(parser.parse(text), firmware=spec.Firmware.PXC_A)
+    sim.run(passes=2)
+    assert sim.panel.value("X") == 99.0
+
 def test_redaction_keeps_an_OIP_keystroke_sequence_intact():
     """An OIP sequence is keystrokes, not a point name.
 
