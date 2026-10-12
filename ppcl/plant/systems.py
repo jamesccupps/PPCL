@@ -117,6 +117,14 @@ class AirHandler:
 
     # -- commands from PPCL ------------------------------------------------
 
+    #: Every name apply() accepts. Kept next to it, and held to it by a test,
+    #: because the bench needs to check a binding WITHOUT commanding anything.
+    COMMANDS = frozenset({"sfan", "sfan_speed", "rfan", "oa_damper",
+                          "hw_valve", "cw_valve", "freeze_reset"})
+
+    def commands(self) -> frozenset:
+        return self.COMMANDS
+
     def apply(self, name: str, value: float) -> bool:
         """Apply a command. Returns False if the name is unknown."""
         if name == "sfan":
@@ -238,6 +246,11 @@ class HotWaterPlant:
     boiler_on: bool = False
     pumps: dict = field(default_factory=lambda: {"P1": False, "P2": False})
     supply_sensor: Sensor = field(default_factory=lambda: Sensor(tau=60.0))
+
+    def commands(self) -> frozenset:
+        """Every name apply() accepts. Pumps are named by what is installed."""
+        return frozenset({"boiler", "setpoint"}
+                         | {"pump%s" % key[1:] for key in self.pumps})
 
     def apply(self, name: str, value: float) -> bool:
         if name == "boiler":

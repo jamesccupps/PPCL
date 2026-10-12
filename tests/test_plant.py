@@ -466,3 +466,53 @@ def test_generated_template_sequences_heating_and_cooling_apart():
             "both valves open at t+%.0fs: HW %.1f%%, CW %.1f%%"
             % (sample["elapsed"], hw, cw)
         )
+
+
+def _system_factories():
+    """One maker per system type, so every apply() runs on a fresh instance."""
+    from ppcl.plant.systems import HotWaterPlant
+
+    return [
+        lambda: build_plant({"preset": "single_zone_ahu"}).systems["AHU1"],
+        lambda: HotWaterPlant(name="HW1"),
+    ]
+
+
+def test_every_listed_command_is_one_apply_accepts():
+    """commands() is a second list of the names apply() takes, so it can drift.
+
+    The bench validates bindings against commands() precisely so that it
+    never has to call apply() to find out. That only holds if the two agree,
+    and nothing but this test makes them.
+    """
+    for make in _system_factories():
+        kind = type(make()).__name__
+        for name in make().commands():
+            assert make().apply(name, 0.0), (
+                "%s lists %r but apply() refuses it" % (kind, name))
+        assert not make().apply("no_such_command", 0.0), kind
+
+
+def test_building_a_bench_does_not_command_the_plant():
+    """Validation used to apply 0.0 to every bound output to see if it existed.
+
+    A hot-water plant at 180 F went to 0 F before the program ran a line. The
+    shipped AHU presets hid it only because their actuators start at zero.
+    """
+    from ppcl.plant.bench import Binding
+
+    plant = build_plant({"systems": [
+        {"kind": "hot_water_plant", "name": "HW1", "setpoint": 180.0}]})
+    prog = parser.parse("10 SET(180.0,HWSP)" + chr(10) + "20 GOTO 10" + chr(10))
+    TestBench(prog, plant, [Binding("HWSP", "HW1.setpoint", "command")])
+    assert plant.systems["HW1"].setpoint == 180.0
+
+
+def test_a_mistyped_command_binding_is_still_refused():
+    """Checking by name must not loosen the check it replaced."""
+    from ppcl.plant.bench import Binding
+
+    plant = build_plant({"systems": [{"kind": "hot_water_plant", "name": "HW1"}]})
+    prog = parser.parse("10 SET(180.0,HWSP)" + chr(10) + "20 GOTO 10" + chr(10))
+    with pytest.raises(KeyError):
+        TestBench(prog, plant, [Binding("HWSP", "HW1.setpiont", "command")])

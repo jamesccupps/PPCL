@@ -377,9 +377,12 @@ class TestBench:
             if b.direction == "sensor":
                 self.plant.read(b.path)
             elif b.direction == "command":
+                # Checked by name, never by commanding it. This used to call
+                # system.apply(name, 0.0) and keep the result -- so building a
+                # bench drove every bound output to zero before the program ran
+                # a line. A hot-water plant's setpoint went from 180 F to 0.
                 system, name = self.plant._split(b.path)
-                probe = system.outputs()
-                if not system.apply(name, 0.0):
+                if name not in system.commands():
                     raise KeyError(
                         "binding for point %s targets %r, which is not a "
                         "command on system %s" % (b.point, name, system.name)
