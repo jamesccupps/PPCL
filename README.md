@@ -1,5 +1,7 @@
 # PPCL Workbench
 
+[![tests](https://github.com/jamesccupps/PPCL/actions/workflows/tests.yml/badge.svg)](https://github.com/jamesccupps/PPCL/actions/workflows/tests.yml)
+
 Read, inspect, lint, debug, optimise and **write** Siemens **PPCL**.
 
 PPCL is not a legacy language. Siemens' 2025 reference manual for its current

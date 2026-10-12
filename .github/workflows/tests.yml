@@ -1,0 +1,55 @@
+name: tests
+
+# pyproject says Python 3.10 and up, and until this existed nothing had ever
+# run the suite on anything but the version on the author's own machine.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Read-only. Nothing here needs to write to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: py${{ matrix.python }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          # Windows at both ends of the range: the server has Windows-only
+          # socket handling, and the oldest and newest are where it breaks.
+          - os: windows-latest
+            python: "3.10"
+          - os: windows-latest
+            python: "3.14"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # Test tooling only. The package itself has no dependencies.
+      - name: Install test tools
+        run: python -m pip install "pytest>=8,<10" "pyflakes>=3.2,<4"
+
+      - name: pyflakes
+        run: python -m pyflakes ppcl tests
+
+      - name: Tests
+        run: python -m pytest tests -q -p no:cacheprovider
+
+      - name: CLI starts
+        run: python -m ppcl --version
