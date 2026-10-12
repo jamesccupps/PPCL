@@ -817,6 +817,38 @@ def test_the_ordinary_functions_stay_quiet():
     assert sim.panel.value("A") == pytest.approx(4.0 + 1.0 + 45.0)
     assert sim.warnings == []
 
+def test_a_line_disabled_in_the_text_does_not_run():
+    """PXC.A disables a line with "# " in the text, and the panel skips it.
+
+    The parser marked it disabled and the linter honoured that, but the
+    simulator only skipped comments -- so code an engineer had switched off
+    kept controlling the point in simulation.
+    """
+    from ppcl.simulator import Simulator
+
+    tab = chr(9)
+    text = chr(10).join(["00010" + tab + "X = 1",
+                         "00020" + tab + "# X = 99",
+                         "00030" + tab + "GOTO 10", ""])
+    sim = Simulator(parser.parse(text), firmware=spec.Firmware.PXC_A)
+    sim.run(passes=3)
+    assert sim.panel.value("X") == 1.0
+    assert sim.starved_lines == []
+
+
+def test_the_line_after_a_disabled_one_still_runs():
+    """Skipping a disabled line must not skip what follows it."""
+    from ppcl.simulator import Simulator
+
+    tab = chr(9)
+    text = chr(10).join(["00010" + tab + "# X = 99",
+                         "00020" + tab + "Y = 5",
+                         "00030" + tab + "GOTO 10", ""])
+    sim = Simulator(parser.parse(text), firmware=spec.Firmware.PXC_A)
+    sim.run(passes=2)
+    assert sim.panel.value("Y") == 5.0
+    assert sim.panel.value("X") == 0.0
+
 def test_redaction_keeps_an_OIP_keystroke_sequence_intact():
     """An OIP sequence is keystrokes, not a point name.
 

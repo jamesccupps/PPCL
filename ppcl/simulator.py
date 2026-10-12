@@ -264,7 +264,18 @@ class Simulator:
         # here instead of on every line of every pass. A branch used to find
         # its target with numbers.index(), a scan of the whole program per GOTO.
         self._pc_of = {number: pc for pc, number in enumerate(self.numbers)}
-        self._comment_at = [self.index[n].is_comment for n in self.numbers]
+        # Lines the panel never evaluates. Comments, and also a PXC.A line
+        # disabled with "# " in the text and a statement the compiler saved
+        # as UNKNOWN(...). Those last two used to be missing, so a line an
+        # engineer had switched off with "# " still ran in simulation -- the
+        # parser marked it disabled and nothing here asked. PARAMETER lines
+        # are deliberately not in this list; they keep their existing
+        # handling.
+        self._skip_at = [
+            self.index[n].is_comment or self.index[n].disabled
+            or self.index[n].unknown
+            for n in self.numbers
+        ]
         self.disabled_lines = set()
         self.parameters = {}
         self.locals_declared = set()
@@ -664,7 +675,7 @@ class Simulator:
 
             number = self.numbers[self._pc]
 
-            if self._comment_at[self._pc] or number in self.disabled_lines:
+            if self._skip_at[self._pc] or number in self.disabled_lines:
                 self._pc += 1
                 continue
             line = self.index[number]
