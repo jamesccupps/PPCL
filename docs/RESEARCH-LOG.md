@@ -3727,3 +3727,86 @@ was wrong:
 3. The table gives `PDLSET` four leading operands where `spec` requires six. No
    corpus call anywhere to arbitrate, so **nothing changed** — a manual-derived
    signature is not worth overturning on a bitfield.
+
+---
+
+## 2026-10-11 (thirty-seventh pass) — an audit, and what it found
+
+Not research: a deliberate audit of the code, the repository, performance and
+accuracy, asked for by name. Every finding below was reproduced before it was
+fixed, and each fix is its own commit.
+
+### Five defects, and the shape they share
+
+| Defect | How it showed |
+|---|---|
+| The web server could be driven by another web page | A text/plain POST from another domain overwrote a program; a DNS-rebound request listed the workspace and its absolute path |
+| Renumber kept a stale `GOTO` on a line it could not lex | "2 line references rewritten" when there were three, exit 0 |
+| Building a test bench zeroed plant setpoints | A hot-water plant built at 180 F began its run at 0 F |
+| The MCP instructions said 75 rules | Every client read it at connect; there are 90 |
+| The simulator computed `LOG` as the natural log, and `LN` as zero | Three days after `spec.py` was corrected |
+
+Four of the five are the same mistake: **converting "cannot tell" into "nothing
+here".** A swallowed lexer exception became "this line holds no references". A
+binding check by side effect became "the output is now zero". An unimplemented
+function fell through to `return 0.0`. A request with no checks became "this
+came from our own UI". In each case the code had no way to know the answer and
+produced a confident one anyway. The fixes all go the same way: refuse, warn,
+or check — never default.
+
+The fifth is the one this log has recorded before: **nothing fails when a
+claim stops being true.** It happened twice more. `spec.FUNCTIONS` was
+corrected and the simulator that implements it was not. And the rule count was
+made to compute in one MCP string and left hand-written in another — with a
+test written specifically to prevent that, which passed, because it scanned
+source lines and the phrase was split across two string literals. A guard is
+only worth anything once it has been seen to fail. That one now has been.
+
+### Localhost is not a boundary
+
+The server bound to 127.0.0.1 and treated that as the security model. Any page
+open in the same browser can POST to 127.0.0.1, and a "simple" request —
+`text/plain`, no preflight — goes straight through. A page that rebinds its
+own domain to 127.0.0.1 gets further, and reads the replies. The workspace
+sandbox confined the damage to `.ppcl` files, but those are the files that get
+loaded onto building controllers. `Host`, `Origin` and `Content-Type` are now
+each checked, and the UI's own requests are tested under both `localhost` and
+`127.0.0.1` so a fix that broke Save would fail first. The existing web tests
+had all called `dispatch()` directly, which is how the HTTP layer went
+untested.
+
+### The profiler was wrong about the simulator
+
+Seven bench tests were 79% of the suite's runtime. `cProfile` blamed 81
+million `isinstance` calls. Replacing every one of them with type-keyed
+dispatch changed the wall time by nothing measurable.
+
+The reason is that `cProfile` charges its own overhead to every function call,
+so code made of millions of tiny calls looks far worse under it than it runs.
+Splitting real wall time — no profiler, one timer per executed line, bucketed
+by statement kind — showed the cost spread evenly at ~10 µs a line, with a bare
+`GOTO` at 3.1 µs. A `GOTO` does almost nothing, so that was the tell: the cost
+was per-line overhead every statement paid. Most of it was **trace records
+nobody read** — the bench consumes only blocked commands, yet every write
+formatted a string and built an event — and **per-read name handling**, three
+`upper()` calls and a dozen comparisons to an answer fixed per name.
+
+Five steps, each held to a golden record of 4 MB of bench and trace output that
+was first captured twice to prove the simulator deterministic, and that stayed
+byte-identical after every step. Interleaved, best of two per side, three
+rounds: **1.4×**. A bare `GOTO` now costs 0.8 µs. The next step change would be
+compiling expressions to closures once, which is a rewrite of the interpreter
+core, and was offered rather than done.
+
+### Checked and fine
+
+Repository hygiene; packaging ships all twelve UI files; no 3.11- or 3.12-only
+syntax or APIs; lint runs at ~3,900 lines a second; import takes 0.23 s; the
+two broad `except` clauses that remain are a top-level server loop and are
+right. Python 3.12 passes locally. CI now runs 3.10–3.14 — 3.10 and 3.11 had
+never been run at all.
+
+### Left for the owner
+
+The roadmap's read-only BACnet adapter contradicts CLAUDE.md's "no BACnet/P2
+client" invariant outright. HANDOFF now marks it blocked on that decision.

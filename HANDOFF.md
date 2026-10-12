@@ -4,7 +4,7 @@
 otherwise be lost: what exists, what is verified versus assumed, which
 decisions were deliberate, and what to build next.
 
-Last updated: 2026-10-08. Thirty-six research passes; see
+Last updated: 2026-10-11. Thirty-seven research passes; see
 docs/RESEARCH-LOG.md. The first twenty were sources; ten after that audited
 this project's own artifacts instead, and found more. The thirty-sixth opened
 a source class the others did not have -- the shipped toolchain's own
@@ -85,7 +85,7 @@ runs on any engineering workstation with no install. Windows is the primary
 platform.
 
 ```bash
-python -m pytest tests -q          # 537 tests, ~150s
+python -m pytest tests -q          # 560 tests, ~4 min
 python -m ppcl.cli serve           # the app
 python -m ppcl.cli lint samples    # exercises the CLI on real programs
 python -m ppcl.cli help            # the built-in documentation
@@ -95,8 +95,9 @@ python -m ppcl.cli help            # the built-in documentation
 
 ## 2. Current state
 
-**537 tests passing.** ~21,000 lines Python, ~4,900 lines UI, ~4,700 lines
-tests. 90 lint rules, 66 commands, 99 BACnet properties, 30 block types,
+**560 tests passing**, and CI runs them on Python 3.10-3.14 on Linux plus
+3.10 and 3.14 on Windows. ~22,500 lines Python, ~5,000 lines UI, ~6,300
+lines tests. 90 lint rules, 66 commands, 99 BACnet properties, 30 block types,
 17 CLI subcommands, 11 MCP tools, 12 help pages, 20 settings, 6 firmware
 families, 29 panel error codes.
 
@@ -437,6 +438,10 @@ tune rules speculatively; tune them against programs that run in a building.
 ### Tier 3 — integration
 8. **BACnet point adapter.** Read live values via bacpypes3 (optional import)
    to seed a bench run from real building state. **Read-only.**
+   **Blocked on a decision, not on work:** this contradicts CLAUDE.md's
+   invariant "no network code, no BACnet/P2 client" outright, read-only or
+   not. One of the two has to change, and that is the owner's call. Do not
+   start it until it is made.
 9. Import from a Desigo CC export / P2 database file.
 
 ### Done since this list was written (2026-09-18)
@@ -564,6 +569,33 @@ priority every pass), `W342` (captured SSTO adjustment), `W343` (unguarded
 
 **Point types `LFMSSL`/`LFMSSP`** added -- three-speed, named on every speed
 command page in the Insight help and absent from Table 3-2.
+
+### Done since, the audit (2026-10-11)
+
+A deliberate audit -- code, repo, performance, accuracy -- rather than new
+features. Every finding below was reproduced before it was fixed. Full
+write-up in RESEARCH-LOG.md, thirty-seventh pass.
+
+- **The web server could be driven by any web page you had open.** A
+  text/plain POST from another domain overwrote a program; a DNS-rebound
+  request listed the workspace and its absolute path. Host, Origin and
+  Content-Type are now checked, and eight tests drive the real server.
+- **Renumber kept a stale GOTO on a line it could not lex**, reported
+  success and exited 0. Now it refuses, naming the line. The UI also asked
+  "how should duplicates be handled?" about every refusal; it now asks only
+  about duplicates.
+- **Building a test bench zeroed plant setpoints** (180 F to 0 F) by
+  validating bindings with apply(name, 0.0).
+- **The MCP instructions said 75 rules**, and the guard test was blind to it
+  because the phrase was split across two string literals. It now scans AST
+  constants, and was proved to fail on the old text.
+- **The simulator computed LOG as the natural log and LN as zero**, three
+  days after spec.py was corrected. A test now requires every function in
+  spec.FUNCTIONS to be simulated or to warn.
+- **Simulator 1.4x faster**, output byte-identical against a 4 MB golden
+  record. The profile blamed isinstance and was wrong; the cost was trace
+  records nobody read and per-read name handling.
+- **pyflakes clean**, **CI on 3.10-3.14**. 3.10 and 3.11 had never run.
 
 ### Tier 3.5 — the reference deliverable (the user has asked for this)
 
