@@ -92,8 +92,9 @@ export const bench = {
 
     if (r.error || !r.ok) {
       clear($('charts'));
-      $('bench-status').innerHTML = '<span class="e">failed</span>';
-      $('b-notes').appendChild(el('div', 'note err',
+      $('bench-status').innerHTML = r.undriven
+        ? 'not run' : '<span class="e">failed</span>';
+      $('b-notes').appendChild(el('div', r.undriven ? 'note' : 'note err',
         r.error || 'the run failed'));
       (r.errors || []).forEach((e) => {
         $('b-notes').appendChild(el('div', 'note err',

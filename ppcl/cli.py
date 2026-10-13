@@ -376,6 +376,13 @@ def cmd_bench(args):
         for check in default_checks():
             bench.add_check(check)
 
+    undriven = bench.undriven_reason()
+    if undriven and not args.force:
+        print(undriven, file=sys.stderr)
+        print("`ppcl run` simulates any program against point values, and "
+              "--force benches it anyway.", file=sys.stderr)
+        return 1
+
     for item in args.set or []:
         name, _, value = item.partition("=")
         bench.panel.load({name.strip(): value.strip()})
@@ -1367,7 +1374,8 @@ def build_parser():
     sp.add_argument("--list-faults", action="store_true",
                     help="list fault kinds and presets, then exit")
     sp.add_argument("--force", action="store_true",
-                    help="bench even if the program has lint errors")
+                    help="bench even if the program has lint errors, or "
+                         "drives none of the bench's equipment")
     sp.add_argument("--format", default="text", choices=["text", "json", "csv"])
     sp.set_defaults(func=cmd_bench)
 

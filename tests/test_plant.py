@@ -375,6 +375,27 @@ def test_bench_rejects_a_bad_binding_direction():
         TestBench(prog, plant, [Binding("SFAN", "AHU1.dat", "sideways")])
 
 
+#: Invented, and controls nothing the air-handler bench models.
+_TOWER = ("10\tIF(TWR.LVG .GT. 85.0) THEN ON(TWR.FAN) ELSE OFF(TWR.FAN)\n"
+          "20\tGOTO 10\n")
+
+
+def test_a_program_that_drives_none_of_the_equipment_is_named_as_such():
+    """It used to run and pass every check: the air handler ran unattended
+    and the checks described that, not the program."""
+    bench = _bench(_TOWER)
+    assert bench.driven_outputs() == []
+    reason = bench.undriven_reason()
+    assert reason and "SFAN" in reason
+
+
+def test_a_write_on_a_branch_the_run_never_takes_still_counts():
+    """That program is in control, and choosing not to act."""
+    bench = _bench("10\tIF(OAT .LT. -100.0) THEN ON(SFAN)\n20\tGOTO 10\n")
+    assert bench.driven_outputs() == ["SFAN"]
+    assert bench.undriven_reason() is None
+
+
 def test_commands_reach_the_plant_and_sensors_come_back():
     bench = _bench("10\tON(SFAN)\n20\tSET(100.0,HVLV)\n30\tGOTO 10\n")
     result = bench.run(seconds=600, dt=10)

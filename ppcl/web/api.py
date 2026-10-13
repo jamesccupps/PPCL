@@ -552,6 +552,11 @@ def api_bench(body, ws=None):
         }
     )
     bench = TestBench(prog, plant, default_bindings())
+    undriven = bench.undriven_reason()
+    if undriven:
+        return {"ok": False, "undriven": True, "error": undriven +
+                " Debug runs any program: step through it and set point "
+                "values as it goes."}
     bench.sample_interval = max(10.0, seconds / 400.0)
     bench.clock.hours = float(body.get("start_hour", 5.0))
 

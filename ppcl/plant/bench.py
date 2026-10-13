@@ -26,6 +26,7 @@ import json
 from dataclasses import dataclass, field
 
 from .. import spec
+from ..analyzer import analyze
 from ..simulator import Clock, Panel, Simulator
 from .systems import Plant
 
@@ -395,6 +396,37 @@ class TestBench:
                     "binding for point %s has direction %r; expected 'sensor' "
                     "or 'command'" % (b.point, b.direction)
                 )
+
+    def driven_outputs(self) -> list:
+        """The bound outputs the program has a statement that writes.
+
+        Read from the statements rather than from a run, so a write on a
+        branch a particular run never takes still counts: that program is in
+        control, and is choosing not to act.
+        """
+        written = {use.name.upper() for use in analyze(self.simulator.program).uses
+                   if use.kind == "write"}
+        return [b.point for b in self.bindings
+                if b.direction == "command" and b.point.upper() in written]
+
+    def undriven_reason(self):
+        """Why a run would say nothing about this program, or None.
+
+        A program that commands none of the bench's equipment still "passes":
+        the equipment runs with nothing in control and the checks describe
+        that. A cooling tower program on an air-handler bench came back with
+        every check green.
+        """
+        if self.driven_outputs():
+            return None
+        outputs = ", ".join(b.point for b in self.bindings
+                            if b.direction == "command")
+        return (
+            "This program writes none of the points the bench drives its "
+            "equipment through (%s), so a run would show the equipment with "
+            "nothing in control, and its checks would pass or fail without "
+            "the program having any say." % outputs
+        )
 
     def add_fault(self, fault: Fault) -> None:
         self.faults.append(fault)

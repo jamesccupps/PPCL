@@ -562,6 +562,12 @@ Point priority arbitration is **exact** -- if a command is refused because the
 point is owned at a higher priority, the bench reports it. That is the defect
 this catches most often.
 
+The program drives the air handler through `SFAN`, `RFAN`, `OADPR`, `HVLV`
+and `CVLV`. One that writes none of them -- a cooling tower or a boiler
+program -- is not run, because the checks would pass or fail with the program
+having no say. **Debug** runs any program: step it, watch points, and set
+their values as it goes.
+
 ## What is not
 
 * `SSTO`, the `PDL` family, `OIP`, `DC` and `DCR` are traced but not modelled.

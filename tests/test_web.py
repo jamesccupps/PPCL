@@ -359,6 +359,17 @@ def test_the_default_bench_run_gets_the_full_panel_rate():
     assert hours * 3600 * bench.lines_per_second <= api.BENCH_LINE_BUDGET
 
 
+def test_bench_refuses_a_program_that_drives_none_of_its_equipment(ws):
+    """Rather than report "all checks passed" for an air handler running
+    with nothing in control -- and it points at Debug, which runs anything."""
+    _s, payload = api.dispatch("/api/bench", {
+        "text": "00010\tIF(TWR.LVG .GT. 85.0) THEN ON(TWR.FAN)\n00020\tGOTO 10\n",
+        "seconds": 600}, ws)
+    assert payload["ok"] is False and payload["undriven"] is True
+    assert "Debug" in payload["error"]
+    assert "passed" not in payload
+
+
 def test_short_bench_runs_at_the_full_panel_rate(ws):
     _s, payload = api.dispatch(
         "/api/bench",
