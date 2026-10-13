@@ -23,8 +23,12 @@ from .. import parser as ppcl_parser
 MAX_UPLOAD = 4 * 1024 * 1024  # a PPCL program is never megabytes
 
 #: Ceiling on simulated statement evaluations for one bench request, so
-#: the UI stays responsive. The CLI has no such limit.
-BENCH_LINE_BUDGET = 1_500_000
+#: the UI stays responsive. The CLI has no such limit. Sized so the UI's
+#: default three-hour run gets the panel's full 500 lines a second: since
+#: the simulator was compiled that takes about as long as the same request
+#: took at 139 lines a second before. Longer runs still have their rate
+#: lowered, and say so.
+BENCH_LINE_BUDGET = 5_400_000
 
 
 class ApiError(Exception):

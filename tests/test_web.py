@@ -338,6 +338,27 @@ def test_bench_clamps_an_absurd_duration(ws):
     assert any("line rate was reduced" in w for w in payload["warnings"])
 
 
+def test_the_default_bench_run_gets_the_full_panel_rate():
+    """The UI's default run length fits the budget at the full line rate.
+
+    The budget was sized for that, so raising the default hours, or the
+    panel rate, without the budget would quietly halve the fidelity of the
+    run most people press.
+    """
+    import re
+
+    from ppcl import parser
+    from ppcl.plant import TestBench, build_plant, default_bindings
+
+    html = open(os.path.join(os.path.dirname(api.__file__), "static",
+                             "index.html"), encoding="utf-8").read()
+    hours = int(re.search(r'id="b-hours" value="(\d+)"', html).group(1))
+    bench = TestBench(parser.parse("00010\tGOTO 10\n"),
+                      build_plant({"preset": "single_zone_ahu"}),
+                      default_bindings())
+    assert hours * 3600 * bench.lines_per_second <= api.BENCH_LINE_BUDGET
+
+
 def test_short_bench_runs_at_the_full_panel_rate(ws):
     _s, payload = api.dispatch(
         "/api/bench",
