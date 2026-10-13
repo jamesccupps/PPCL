@@ -1222,7 +1222,12 @@ Field Panel", Vendor Identifier 7, Protocol Revision 7:
 |---|---|
 | `PXME V3.5.3 BACnet 4.3g` | `BME1300_0017` |
 | `PXME V3.5.5 BACnet 4.3g` | `BME1320_0003` |
+| `PXME V3.5.7 BACnet 4.3g` | `BME1340_0002` |
 | `EPXC V3.5.2 BACnet 4.3g` | `BXE1290_0049` |
+
+*The 3.5.7 row was in the screenshots and missed when this table was first
+transcribed; added in the thirty-eighth pass, which also identifies that
+panel's hardware.*
 
 **P2 network** — PXC panels on the APOGEE side:
 
@@ -3852,3 +3857,47 @@ Reading the line loop for the rewrite also turned up one more correctness
 defect, fixed separately and first: the simulator ran PXC.A lines disabled
 with `# `. They now start in the runtime disabled set, so `ENABLE` can turn
 them back on, as it does on a panel.
+
+---
+
+## 2026-10-13 (thirty-eighth pass) — a new panel, and the suffix that does not mean what it seems
+
+A panel installed this year reports `PXME V3.5.7 BACnet 4.3g` and application
+software `BME1340_0002`. The question was whether "newer" meant a newer way of
+programming it. It does not, and the reason is worth keeping.
+
+### The firmware strings say one product line
+
+Model Name "Siemens BACnet Field Panel", Protocol Revision 7 — the same as a
+panel at the same site last restored in 2009. The application software number
+continues one series across the estate: `BME1300` on 3.5.3, `BME1320` on 3.5.5,
+`BME1340` on 3.5.7. That is point releases of one firmware line, not a
+different platform.
+
+What the strings cannot do is say Compact or Modular. A panel named as a
+Compact by the site convention also reports `PXME`, so the `M` in `PXME` is not
+"Modular". Only the hardware says.
+
+### The hardware
+
+Read off the label: **PXC100-E96.A** with a **PXX-485.3** on top, a
+**TXS1.12F4** TX-I/O power supply, and TX-I/O modules. 125-3020, the APOGEE
+BACnet ALN field panel manual, names the PXX-485.3 as the PXC Modular's
+primary FLN port. A PXC Modular, programmed from the same manual as the rest
+of the estate; `apogee` is the right lint firmware.
+
+### The `.A` suffix is not the PXC.A generation
+
+This pass first told the engineer that a `.A` suffix marks the PXC.A
+generation. It does not: the PXC Modular's own part number ends `E96.A`. The
+PXC.A generation is identified by its model number — **PXC4, PXC5, PXC7**
+(A6V12954388 calls them PXC4.A, PXC5.A, PXC7.A). PXC00, PXC100, PXC128 or a
+PXX-485.3 is the older line. Recorded here so the next reader does not repeat
+it.
+
+### For the day this panel is modernised
+
+The 2026 migration manual (A6V13998441) keeps the TX-I/O when a PXC Modular is
+replaced by a PXC7.A — only the controller changes — and sends the PPCL to the
+PXC.A manual for rework. That is when `pxc_a` becomes the lint firmware, and
+not before.
