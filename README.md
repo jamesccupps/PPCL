@@ -79,7 +79,9 @@ Opens a local IDE in the browser with six panes over everything below.
 
 ### Editor
 
-A PPCL editor that checks as you type. Multi-file tabs, syntax colouring, and
+A PPCL editor that checks as you type. **Open** reads a program from anywhere
+on the machine — a Desigo or Insight `.pcl` export, say — or drop the file on
+the window. Multi-file tabs, syntax colouring, and
 error, warning and unresolved-point markers in the gutter — click a finding to
 jump to it.
 

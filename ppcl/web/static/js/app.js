@@ -45,7 +45,8 @@ async function loadFiles() {
   if (r.error) { node.appendChild(el('div', 'empty', r.error)); return; }
   if (!r.files.length) {
     node.appendChild(el('div', 'empty',
-      'No .ppcl, .seq or .blocks.json files in ' + r.root + '.'));
+      'No .ppcl, .seq or .blocks.json files in ' + r.root +
+      '. Open reads a program from anywhere else.'));
     return;
   }
   r.files.forEach((file) => {
@@ -100,6 +101,71 @@ async function saveActive() {
   editor.markSaved(answer.path);
   loadFiles();
   toast('saved ' + answer.path + ' (' + r.bytes + ' bytes)', 'good');
+}
+
+/* A file from anywhere on this machine, read by the browser itself. The
+ * server never sees its path, so the workspace sandbox is untouched, and
+ * Save writes a copy into the workspace rather than back over the original. */
+
+const MAX_OPEN = 4 * 1024 * 1024;  // the API refuses more than this anyway
+
+/** Desigo and Insight export ASCII with CRLF, but a comment can carry a
+ * Windows-1252 byte -- a degree sign is 0xB0 -- which is not valid UTF-8.
+ * So UTF-8 is tried strictly and 1252 is the fallback. */
+function decodeProgram(buffer) {
+  let text;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  } catch (err) {
+    text = new TextDecoder('windows-1252').decode(buffer);
+  }
+  return text.replace(/\r\n?/g, '\n');
+}
+
+async function openLocal(files) {
+  for (const file of Array.from(files || [])) {
+    if (file.size > MAX_OPEN) {
+      toast(file.name + ' is too large to be a PPCL program', 'bad');
+      continue;
+    }
+    const text = decodeProgram(await file.arrayBuffer());
+    if (text.includes('\0')) {
+      toast(file.name + ' is not a text file', 'bad');
+      continue;
+    }
+    const open = editor.tabs.find((t) => t.path === file.name);
+    if (open && open.text !== open.saved && !window.confirm(
+      file.name + ' is already open with unsaved changes. Replace it?')) {
+      continue;
+    }
+    CURRENT_FILE = null;
+    editor.set(text, file.name);
+    switchPane('editor');
+    toast('opened ' + file.name + ' -- Save puts a copy in the workspace',
+      'good');
+  }
+}
+
+function initOpen() {
+  const input = $('file-open');
+  $('btn-open').onclick = () => input.click();
+  input.onchange = async () => {
+    await openLocal(input.files);
+    input.value = '';  // so choosing the same file again still fires
+  };
+
+  /* A file dropped anywhere opens in the editor. Left to itself the browser
+   * would navigate to the file and take the unsaved work with it. */
+  const carriesFiles = (e) =>
+    Array.from((e.dataTransfer && e.dataTransfer.types) || []).includes('Files');
+  document.addEventListener('dragover', (e) => {
+    if (carriesFiles(e)) e.preventDefault();
+  });
+  document.addEventListener('drop', (e) => {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    openLocal(e.dataTransfer.files);
+  });
 }
 
 /* ------------------------------------------------------------ points */
@@ -231,6 +297,10 @@ function initKeyboard() {
         e.preventDefault();
         saveActive();
         break;
+      case 'o':
+        e.preventDefault();
+        $('file-open').click();
+        break;
       case 'f':
         e.preventDefault();
         switchPane('editor');
@@ -348,6 +418,7 @@ async function boot() {
 
   $('btn-new').onclick = () => editor.newTab('untitled.ppcl', '');
   $('btn-save').onclick = saveActive;
+  initOpen();
   $('btn-refresh-files').onclick = loadFiles;
 
   $('btn-fmt').onclick = async () => {

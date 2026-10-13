@@ -154,6 +154,7 @@ memory transfers.
 | --- | --- |
 | `Ctrl` `G` | Go to a program statement by line number |
 | `Ctrl` `F` | Find, and replace when the editor is focused |
+| `Ctrl` `O` | Open a file from anywhere on this computer |
 | `Ctrl` `S` | Save |
 | `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo |
 | `Ctrl` `/` | Comment or uncomment the selected statements |
