@@ -415,6 +415,53 @@ def test_save_keeps_a_backup_of_what_it_overwrote(ws):
         assert "ON(SFAN)" in fh.read()
 
 
+#: How Desigo and Insight export: CRLF, and Windows-1252 in comments.
+_EXPORT = b"00010\tC RESET AT 85\xb0F\r\n00020\tGOTO 10\r\n"
+
+
+def test_a_windows_1252_export_keeps_its_degree_sign(ws):
+    """Read as UTF-8 with replacement, 0xB0 became U+FFFD, and Save wrote
+    that out -- the byte was gone from the file and from its .bak."""
+    path = os.path.join(ws.root, "programs", "export.pcl")
+    with open(path, "wb") as fh:
+        fh.write(_EXPORT)
+
+    _s, opened = api.dispatch("/api/open", {"path": "programs/export.pcl"}, ws)
+    assert opened["encoding"] == "cp1252"
+    assert "85\N{DEGREE SIGN}F" in opened["text"]
+    assert "\r" not in opened["text"]
+
+    api.dispatch("/api/save", {"path": "programs/export.pcl",
+                               "text": opened["text"],
+                               "encoding": opened["encoding"]}, ws)
+    with open(path, "rb") as fh:
+        assert b"85\xb0F" in fh.read()
+    with open(path + ".bak", "rb") as fh:
+        assert fh.read() == _EXPORT
+
+
+def test_save_refuses_a_character_the_file_encoding_cannot_hold(ws):
+    path = os.path.join(ws.root, "programs", "a.ppcl")
+    with open(path, "rb") as fh:
+        before = fh.read()
+    status, payload = api.dispatch(
+        "/api/save", {"path": "programs/a.ppcl", "encoding": "cp1252",
+                      "text": "00010\tC ok\n00020\tC \N{RIGHTWARDS ARROW}\n"}, ws)
+    assert status == 400
+    assert "line 2" in payload["error"]
+    with open(path, "rb") as fh:
+        assert fh.read() == before
+
+
+def test_a_utf8_file_opens_and_saves_as_utf8(ws):
+    _s, opened = api.dispatch("/api/open", {"path": "programs/a.ppcl"}, ws)
+    assert opened["encoding"] == "utf-8"
+    api.dispatch("/api/save", {"path": "programs/new.ppcl",
+                               "text": "00010\tC 85\N{DEGREE SIGN}F\n"}, ws)
+    with open(os.path.join(ws.root, "programs", "new.ppcl"), "rb") as fh:
+        assert fh.read() == "00010\tC 85\N{DEGREE SIGN}F\n".encode("utf-8")
+
+
 def test_open_a_missing_file_is_404(ws):
     status, payload = api.dispatch("/api/open", {"path": "nope.ppcl"}, ws)
     assert status == 404

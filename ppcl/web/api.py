@@ -15,6 +15,7 @@ Two safety rules hold throughout, because this process can write files:
 from __future__ import annotations
 
 import os
+import shutil
 import traceback
 
 from .. import analyzer, formatter, linter, sequence, spec
@@ -632,14 +633,33 @@ def api_files(body, ws=None):
     return {"root": ws.root, "files": ws.listing()}
 
 
+#: How a file is read, in order. Desigo and Insight export Windows-1252 -- a
+#: degree sign in a comment is 0xB0, which is not UTF-8 -- and Latin-1 is
+#: last because it decodes any byte at all. A file is saved in the encoding
+#: it was read in, so a byte nobody edited is a byte that does not change.
+TEXT_ENCODINGS = ("utf-8", "cp1252", "latin-1")
+
+
+def _read_text(path):
+    with open(path, "rb") as fh:
+        raw = fh.read()
+    for encoding in TEXT_ENCODINGS:
+        try:
+            text = raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+        return text.replace("\r\n", "\n").replace("\r", "\n"), encoding
+    raise AssertionError("latin-1 decodes every byte")
+
+
 def api_open(body, ws=None):
     if ws is None:
         raise ApiError("no workspace is configured", 500)
     path = ws.resolve(body.get("path"))
     if not os.path.isfile(path):
         raise ApiError("no such file: %s" % body.get("path"), 404)
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
-        return {"path": body.get("path"), "text": fh.read()}
+    text, encoding = _read_text(path)
+    return {"path": body.get("path"), "text": text, "encoding": encoding}
 
 
 def api_save(body, ws=None):
@@ -647,18 +667,29 @@ def api_save(body, ws=None):
         raise ApiError("no workspace is configured", 500)
     path = ws.resolve(body.get("path"))
     text = _text(body)
+    encoding = body.get("encoding") or "utf-8"
+    if encoding not in TEXT_ENCODINGS:
+        raise ApiError("unknown encoding %r" % encoding)
+    try:
+        data = text.encode(encoding)
+    except UnicodeEncodeError as err:
+        raise ApiError(
+            "line %d contains %r, which %s cannot hold. The file was read in "
+            "that encoding and is saved the same way so nothing else in it "
+            "changes; remove the character to save."
+            % (text.count("\n", 0, err.start) + 1, text[err.start], encoding)
+        )
     os.makedirs(os.path.dirname(path) or ws.root, exist_ok=True)
     if os.path.exists(path) and body.get("backup", True):
         try:
-            with open(path, "r", encoding="utf-8", errors="replace") as src:
-                previous = src.read()
-            with open(path + ".bak", "w", encoding="utf-8", newline="\n") as dst:
-                dst.write(previous)
+            # Bytes, not text: a backup that went through a decoder is not
+            # the file it is backing up.
+            shutil.copyfile(path, path + ".bak")
         except OSError:
             pass  # a missing backup must not block the save
-    with open(path, "w", encoding="utf-8", newline="\n") as fh:
-        fh.write(text)
-    return {"ok": True, "path": body.get("path"), "bytes": len(text)}
+    with open(path, "wb") as fh:
+        fh.write(data)
+    return {"ok": True, "path": body.get("path"), "bytes": len(data)}
 
 
 # --------------------------------------------------------------------------

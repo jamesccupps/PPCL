@@ -80,6 +80,7 @@ async function openFile(file) {
     return;
   }
   editor.set(r.text, file.path);
+  editor.tab.encoding = r.encoding;
   switchPane('editor');
 }
 
@@ -94,6 +95,7 @@ async function saveActive() {
   if (!answer || !answer.path) return;
   const r = await post('/api/save', {
     path: answer.path, text: editor.get(),
+    encoding: editor.tab ? editor.tab.encoding : undefined,
     backup: SETTINGS.backup_on_save !== false,
   });
   if (r.error) { toast(r.error, 'bad'); return; }
@@ -111,15 +113,18 @@ const MAX_OPEN = 4 * 1024 * 1024;  // the API refuses more than this anyway
 
 /** Desigo and Insight export ASCII with CRLF, but a comment can carry a
  * Windows-1252 byte -- a degree sign is 0xB0 -- which is not valid UTF-8.
- * So UTF-8 is tried strictly and 1252 is the fallback. */
+ * So UTF-8 is tried strictly and 1252 is the fallback, and the tab
+ * remembers which, so Save writes the file back the same way. */
 function decodeProgram(buffer) {
   let text;
+  let encoding = 'utf-8';
   try {
     text = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
   } catch (err) {
     text = new TextDecoder('windows-1252').decode(buffer);
+    encoding = 'cp1252';
   }
-  return text.replace(/\r\n?/g, '\n');
+  return { text: text.replace(/\r\n?/g, '\n'), encoding };
 }
 
 async function openLocal(files) {
@@ -128,7 +133,7 @@ async function openLocal(files) {
       toast(file.name + ' is too large to be a PPCL program', 'bad');
       continue;
     }
-    const text = decodeProgram(await file.arrayBuffer());
+    const { text, encoding } = decodeProgram(await file.arrayBuffer());
     if (text.includes('\0')) {
       toast(file.name + ' is not a text file', 'bad');
       continue;
@@ -140,6 +145,7 @@ async function openLocal(files) {
     }
     CURRENT_FILE = null;
     editor.set(text, file.name);
+    editor.tab.encoding = encoding;
     switchPane('editor');
     toast('opened ' + file.name + ' -- Save puts a copy in the workspace',
       'good');
