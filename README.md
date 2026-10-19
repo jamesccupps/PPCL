@@ -289,10 +289,10 @@ sequence "AHU-1 single zone"
   equipment AHU1
 
 points
-  SFAN    digital output
-  HVLV    analog  output
-  MAT     analog  input
-  DMD     analog  local
+  SFAN    LDO
+  HVLV    LAO
+  MAT     LAI
+  DMD     local
 
 modes
   Unoccupied  otherwise
@@ -317,6 +317,9 @@ loop Discharge
   throttling 10
   range 0 to 100
 ```
+
+Each point carries its panel type (`LDO`, `LAI`, `MV`...), `local` for a
+program local, or `-` to take it from the loaded point database.
 
 Modes are listed lowest priority first and the last match wins, so putting a
 shutdown mode after the occupied mode is all it takes to override it. A cell

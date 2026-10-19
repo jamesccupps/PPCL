@@ -140,19 +140,52 @@ CELL_ACTIONS = {
 }
 
 
+#: A program local: a virtual point only this program sees, written $NAME.
+LOCAL = "local"
+
+#: How a sequence written before point types read its "kind role" pair.
+#: The words are APOGEE's own -- LAI is the logical analog input -- and on
+#: APOGEE a virtual point is an LAO or LDO with no physical address. A
+#: loaded point database still overrides whatever this gives.
+LEGACY_TYPES = {
+    ("analog", "input"): "LAI", ("analog", "output"): "LAO",
+    ("analog", "virtual"): "LAO", ("digital", "input"): "LDI",
+    ("digital", "output"): "LDO", ("digital", "virtual"): "LDO",
+}
+
+
+def legacy_type(kind, role):
+    """The point type an old ``kind``/``role`` pair described."""
+    if (role or "").lower() == LOCAL:
+        return LOCAL
+    return LEGACY_TYPES.get(((kind or "").lower(), (role or "").lower()), "")
+
+
 @dataclass
 class Point:
     """A point the sequence uses."""
 
     name: str
-    kind: str = "analog"  # "analog" | "digital"
-    role: str = "output"  # "input" | "output" | "virtual" | "local"
+    #: The panel's point type -- LAI, LDO, LOOAP, MV and so on -- or
+    #: ``local`` for a program local, or blank to take it from the loaded
+    #: point database. It replaced an analog/digital "kind" that the
+    #: compiler never read.
+    ptype: str = ""
     units: str = ""
     description: str = ""
 
     @property
     def is_local(self) -> bool:
-        return self.role == "local"
+        return self.ptype.lower() == LOCAL
+
+
+def point_from_dict(data: dict) -> Point:
+    """A point from JSON, including one saved with the old kind and role."""
+    data = dict(data)
+    kind, role = data.pop("kind", None), data.pop("role", None)
+    if not data.get("ptype") and (kind or role):
+        data["ptype"] = legacy_type(kind, role)
+    return Point(**data)
 
 
 @dataclass
@@ -446,7 +479,7 @@ def from_dict(data: dict) -> Sequence:
         start_line=int(data.get("start_line", 10)),
         line_step=int(data.get("line_step", 10)),
     )
-    seq.points = [Point(**p) for p in data.get("points", [])]
+    seq.points = [point_from_dict(p) for p in data.get("points", [])]
     seq.modes = [
         Mode(m["name"], condition_from_dict(m.get("when")), m.get("description", ""))
         for m in data.get("modes", [])

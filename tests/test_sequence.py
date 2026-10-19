@@ -32,15 +32,15 @@ sequence "Test AHU"
   author Tester
 
 points
-  SFAN    digital output
-  OADPR   analog  output
-  HVLV    analog  output
-  CVLV    analog  output
-  MAT     analog  input
-  DAT     analog  input
-  ZNT     analog  input
-  DASP    analog  virtual
-  DMD     analog  local
+  SFAN    LDO
+  OADPR   LAO
+  HVLV    LAO
+  CVLV    LAO
+  MAT     LAI
+  DAT     LAI
+  ZNT     LAI
+  DASP    LAO
+  DMD     local
 
 modes
   Unoccupied  otherwise
@@ -270,8 +270,8 @@ def test_table_groups_points_sharing_an_action():
         "  SFAN        off         on        off\n"
         "  RFAN        off         on        off",
     ).replace(
-        "  SFAN    digital output",
-        "  SFAN    digital output\n  RFAN    digital output",
+        "  SFAN    LDO",
+        "  SFAN    LDO\n  RFAN    LDO",
     )
     _seq, ppcl_text, _w = compile_text(text)
     assert "ON(SFAN,RFAN)" in ppcl_text
@@ -351,7 +351,7 @@ def test_modulate_without_a_driver_warns():
         "reset HVLV from DMD\n  50 -> 0\n  100 -> 100\n", ""
     ).replace("loop Discharge\n  measure DAT\n  output DMD\n", "loop Discharge\n  measure DAT\n  output DMD2\n")
     seq = sequence.parse(text)
-    seq.points.append(Point(name="DMD2", kind="analog", role="local"))
+    seq.points.append(Point(name="DMD2", ptype="local"))
     _text, warnings = compile_sequence(seq)
     assert any("HVLV" in w and "modulate" in w for w in warnings)
 
@@ -477,3 +477,81 @@ def test_shutdown_mode_prevents_simultaneous_heating_and_cooling():
             "dt=%d: both valves open after a freeze trip (HW %.1f%%, CW %.1f%%)"
             % (dt, hw, cw)
         )
+
+
+# --------------------------------------------------------------------------
+# Point types
+# --------------------------------------------------------------------------
+
+#: The points section as it was written before point types.
+_LEGACY_POINTS = """
+points
+  SFAN    digital output   supply fan
+  OADPR   analog  output
+  HVLV    analog  output
+  CVLV    analog  output
+  MAT     analog  input    mixed air temperature
+  DAT     analog  input
+  ZNT     analog  input
+  DASP    analog  virtual
+  DMD     analog  local
+"""
+
+
+def _with_points(section):
+    start = AHU.index("points\n")
+    end = AHU.index("modes\n")
+    return AHU[:start] + section.lstrip("\n") + "\n" + AHU[end:]
+
+
+def test_a_sequence_written_with_kind_and_role_still_reads():
+    """The words were APOGEE's: "analog input" is what LAI stands for."""
+    seq = sequence.parse(_with_points(_LEGACY_POINTS))
+    types = {p.name: p.ptype for p in seq.points}
+    assert types == {"SFAN": "LDO", "OADPR": "LAO", "HVLV": "LAO",
+                     "CVLV": "LAO", "MAT": "LAI", "DAT": "LAI", "ZNT": "LAI",
+                     "DASP": "LAO", "DMD": "local"}
+    assert seq.point("MAT").description == "mixed air temperature"
+    assert seq.point("DMD").is_local
+
+
+def test_the_point_type_changes_no_compiled_program():
+    """The old analog/digital kind was never read by the compiler, and the
+    type that replaced it is not either: same sequence, same PPCL."""
+    _s, old, old_w = compile_text(_with_points(_LEGACY_POINTS))
+    _s, new, new_w = compile_text(AHU)
+    assert old == new and old_w == new_w
+
+
+def test_point_types_render_and_read_back():
+    text = _with_points(
+        "points\n  SFAN  LOOAP  supply fan\n  MODE  mv\n  DMD   local\n"
+        "  MAT   -      mixed air\n  ZNT\n"
+        "  DAT   LAI\n  HVLV  LAO\n  OADPR LAO\n  CVLV  LAO\n  DASP  LAO\n")
+    seq = sequence.parse(text)
+    types = {p.name: p.ptype for p in seq.points}
+    assert types["SFAN"] == "LOOAP" and types["MODE"] == "MV"
+    assert types["DMD"] == "local" and types["MAT"] == "" and types["ZNT"] == ""
+    rendered = sequence.render(seq)
+    assert "SFAN   LOOAP   supply fan" in rendered
+    assert "MAT    -       mixed air" in rendered
+    assert sequence.render(sequence.parse(rendered)) == rendered
+
+
+def test_an_unknown_point_type_is_refused_with_the_choices():
+    with pytest.raises(sequence.SequenceSyntaxError) as err:
+        sequence.parse(_with_points("points\n  SFAN  fan  supply fan\n"))
+    assert "not a point type" in err.value.message
+    assert "local" in err.value.message and "'-'" in err.value.message
+
+
+def test_a_document_saved_with_kind_and_role_loads():
+    doc = sequence.to_dict(sequence.parse(AHU))
+    for p in doc["points"]:
+        p.pop("ptype")
+        p["kind"], p["role"] = "analog", "input"
+    doc["points"][0].update(kind="digital", role="local")
+    seq = sequence.from_dict(doc)
+    assert seq.points[0].ptype == "local"
+    assert all(p.ptype == "LAI" for p in seq.points[1:])
+    assert "kind" not in sequence.to_dict(seq)["points"][0]

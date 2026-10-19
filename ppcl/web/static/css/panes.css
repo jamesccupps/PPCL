@@ -121,6 +121,10 @@ table.dt td.off select { color: var(--dim); }
   display: flex; align-items: center; gap: 8px; margin-bottom: 9px;
 }
 .card .cardhead .name { font-weight: 600; flex: 1; }
+.card .cardhead .ptype { font-family: var(--mono); font-size: 11px;
+  font-weight: 400; color: var(--accent); margin-left: 9px; }
+.card .pthint { color: var(--dim); font-size: 12px; line-height: 1.45;
+  margin-top: 8px; }
 .card .grid2 {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 9px;

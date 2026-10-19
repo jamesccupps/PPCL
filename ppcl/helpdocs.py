@@ -310,6 +310,23 @@ A decision table puts equipment down the side and modes of operation across
 the top. Each cell says what that equipment does in that mode. It is Siemens'
 own recommended way to organise a sequence before writing any code.
 
+## Points
+
+Each point gets its panel type -- `LAI`, `LDO`, `LOOAP`, `AV`, `MV` and the
+rest -- or `local` for a virtual point only this program sees, written
+`$NAME`, or `-` to take the type from the point database loaded in Settings.
+In the text form that is one word after the name:
+
+```
+points
+  SFAN   LDO     supply fan
+  MAT    LAI     mixed air temperature
+  DMD    local   heat/cool demand
+```
+
+A sequence written the older way, `SFAN digital output`, still opens: those
+words are what LDO stands for, and it is read as LDO.
+
 ## Modes are ordered, and the last match wins
 
 Modes are listed lowest priority first. Every mode whose condition holds sets

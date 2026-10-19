@@ -10,8 +10,8 @@ type than click.
       author James Cupps
 
     points
-      SFAN  digital output
-      MAT   analog input   mixed air temperature
+      SFAN  LDO    supply fan
+      MAT   LAI    mixed air temperature
 
     modes
       Occupied    when TIME between 6:00 and 18:00
@@ -36,7 +36,9 @@ from __future__ import annotations
 
 import re
 
+from ..points import type_info
 from .model import (
+    LOCAL,
     All,
     Always,
     Any,
@@ -49,6 +51,7 @@ from .model import (
     Reset,
     Rule,
     Sequence,
+    legacy_type,
 )
 
 
@@ -338,32 +341,45 @@ def _parse_metadata(seq, lines, i):
     return i
 
 
+#: Written where a point's type is left to the point database.
+UNTYPED = "-"
+
+
 def _parse_points(seq, lines, i):
+    """``NAME TYPE description...``, TYPE a point type, ``local`` or ``-``.
+
+    The form before point types, ``NAME analog|digital [role] ...``, still
+    reads, and means the APOGEE type those words spell out.
+    """
     block, i = _block(lines, i, _indent(lines[i - 1][1]))
     for line_no, raw in block:
         parts = raw.split()
-        if len(parts) < 2:
-            raise SequenceSyntaxError(
-                "a point needs at least a name and a kind, e.g. "
-                "'SFAN digital output'",
-                line_no,
-                raw,
-            )
-        name = parts[0]
-        kind = parts[1].lower()
-        if kind not in ("analog", "digital"):
-            raise SequenceSyntaxError(
-                "point kind must be 'analog' or 'digital', not %r" % parts[1],
-                line_no,
-                raw,
-            )
-        role = "output"
-        rest = parts[2:]
-        if rest and rest[0].lower() in ("input", "output", "virtual", "local"):
-            role = rest[0].lower()
-            rest = rest[1:]
+        name, rest = parts[0], parts[1:]
+        ptype = ""
+        if rest and rest[0].lower() in ("analog", "digital"):
+            kind, rest = rest[0], rest[1:]
+            role = "output"
+            if rest and rest[0].lower() in ("input", "output", "virtual",
+                                            LOCAL):
+                role, rest = rest[0], rest[1:]
+            ptype = legacy_type(kind, role)
+        elif rest:
+            word, rest = rest[0], rest[1:]
+            info = type_info(word)
+            if info is not None:
+                ptype = info.name
+            elif word.lower() == LOCAL:
+                ptype = LOCAL
+            elif word != UNTYPED:
+                raise SequenceSyntaxError(
+                    "%r is not a point type. Use one such as LAI, LDO, LOOAP, "
+                    "AV or MV; 'local' for a program local; or '-' to take "
+                    "it from the point database" % word,
+                    line_no,
+                    raw,
+                )
         seq.points.append(
-            Point(name=name, kind=kind, role=role, description=" ".join(rest))
+            Point(name=name, ptype=ptype, description=" ".join(rest))
         )
     return i
 
@@ -589,9 +605,8 @@ def render(seq: Sequence) -> str:
         out.append("points")
         width = max(len(p.name) for p in seq.points)
         for p in seq.points:
-            row = "  %-*s %-7s %s" % (width, p.name, p.kind, p.role)
-            if p.description:
-                row += "   " + p.description
+            row = "  %-*s  %-6s  %s" % (width, p.name, p.ptype or UNTYPED,
+                                       p.description)
             out.append(row.rstrip())
 
     if seq.modes:

@@ -18,7 +18,7 @@ import os
 import shutil
 import traceback
 
-from .. import analyzer, formatter, linter, sequence, spec
+from .. import analyzer, formatter, linter, points, sequence, spec
 from .. import parser as ppcl_parser
 
 MAX_UPLOAD = 4 * 1024 * 1024  # a PPCL program is never megabytes
@@ -431,6 +431,15 @@ def api_meta(body=None, ws=None):
         "priority_help": spec.PRIORITY_DESCRIPTIONS,
         "point_types": sorted(spec.POINT_TYPES),
         "bacnet_object_types": spec.BACNET_OBJECT_TYPES,
+        # The labelled, grouped list a person picks a point's type from, and
+        # what each one reads as -- shared by the Builder and the blocks.
+        "point_type_choices": [
+            {"value": v, "label": l, "group": g}
+            for v, l, g in points.TYPE_CHOICES
+        ],
+        "point_type_info": {
+            name: points.describe(info) for name, info in points.TYPES.items()
+        },
         "status_indicators": sorted(spec.STATUS_INDICATORS),
         "resident_points": sorted(spec.RESIDENT_POINTS),
         "reserved": sorted(spec.RESERVED_WORDS),

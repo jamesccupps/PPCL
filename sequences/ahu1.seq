@@ -5,16 +5,16 @@ sequence "AHU-1 single zone"
   description "Single zone AHU with freeze protection and discharge reset."
 
 points
-  SFAN    digital output   supply fan
-  RFAN    digital output   return fan
-  OADPR   analog  output   outside air damper
-  HVLV    analog  output   heating valve
-  CVLV    analog  output   cooling valve
-  MAT     analog  input    mixed air temperature
-  DAT     analog  input    discharge air temperature
-  ZNT     analog  input    zone temperature
-  DASP    analog  virtual  discharge air setpoint
-  DMD     analog  local    heat/cool demand
+  SFAN    LDO     supply fan
+  RFAN    LDO     return fan
+  OADPR   LAO     outside air damper
+  HVLV    LAO     heating valve
+  CVLV    LAO     cooling valve
+  MAT     LAI     mixed air temperature
+  DAT     LAI     discharge air temperature
+  ZNT     LAI     zone temperature
+  DASP    LAO     discharge air setpoint
+  DMD     local   heat/cool demand
 
 modes
   Unoccupied  otherwise

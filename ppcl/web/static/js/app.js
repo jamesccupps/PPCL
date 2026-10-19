@@ -408,7 +408,7 @@ async function boot() {
   };
 
   editor.init({ meta: META, settings: values });
-  builder.init();
+  builder.init({ meta: META });
   bench.init({ settings: values });
   await blocks.init();
   await help.init();

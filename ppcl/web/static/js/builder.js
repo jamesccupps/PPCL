@@ -25,7 +25,8 @@ export const builder = {
   text: '',
   onCompiled: null,
 
-  init() {
+  init(context) {
+    this.meta = (context && context.meta) || {};
     $('btn-seq-compile').onclick = () => this.compile();
     $('btn-seq-new').onclick = () => this.starter();
     $('btn-seq-save').onclick = () => this.save();
@@ -218,13 +219,16 @@ export const builder = {
 
   renderPoints(node) {
     this.head(node, 'Points', '+ Point', () => this.addPoint(),
-      'Declare a point so the compiler knows whether it is analog or digital, ' +
-      'and whether it is a program local.');
+      'Give each point its type, or leave it to the point database loaded ' +
+      'in Settings. A program local is a virtual point only this program ' +
+      'sees, written $NAME.');
     const cards = el('div', 'cards');
     (this.doc.points || []).forEach((point, index) => {
       const card = el('div', 'card');
       const head = el('div', 'cardhead');
-      head.appendChild(el('span', 'name', point.name));
+      const title = el('span', 'name', point.name);
+      if (point.ptype) title.appendChild(el('span', 'ptype', point.ptype));
+      head.appendChild(title);
       head.appendChild(el('div', 'spacer'));
       head.appendChild(this.removeButton(() => {
         this.doc.points.splice(index, 1);
@@ -234,35 +238,55 @@ export const builder = {
       const grid = el('div', 'grid2');
       grid.appendChild(field('Name', 'text', point.name, '',
         (v) => { point.name = v; this.sync(); }));
-      grid.appendChild(field('Kind', 'select', point.kind,
-        'Digital points read 1.0 when ON.',
-        (v) => { point.kind = v; this.sync(); }, ['analog', 'digital']));
-      grid.appendChild(field('Role', 'select', point.role,
-        'A local is a program-only virtual point, referenced as $NAME. PPCL ' +
-        'allows sixteen of them.',
-        (v) => { point.role = v; this.sync(); },
-        ['input', 'output', 'virtual', 'local']));
+      grid.appendChild(field('Type', 'select', point.ptype || '',
+        '', (v) => { point.ptype = v; this.sync(); }, null,
+        this.typeOptions()));
       grid.appendChild(field('Units', 'text', point.units, '',
         (v) => { point.units = v; this.sync(); }));
+      grid.appendChild(field('Description', 'text', point.description, '',
+        (v) => { point.description = v; this.sync(); }));
       card.appendChild(grid);
+      card.appendChild(el('div', 'pthint', this.typeHint(point.ptype)));
       cards.appendChild(card);
     });
     node.appendChild(cards);
   },
 
+  /** The type list: the point database, a program local, then every
+   *  APOGEE and BACnet type, grouped and labelled. */
+  typeOptions() {
+    return [
+      { value: '', label: 'Use the point database', group: '' },
+      { value: 'local', label: 'Program local ($NAME)', group: '' },
+    ].concat(this.meta.point_type_choices || []);
+  },
+
+  /** One plain sentence or two on what a type means for this point. */
+  typeHint(ptype) {
+    if (!ptype) {
+      return 'Taken from the point database when one is loaded in Settings.';
+    }
+    if (ptype === 'local') {
+      return 'A virtual point only this program sees, written $NAME. PPCL ' +
+             'allows sixteen of them.';
+    }
+    const info = (this.meta.point_type_info || {})[ptype];
+    return info ? info.label + '. ' + info.reads_hint + ' ' + info.role_hint
+                : '';
+  },
+
   async addPoint() {
     const answer = await ask('Add a point', [
       { name: 'name', label: 'Name', type: 'text' },
-      { name: 'kind', label: 'Kind', type: 'select', value: 'analog',
-        choices: ['analog', 'digital'] },
-      { name: 'role', label: 'Role', type: 'select', value: 'output',
-        choices: ['input', 'output', 'virtual', 'local'],
-        doc: 'A local is program-only and is referenced as $NAME.' },
+      { name: 'ptype', label: 'Type', type: 'select', value: '',
+        choices: this.typeOptions(),
+        doc: 'Leave it to the point database, or pick the type the panel ' +
+             'has. A program local is referenced as $NAME.' },
     ], 'Add');
     if (!answer || !answer.name.trim()) return;
     this.doc.points.push({
-      name: answer.name.trim(), kind: answer.kind, role: answer.role,
-      units: '', description: '',
+      name: answer.name.trim(), ptype: answer.ptype, units: '',
+      description: '',
     });
     this.sync();
   },
@@ -678,11 +702,31 @@ function cellClass(value) {
   return '';
 }
 
-function field(label, kind, value, doc, onChange, choices) {
+function field(label, kind, value, doc, onChange, choices, options) {
   const wrap = el('div', 'f');
   wrap.appendChild(el('label', '', label));
   let input;
-  if (kind === 'select') {
+  if (kind === 'select' && options) {
+    // Labelled choices, grouped where a group is given.
+    input = el('select');
+    const groups = {};
+    options.forEach((opt) => {
+      let parent = input;
+      if (opt.group) {
+        if (!groups[opt.group]) {
+          groups[opt.group] = el('optgroup');
+          groups[opt.group].label = opt.group;
+          input.appendChild(groups[opt.group]);
+        }
+        parent = groups[opt.group];
+      }
+      const o = el('option', '', opt.label);
+      o.value = opt.value;
+      if (String(opt.value) === String(value)) o.selected = true;
+      parent.appendChild(o);
+    });
+    input.onchange = () => onChange(input.value);
+  } else if (kind === 'select') {
     input = el('select');
     (choices || []).forEach((c) => {
       const o = el('option', '', c);
@@ -803,13 +847,13 @@ export const STARTER = [
   '  equipment AHU1',
   '',
   'points',
-  '  SFAN    digital output',
-  '  OADPR   analog  output',
-  '  HVLV    analog  output',
-  '  MAT     analog  input',
-  '  DAT     analog  input',
-  '  ZNT     analog  input',
-  '  DASP    analog  virtual',
+  '  SFAN    LDO',
+  '  OADPR   LAO',
+  '  HVLV    LAO',
+  '  MAT     LAI',
+  '  DAT     LAI',
+  '  ZNT     LAI',
+  '  DASP    LAO',
   '',
   'modes',
   '  Unoccupied  otherwise',

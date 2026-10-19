@@ -556,13 +556,13 @@ STARTER_SEQUENCE = '''sequence "New sequence"
   description "Describe what this equipment is supposed to do."
 
 points
-  SFAN    digital output   supply fan
-  OADPR   analog  output   outside air damper
-  HVLV    analog  output   heating valve
-  MAT     analog  input    mixed air temperature
-  DAT     analog  input    discharge air temperature
-  ZNT     analog  input    zone temperature
-  DASP    analog  virtual  discharge air setpoint
+  SFAN    LDO     supply fan
+  OADPR   LAO     outside air damper
+  HVLV    LAO     heating valve
+  MAT     LAI     mixed air temperature
+  DAT     LAI     discharge air temperature
+  ZNT     LAI     zone temperature
+  DASP    LAO     discharge air setpoint
 
 modes
   Unoccupied  otherwise

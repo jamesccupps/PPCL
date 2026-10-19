@@ -129,6 +129,41 @@ def _build_types():
 TYPES = _build_types()
 
 
+#: Every type, labelled and grouped the way an engineer looks for it, for
+#: the Point block and the Builder. Each type in ``TYPES`` appears exactly
+#: once; a test holds that.
+#: On APOGEE a virtual point is an LAO or LDO with no physical address, so
+#: those two say so rather than pretending virtual is a type of its own.
+TYPE_CHOICES = (
+    ("LAI", "LAI — analog input (sensor)", "APOGEE: analog and digital"),
+    ("LAO", "LAO — analog output, or virtual analog",
+     "APOGEE: analog and digital"),
+    ("LDI", "LDI — digital input (status, contact)",
+     "APOGEE: analog and digital"),
+    ("LDO", "LDO — digital output, or virtual digital",
+     "APOGEE: analog and digital"),
+    ("L2SL", "L2SL — two-state, latched, with proof", "APOGEE: motors"),
+    ("L2SP", "L2SP — two-state, pulsed, with proof", "APOGEE: motors"),
+    ("LOOAL", "LOOAL — on/off/auto, latched", "APOGEE: motors"),
+    ("LOOAP", "LOOAP — on/off/auto, pulsed", "APOGEE: motors"),
+    ("LFSSL", "LFSSL — fast/slow/stop, latched", "APOGEE: motors"),
+    ("LFSSP", "LFSSP — fast/slow/stop, pulsed", "APOGEE: motors"),
+    ("LFMSSL", "LFMSSL — fast/medium/slow/stop, latched", "APOGEE: motors"),
+    ("LFMSSP", "LFMSSP — fast/medium/slow/stop, pulsed", "APOGEE: motors"),
+    ("LPACI", "LPACI — pulse accumulator (meter)", "APOGEE: other"),
+    ("LCTLR", "LCTLR — controller (day/night)", "APOGEE: other"),
+    ("AI", "AI — analog input", "BACnet: analog"),
+    ("AO", "AO — analog output", "BACnet: analog"),
+    ("AV", "AV — analog value (virtual)", "BACnet: analog"),
+    ("BI", "BI — binary input", "BACnet: binary"),
+    ("BO", "BO — binary output", "BACnet: binary"),
+    ("BV", "BV — binary value (virtual)", "BACnet: binary"),
+    ("MI", "MI — multistate input", "BACnet: multistate"),
+    ("MO", "MO — multistate output", "BACnet: multistate"),
+    ("MV", "MV — multistate value (virtual)", "BACnet: multistate"),
+)
+
+
 def type_info(ptype):
     """The :class:`TypeInfo` for ``ptype``, or None if it is not one."""
     return TYPES.get((ptype or "").strip().upper())
