@@ -67,6 +67,9 @@ class Param:
     default: object = ""
     choices: tuple = ()
     doc: str = ""
+    #: For a choice: ``(value, label, group)`` per choice, when the bare
+    #: value means nothing to someone picking from the list.
+    options: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -139,6 +142,40 @@ def block_type(name, label, category, summary, **kw):
 # --------------------------------------------------------------------------
 
 
+#: The Point block's type list, grouped the way an engineer looks for it.
+#: Every type in ``points.TYPES`` appears exactly once; a test holds that.
+#: On APOGEE a virtual point is an LAO or LDO with no physical address, so
+#: those two say so rather than pretending virtual is a type of its own.
+_POINT_TYPE_OPTIONS = (
+    ("LAI", "LAI — analog input (sensor)", "APOGEE: analog and digital"),
+    ("LAO", "LAO — analog output, or virtual analog",
+     "APOGEE: analog and digital"),
+    ("LDI", "LDI — digital input (status, contact)",
+     "APOGEE: analog and digital"),
+    ("LDO", "LDO — digital output, or virtual digital",
+     "APOGEE: analog and digital"),
+    ("L2SL", "L2SL — two-state, latched, with proof", "APOGEE: motors"),
+    ("L2SP", "L2SP — two-state, pulsed, with proof", "APOGEE: motors"),
+    ("LOOAL", "LOOAL — on/off/auto, latched", "APOGEE: motors"),
+    ("LOOAP", "LOOAP — on/off/auto, pulsed", "APOGEE: motors"),
+    ("LFSSL", "LFSSL — fast/slow/stop, latched", "APOGEE: motors"),
+    ("LFSSP", "LFSSP — fast/slow/stop, pulsed", "APOGEE: motors"),
+    ("LFMSSL", "LFMSSL — fast/medium/slow/stop, latched", "APOGEE: motors"),
+    ("LFMSSP", "LFMSSP — fast/medium/slow/stop, pulsed", "APOGEE: motors"),
+    ("LPACI", "LPACI — pulse accumulator (meter)", "APOGEE: other"),
+    ("LCTLR", "LCTLR — controller (day/night)", "APOGEE: other"),
+    ("AI", "AI — analog input", "BACnet: analog"),
+    ("AO", "AO — analog output", "BACnet: analog"),
+    ("AV", "AV — analog value (virtual)", "BACnet: analog"),
+    ("BI", "BI — binary input", "BACnet: binary"),
+    ("BO", "BO — binary output", "BACnet: binary"),
+    ("BV", "BV — binary value (virtual)", "BACnet: binary"),
+    ("MI", "MI — multistate input", "BACnet: multistate"),
+    ("MO", "MO — multistate output", "BACnet: multistate"),
+    ("MV", "MV — multistate value (virtual)", "BACnet: multistate"),
+)
+
+
 @block_type(
     "point_in", "Point", "Inputs",
     "Read a point from the panel database.",
@@ -146,8 +183,14 @@ def block_type(name, label, category, summary, **kw):
     params=(
         Param("point", "Point name", "point", "",
               doc="The name exactly as it appears in the panel."),
-        Param("kind", "Type", "choice", "analog", ("analog", "digital"),
-              doc="Digital points read as 1.0 when ON and 0.0 when OFF."),
+        Param("ptype", "Point type", "choice", "",
+              ("",) + tuple(o[0] for o in _POINT_TYPE_OPTIONS),
+              doc="Filled in from the point database when one is loaded. "
+                  "Without one, pick it here: it tells you how the point "
+                  "reads, and the compiler warns when it is wired somewhere "
+                  "that reading does not fit.",
+              options=(("", "Use the point database", ""),)
+              + _POINT_TYPE_OPTIONS),
     ),
     help="The starting point for most logic. Any reference the panel accepts "
          "works here, including a colon-qualified FLN subpoint such as "
@@ -158,8 +201,7 @@ def _emit_point_in(ctx, block):
     name = ctx.text(block, "point")
     if not name:
         raise BlockError("this Point block has no point name", block.id)
-    digital = ctx.text(block, "kind", "analog") == "digital"
-    ctx.set_out(block, "out", ctx.point_value(name, digital=digital))
+    ctx.set_out(block, "out", ctx.read_point(block, name))
 
 
 @block_type(
@@ -249,6 +291,7 @@ _logic("nand", ".NAND.", "False only when every wired input is true.",
 )
 def _emit_not(ctx, block):
     value = ctx.value_in(block, "in")
+    ctx.check_condition(value)
     ctx.set_out(block, "out", ctx.compare(value, ".EQ.", ctx.const(0.0)))
 
 
@@ -966,7 +1009,9 @@ def catalog_payload() -> dict:
             "params": [
                 {"name": p.name, "label": p.label, "kind": p.kind,
                  "default": p.default, "choices": list(p.choices),
-                 "doc": p.doc}
+                 "doc": p.doc,
+                 "options": [{"value": v, "label": l, "group": g}
+                             for v, l, g in p.options]}
                 for p in bt.params
             ],
         }

@@ -171,6 +171,11 @@ def from_dict(data: dict) -> Diagram:
         line_step=int(data.get("line_step", 10)),
     )
     for raw in data.get("blocks", []):
+        params = dict(raw.get("params") or {})
+        if raw.get("type") == "point_in":
+            # An analog/digital "kind" that changed nothing in the compiled
+            # program. The point's real type replaced it.
+            params.pop("kind", None)
         dia.blocks.append(
             Block(
                 id=str(raw["id"]),
@@ -179,7 +184,7 @@ def from_dict(data: dict) -> Diagram:
                 y=float(raw.get("y", 0)),
                 label=str(raw.get("label", "")),
                 note=str(raw.get("note", "")),
-                params=dict(raw.get("params") or {}),
+                params=params,
             )
         )
     for raw in data.get("wires", []):

@@ -169,7 +169,7 @@ def test_a_value_used_twice_becomes_a_local():
 
 def test_not_compiles_to_a_comparison_and_no_statement():
     d = diagram(
-        ("p", "point_in", {"point": "ALARM1", "kind": "digital"}),
+        ("p", "point_in", {"point": "ALARM1", "ptype": "LDI"}),
         ("n", "not"),
         ("out", "command", {"point": "SFAN", "action": "on"}),
     )
@@ -259,7 +259,7 @@ def test_a_combinational_cycle_is_refused_and_names_the_blocks():
 
 def test_a_cycle_through_a_latch_is_allowed_and_reported():
     d = diagram(
-        ("p", "point_in", {"point": "TRIP", "kind": "digital"}),
+        ("p", "point_in", {"point": "TRIP", "ptype": "LDI"}),
         ("l", "latch", {}, "HOLD"),
         ("n", "not"),
         ("o", "command", {"point": "SFAN", "action": "on"}),
@@ -540,7 +540,7 @@ def test_no_statement_exceeds_the_operand_or_operator_limits(index):
 def test_a_command_with_release_writes_the_matching_release():
     """The single most common PPCL field defect, made impossible."""
     d = diagram(
-        ("p", "point_in", {"point": "TRIP", "kind": "digital"}),
+        ("p", "point_in", {"point": "TRIP", "ptype": "LDI"}),
         ("o", "command", {"point": "SFAN", "action": "off",
                           "priority": "@EMER",
                           "release_when_false": "yes"}),
@@ -549,3 +549,80 @@ def test_a_command_with_release_writes_the_matching_release():
     text = compile_text(d)
     assert "OFF(@EMER,SFAN)" in text
     assert "RELEAS(@EMER,SFAN)" in text
+
+
+# --------------------------------------------------------------------------
+# Point types
+# --------------------------------------------------------------------------
+
+
+def _gated(ptype, point="MODE"):
+    """A point used straight as a condition, through NOT and AND."""
+    d = diagram(
+        ("p", "point_in", {"point": point, "ptype": ptype}),
+        ("q", "point_in", {"point": "SCHED", "ptype": "BV"}),
+        ("n", "not"),
+        ("a", "and"),
+        ("out", "command", {"point": "SFAN", "action": "on"}),
+    )
+    d.connect("p", "out", "n", "in")
+    d.connect("n", "out", "a", "a")
+    d.connect("q", "out", "a", "b")
+    d.connect("a", "out", "out", "when")
+    return d
+
+
+def test_every_point_type_is_offered_once_with_a_label():
+    from ppcl import points
+    param = next(p for p in blocks.CATALOG["point_in"].params
+                 if p.name == "ptype")
+    values = [v for v, _label, _group in param.options]
+    assert values[0] == ""
+    assert sorted(values[1:]) == sorted(points.TYPES)
+    assert all(label for _v, label, _g in param.options)
+
+
+def test_the_point_type_never_changes_the_compiled_program():
+    """It describes the point; it does not rewrite how a read compiles.
+    The old analog/digital switch changed nothing either, so a type is
+    free to be wrong about nothing but its own warnings."""
+    from ppcl import points
+    texts = {compile_text(_gated(t)) for t in [""] + sorted(points.TYPES)}
+    assert len(texts) == 1
+
+
+@pytest.mark.parametrize("ptype, warns", [
+    ("MV", "multistate"), ("MI", "multistate"), ("LAI", "analog"),
+    ("AV", "analog"), ("LPACI", "running count"),
+    ("BV", None), ("LDI", None), ("L2SL", None), ("LOOAP", None), ("", None),
+])
+def test_a_point_used_as_a_condition_warns_only_when_its_type_cannot_be(
+        ptype, warns):
+    _text, warnings = blocks.compile_diagram(_gated(ptype))
+    hits = [w for w in warnings if "true/false condition" in w]
+    if warns:
+        assert hits and warns in hits[0]
+    else:
+        assert not hits
+
+
+def test_the_point_database_wins_over_the_block_and_says_so():
+    d = _gated("MV", point='"mode"')
+    _text, warnings = blocks.compile_diagram(
+        d, point_types={"MODE": "LDI", "SCHED": "BV"})
+    assert any("point database says LDI" in w for w in warnings)
+    assert not any("true/false condition" in w for w in warnings)
+    info = blocks.point_info(d, {"MODE": "LDI"})
+    assert info["p"]["name"] == "LDI" and info["p"]["source"] == "database"
+    assert info["q"]["source"] == "block"
+
+
+def test_a_diagram_saved_with_the_old_analog_digital_switch_still_loads():
+    old = blocks.to_dict(_gated("LDI"))
+    for b in old["blocks"]:
+        if b["type"] == "point_in":
+            b["params"].pop("ptype", None)
+            b["params"]["kind"] = "digital"
+    loaded = blocks.from_dict(old)
+    assert all("kind" not in b.params for b in loaded.blocks)
+    assert compile_text(loaded) == compile_text(_gated(""))

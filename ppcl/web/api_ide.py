@@ -50,27 +50,31 @@ def api_blocks_compile(body, ws=None):
     except (ValueError, KeyError, TypeError) as exc:
         raise ApiError("that diagram cannot be read: %s" % exc)
 
+    db = _database(ws)
+    point_types = db.types() if db else {}
+    # Sent whether or not the diagram compiles, so the inspector can say
+    # what each point is while the diagram is still half drawn.
+    described = {"points": blocks.point_info(diagram, point_types),
+                 "database": db is not None}
     try:
         text, warnings, diagnostics = blocks.compile_and_lint(
-            diagram, firmware=_firmware(body)
+            diagram, firmware=_firmware(body), point_types=point_types
         )
     except blocks.BlockError as exc:
-        return {
-            "ok": False,
-            "error": exc.message,
-            "block": exc.block_id,
-        }
+        return dict(described, ok=False, error=exc.message,
+                    block=exc.block_id)
 
     order, feedback, _deferred = blocks.order_blocks(diagram)
-    return {
-        "ok": True,
-        "text": text,
-        "warnings": warnings,
-        "diagnostics": _diag_payload(diagnostics),
-        "counts": linter.summarize(diagnostics),
-        "order": [b.id for b in order],
-        "feedback": [{"from": a, "to": b} for a, b in feedback],
-    }
+    return dict(
+        described,
+        ok=True,
+        text=text,
+        warnings=warnings,
+        diagnostics=_diag_payload(diagnostics),
+        counts=linter.summarize(diagnostics),
+        order=[b.id for b in order],
+        feedback=[{"from": a, "to": b} for a, b in feedback],
+    )
 
 
 def api_blocks_new(body, ws=None):
@@ -92,7 +96,7 @@ def _starter_diagram():
         d.add(blocks.Block(id=block_id, type=block_type, x=x, y=y,
                            label=label, note=note, params=params))
 
-    add("mat", "point_in", 40, 60, point="MAT", kind="analog")
+    add("mat", "point_in", 40, 60, point="MAT", ptype="LAI")
     add("lo", "constant", 40, 160, value=38)
     add("hi", "constant", 40, 250, value=45)
     add("trip", "compare", 230, 90, op="<")

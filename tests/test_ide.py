@@ -497,6 +497,28 @@ def test_the_starter_diagram_compiles_clean(ws):
     assert "RELEAS(@EMER,SFAN)" in out["text"]
 
 
+def test_block_compile_describes_each_point_from_the_database(ws):
+    """The inspector shows what a point is, from the panel's own database --
+    even while the diagram is too unfinished to compile."""
+    ws.point_db = points.load("name,type\nMAT,LAI\nSFAN,LDO\n", source="t")
+    status, new = call("/api/blocks/new", {}, ws)
+    diagram = new["diagram"]
+    for block in diagram["blocks"]:
+        if block["type"] == "point_in":
+            block["params"]["ptype"] = ""
+    status, out = call("/api/blocks/compile", {"diagram": diagram}, ws)
+    assert out["ok"] and out["database"] is True
+    mat = next(b["id"] for b in diagram["blocks"] if b["type"] == "point_in")
+    assert out["points"][mat]["name"] == "LAI"
+    assert out["points"][mat]["source"] == "database"
+    assert "input" in out["points"][mat]["role_hint"]
+
+    diagram["blocks"].append({"id": "lost", "type": "pid", "params": {}})
+    status, out = call("/api/blocks/compile", {"diagram": diagram}, ws)
+    assert out["ok"] is False
+    assert out["points"][mat]["name"] == "LAI"
+
+
 def test_a_broken_diagram_names_the_block_so_the_ui_can_mark_it(ws):
     status, out = call("/api/blocks/compile", {
         "diagram": {

@@ -277,6 +277,21 @@ do not need to watch, or split the diagram into two programs.
   owned forever.
 * **Reset schedule** rather than Scale when the curve must flatten outside its
   range, or needs more than two breakpoints.
+
+## Point types
+
+Import the panel's point database in Settings and every Point block fills in
+its own type -- LAI, LDO, LOOAP, AV, MV and the rest -- with what a read of it
+gives and whether it is an input, an output or a value object. Without one,
+pick the type on the block. The database wins when the two disagree, because
+it is what the panel holds.
+
+The type never changes the PPCL a block compiles to; reading a point is the
+same whatever it is. What it changes is the advice. Wire an analog point, a
+counter or a multistate point straight into AND, OR, NOT, Latch or a
+Command's *when*, and the Findings tab says why that is almost never what you
+meant: a multistate value's states start at 1, so on its own it is true in
+every state. Put a Compare in between.
 """,
     "see_also": ["priority", "builder", "start"],
 },

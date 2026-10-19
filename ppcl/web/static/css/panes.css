@@ -190,6 +190,11 @@ table.dt td.off select { color: var(--dim); }
   font-family: var(--mono); border-top: 1px solid var(--line);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.blk .ptag { color: var(--dim); }
+.blk .ptag.db { color: var(--accent); }
+.inspector .ptinfo div + div { margin-top: 4px; }
+.inspector .ptinfo .src { color: var(--faint); font-size: 11px; }
+.inspector .ptinfo .warnline { color: var(--warn); }
 
 .blk[data-cat="Inputs"] .bhead { color: var(--t-str); }
 .blk[data-cat="Logic"] .bhead { color: var(--t-cmd); }

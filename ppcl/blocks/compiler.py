@@ -36,7 +36,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .. import linter, spec
+from .. import linter, points, spec
 from .. import parser as ppcl_parser
 from ..generator import Builder
 from .catalog import CATALOG, BlockError
@@ -74,6 +74,56 @@ class Value:
     digital: bool = False
     #: Source for the logical inverse, when it can be produced for free.
     inverse: str = None
+    #: For a point read, what the read gives -- see :data:`points.READS_HINT`.
+    reads: str = None
+
+
+# --------------------------------------------------------------------------
+# Point types
+# --------------------------------------------------------------------------
+
+
+def _point_key(name):
+    return str(name or "").strip().strip('"').upper()
+
+
+def resolve_point_type(block, point_types=None):
+    """``(TypeInfo or None, source, note)`` for a block that names a point.
+
+    The panel's point database wins over the type set on the block, because
+    it is what the panel actually holds. ``source`` is "database", "block"
+    or None; ``note`` says why the block's own choice was not used.
+    """
+    params = block.params or {}
+    chosen = str(params.get("ptype") or "").strip().upper()
+    recorded = (point_types or {}).get(_point_key(params.get("point")))
+    if recorded:
+        info = points.type_info(recorded)
+        if info is None:
+            return None, "database", (
+                "the point database gives its type as %s, which is not a "
+                "point type this workbench knows" % recorded)
+        note = None
+        if chosen and chosen != info.name:
+            note = ("the block says %s but the point database says %s; the "
+                    "database is what the panel holds, so it is used"
+                    % (chosen, info.name))
+        return info, "database", note
+    info = points.type_info(chosen)
+    return info, ("block" if info else None), None
+
+
+def point_info(diagram, point_types=None):
+    """``{block_id: description}`` for every block that names a point."""
+    out = {}
+    for block in diagram.blocks:
+        if not (block.params or {}).get("point"):
+            continue
+        info, source, note = resolve_point_type(block, point_types)
+        entry = points.describe(info) if info else {}
+        entry.update(source=source, note=note)
+        out[block.id] = entry
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -84,9 +134,12 @@ class Value:
 class Context:
     """The state a block emitter works against."""
 
-    def __init__(self, diagram: Diagram, firmware=spec.Firmware.APOGEE):
+    def __init__(self, diagram: Diagram, firmware=spec.Firmware.APOGEE,
+                 point_types=None):
         self.diagram = diagram
         self.firmware = firmware
+        self.point_types = {_point_key(k): str(v).upper()
+                            for k, v in (point_types or {}).items()}
         self.builder = Builder(start=diagram.start_line, step=diagram.line_step)
         self.warnings = []
         self.locals = []
@@ -191,11 +244,37 @@ class Context:
             return '"%s"' % text
         return text
 
-    def point_value(self, name, digital=False):
+    def read_point(self, block, name):
+        """A point read, carrying what its type says the read gives."""
+        info, _source, note = resolve_point_type(block, self.point_types)
+        if note:
+            self.warn("%s: %s." % (name, note))
+        reads = info.reads if info else None
         text = self.render_point(name)
+        two_state = reads == "two-state"
         return Value(text, operands=1, operators=0, is_point=True,
-                     digital=digital,
-                     inverse="%s.EQ.0.0" % text if digital else None)
+                     digital=two_state,
+                     inverse="%s.EQ.0.0" % text if two_state else None,
+                     reads=reads)
+
+    #: Why a point that reads as something other than ON/OFF makes a poor
+    #: condition on its own. Status points are left out: how a panel numbers
+    #: AUTO, FAST and SLOW is not published, so there is nothing to say.
+    _NOT_A_CONDITION = {
+        "analog": "it is an analog value, so on its own it only means "
+                  "\"not exactly 0\". Compare it to a limit instead",
+        "counter": "it is a running count, so on its own it only means "
+                   "\"not 0\". Compare it to a limit instead",
+        "multistate": "it is a multistate value, and states start at 1, so "
+                      "on its own it is true in every state. Compare it to "
+                      "the state you mean",
+    }
+
+    def check_condition(self, value):
+        """Warn when a point is used as a condition its type cannot support."""
+        if value.is_point and value.reads in self._NOT_A_CONDITION:
+            self.warn("%s is used as a true/false condition, but %s."
+                      % (value.text, self._NOT_A_CONDITION[value.reads]))
 
     def set_out(self, block, pin, value):
         """Record a block's output, condensing it into a local if needed."""
@@ -399,6 +478,7 @@ class Context:
 
     def as_boolean(self, value):
         """Coerce a value to something usable as a condition."""
+        self.check_condition(value)
         if value.digital and value.operators > 0:
             return value
         if value.is_point:
@@ -517,8 +597,13 @@ def _upstream(deps, start):
 # --------------------------------------------------------------------------
 
 
-def compile_diagram(diagram: Diagram, firmware=spec.Firmware.APOGEE):
-    """Compile ``diagram``. Returns ``(ppcl_text, warnings)``."""
+def compile_diagram(diagram: Diagram, firmware=spec.Firmware.APOGEE,
+                    point_types=None):
+    """Compile ``diagram``. Returns ``(ppcl_text, warnings)``.
+
+    ``point_types`` is the panel's point database as ``{NAME: TYPE}``; a
+    point found there takes its type from it rather than from the block.
+    """
     if not diagram.blocks:
         raise BlockError("the diagram is empty, so there is nothing to compile")
 
@@ -537,7 +622,7 @@ def compile_diagram(diagram: Diagram, firmware=spec.Firmware.APOGEE):
             "Write value block."
         )
 
-    ctx = Context(diagram, firmware=firmware)
+    ctx = Context(diagram, firmware=firmware, point_types=point_types)
     order, feedback, deferred = order_blocks(diagram)
 
     # A block whose output closes a feedback loop needs its local to exist
@@ -652,9 +737,11 @@ def _header_items(ctx, diagram, feedback):
     return b.items
 
 
-def compile_and_lint(diagram: Diagram, firmware=spec.Firmware.APOGEE):
+def compile_and_lint(diagram: Diagram, firmware=spec.Firmware.APOGEE,
+                     point_types=None):
     """Compile, then lint the result. The UI never shows unchecked code."""
-    text, warnings = compile_diagram(diagram, firmware=firmware)
+    text, warnings = compile_diagram(diagram, firmware=firmware,
+                                     point_types=point_types)
     program = ppcl_parser.parse(text, name=diagram.name)
     diagnostics = linter.lint(program, firmware=firmware)
     return text, warnings, diagnostics

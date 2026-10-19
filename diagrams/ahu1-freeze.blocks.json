@@ -16,7 +16,7 @@
       "note": "",
       "params": {
         "point": "MAT",
-        "kind": "analog"
+        "ptype": "LAI"
       }
     },
     {

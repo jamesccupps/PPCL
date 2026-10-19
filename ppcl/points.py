@@ -47,6 +47,104 @@ COLUMNS = {
 }
 
 
+# --------------------------------------------------------------------------
+# What a point type is, in the terms an engineer picks it by
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class TypeInfo:
+    """One point type, described for a person choosing or reading it.
+
+    ``reads`` is what a program gets when it reads the point. ``role`` is
+    whether the program should command it at all. Neither is a column in a
+    point export: both follow from the type.
+    """
+
+    name: str
+    label: str
+    family: str  # "APOGEE" | "BACnet"
+    #: "analog" | "two-state" | "multistate" | "status" | "counter" |
+    #: "controller"
+    reads: str
+    role: str    # "input" | "output" | "value" | "controller"
+    #: The status words a program compares a "status" point against.
+    states: tuple = ()
+
+
+#: What a read gives the program, in one sentence.
+READS_HINT = {
+    "analog": "Reads as its engineering value, such as 72.5.",
+    "two-state": "Reads as 1 when ON and 0 when OFF.",
+    "multistate": "Reads as a state number, starting at 1.",
+    "status": "Compare it with %s.",
+    "counter": "Reads as a running count.",
+    "controller": "Compare it with %s.",
+}
+
+#: Whether the program should command it.
+ROLE_HINT = {
+    "input": "An input from the field. Read it; do not command it.",
+    "output": "An output the program can command.",
+    "value": "A value object, with no hardware behind it.",
+    "controller": "A controller the program switches between day and night.",
+}
+
+_APOGEE_ROLES = {"LAI": "input", "LDI": "input", "LPACI": "input",
+                 "LCTLR": "controller"}
+# L2SL and L2SP are bundled -- an output plus a proof input -- but read as
+# ON/OFF. The On/Off/Auto and speed types are compared against status words
+# rather than used as numbers: how a panel numbers AUTO, FAST and SLOW is not
+# published, so nothing here assumes it.
+_APOGEE_READS = {"LAI": "analog", "LAO": "analog", "LDI": "two-state",
+                 "LDO": "two-state", "L2SL": "two-state", "L2SP": "two-state",
+                 "LPACI": "counter", "LCTLR": "controller"}
+_STATES = {"LOOAL": ("ON", "OFF", "AUTO"), "LOOAP": ("ON", "OFF", "AUTO"),
+           "LCTLR": ("DAYMOD", "NGTMOD")}
+_SPEED_STATES = ("FAST", "SLOW", "OFF")
+
+_BACNET_READS = {"A": "analog", "B": "two-state", "M": "multistate"}
+_BACNET_ROLES = {"I": "input", "O": "output", "V": "value"}
+
+
+def _build_types():
+    out = {}
+    for name, pt in spec.POINT_TYPES.items():
+        out[name] = TypeInfo(
+            name=name, label=pt.description, family="APOGEE",
+            reads=_APOGEE_READS.get(name, "status"),
+            role=_APOGEE_ROLES.get(name, "output"),
+            states=_STATES.get(
+                name, _SPEED_STATES if name in spec.SPEED_TYPES else ()),
+        )
+    for name, label in spec.BACNET_OBJECT_TYPES.items():
+        out[name] = TypeInfo(
+            name=name, label=label, family="BACnet",
+            reads=_BACNET_READS[name[0]], role=_BACNET_ROLES[name[1]],
+        )
+    return out
+
+
+#: Every type a point can have, APOGEE first, keyed by name.
+TYPES = _build_types()
+
+
+def type_info(ptype):
+    """The :class:`TypeInfo` for ``ptype``, or None if it is not one."""
+    return TYPES.get((ptype or "").strip().upper())
+
+
+def describe(info):
+    """A type in plain language, for the UI."""
+    reads = READS_HINT[info.reads]
+    if "%s" in reads:
+        reads = reads % (", ".join(info.states[:-1]) + " or "
+                         + info.states[-1])
+    return {"name": info.name, "label": info.label, "family": info.family,
+            "reads": info.reads, "role": info.role,
+            "reads_hint": reads, "role_hint": ROLE_HINT[info.role]}
+
+
 def _norm(header):
     return re.sub(r"[^a-z0-9]", "", str(header).strip().lower())
 

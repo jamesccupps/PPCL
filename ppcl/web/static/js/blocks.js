@@ -254,12 +254,65 @@ export const blocks = {
       node.appendChild(body);
 
       const summary = this.summaryOf(block, entry);
-      if (summary) node.appendChild(el('div', 'bfoot', summary));
+      if (summary) {
+        const foot = el('div', 'bfoot', summary);
+        if (block.params && 'point' in block.params) {
+          const tag = el('span', 'ptag');
+          tag.dataset.block = block.id;
+          foot.appendChild(tag);
+        }
+        node.appendChild(foot);
+      }
       canvas.appendChild(node);
     });
 
     this.drawWires();
     this.renderInspector();
+    this.updatePointInfo();
+  },
+
+  /** Put each point's type on its block, and describe the selected one.
+   *  Filled from the last compile, so it follows the point database. */
+  updatePointInfo() {
+    const known = this.pointInfo || {};
+    document.querySelectorAll('.blk .ptag').forEach((tag) => {
+      const info = known[tag.dataset.block];
+      tag.textContent = info && info.name ? ' · ' + info.name : '';
+      tag.classList.toggle('db', !!(info && info.source === 'database'));
+    });
+
+    const box = $('ptinfo');
+    if (!box || !this.selected) return;
+    const block = this.block(this.selected);
+    const name = block && block.params ? block.params.point : '';
+    const info = known[this.selected];
+    clear(box);
+    if (!name) {
+      box.appendChild(el('div', '', 'Name the point, and its type and how ' +
+        'it reads show here.'));
+      return;
+    }
+    if (info && info.name) {
+      const head = el('div', '');
+      head.appendChild(el('b', '', info.name));
+      head.appendChild(document.createTextNode(' — ' + info.label));
+      head.appendChild(el('span', 'src', info.source === 'database'
+        ? '  from the point database' : '  set on this block'));
+      box.appendChild(head);
+      box.appendChild(el('div', '', info.reads_hint));
+      box.appendChild(el('div', '', info.role_hint));
+    } else if (this.hasDatabase) {
+      box.appendChild(el('div', '', (info && info.note) ? info.note + '.'
+        : name + ' is not in the loaded point database. Check the name, or ' +
+          'pick its type above.'));
+    } else {
+      box.appendChild(el('div', '', 'Type not set. Pick it above, or import ' +
+        'the panel\'s point database in Settings and every point fills in ' +
+        'by itself.'));
+    }
+    if (info && info.name && info.note) {
+      box.appendChild(el('div', 'warnline', info.note + '.'));
+    }
   },
 
   /** The one-line reminder on a block's face of what it is set to. */
@@ -446,8 +499,17 @@ export const blocks = {
           block.params[param.name] = v;
           this.render();
           this.recompile();
-        }, param.choices));
+        }, param.choices, param.options));
     });
+
+    /* What the named point is, as the server resolved it at the last
+     * compile: from the point database when there is one. */
+    if ('point' in block.params || entry.params.some((p) => p.name === 'point')) {
+      const info = el('div', 'note ptinfo');
+      info.id = 'ptinfo';
+      node.appendChild(info);
+      this.updatePointInfo();
+    }
 
     node.appendChild(this.field('Comment', 'textarea', block.note,
       'Emitted as a PPCL comment above this block\'s statements.',
@@ -465,11 +527,32 @@ export const blocks = {
     }
   },
 
-  field(label, kind, value, doc, onChange, choices) {
+  field(label, kind, value, doc, onChange, choices, options) {
     const wrap = el('div', 'f');
     wrap.appendChild(el('label', '', label));
     let input;
-    if (kind === 'select') {
+    if (kind === 'select' && options && options.length) {
+      // Labelled choices, grouped, for lists where the bare value means
+      // nothing to someone picking from it.
+      input = el('select');
+      const groups = {};
+      options.forEach((opt) => {
+        let parent = input;
+        if (opt.group) {
+          if (!groups[opt.group]) {
+            groups[opt.group] = el('optgroup');
+            groups[opt.group].label = opt.group;
+            input.appendChild(groups[opt.group]);
+          }
+          parent = groups[opt.group];
+        }
+        const o = el('option', '', opt.label);
+        o.value = opt.value;
+        if (String(opt.value) === String(value)) o.selected = true;
+        parent.appendChild(o);
+      });
+      input.onchange = () => onChange(input.value);
+    } else if (kind === 'select') {
       input = el('select');
       (choices || []).forEach((c) => {
         const o = el('option', '', c === '' ? '(none)' : c);
@@ -502,6 +585,11 @@ export const blocks = {
     });
     document.querySelectorAll('.blk.bad').forEach(
       (n) => n.classList.remove('bad'));
+    if (r.points) {
+      this.pointInfo = r.points;
+      this.hasDatabase = !!r.database;
+      this.updatePointInfo();
+    }
 
     if (r.error && !('ok' in r)) {
       $('dia-status').innerHTML = '<span class="e">' + esc(r.error) + '</span>';
