@@ -637,3 +637,34 @@ def test_block_lint_uses_the_loaded_point_database(ws):
     _s, out = api.dispatch("/api/blocks/compile", {"diagram": diagram}, ws)
     assert out["ok"]
     assert "E316" in _errors(out)
+
+
+def _shipped_sequence():
+    path = os.path.join(os.path.dirname(__file__), "..", "sequences",
+                        "ahu1.seq")
+    with open(path, encoding="utf-8") as fh:
+        return fh.read()
+
+
+def test_builder_lint_checks_the_table_against_declared_point_types(ws):
+    """The Builder compiled and linted with no point types at all, so a
+    table commanding ON to a point declared LAI came back clean."""
+    text = _shipped_sequence()
+    _s, clean = api.dispatch("/api/seq/compile", {"text": text}, ws)
+    assert "E316" not in _errors(clean)
+
+    wrong = text.replace("  SFAN    LDO     supply fan",
+                         "  SFAN    LAI     supply fan")
+    assert wrong != text
+    _s, out = api.dispatch("/api/seq/compile", {"text": wrong}, ws)
+    assert "E316" in _errors(out)
+
+
+def test_builder_lint_prefers_the_point_database_and_says_so(ws):
+    from ppcl import points
+
+    ws.point_db = points.load("name,type\nSFAN,LAI\n", source="t")
+    _s, out = api.dispatch("/api/seq/compile",
+                           {"text": _shipped_sequence()}, ws)
+    assert "E316" in _errors(out)
+    assert any("point database says LAI" in w for w in out["warnings"])

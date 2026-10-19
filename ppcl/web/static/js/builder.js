@@ -220,8 +220,10 @@ export const builder = {
   renderPoints(node) {
     this.head(node, 'Points', '+ Point', () => this.addPoint(),
       'Give each point its type, or leave it to the point database loaded ' +
-      'in Settings. A program local is a virtual point only this program ' +
-      'sees, written $NAME.');
+      'in Settings. The compiled program is checked against the types, so ' +
+      'ON to an analog input is caught here rather than at the panel. A ' +
+      'program local is a virtual point only this program sees, written ' +
+      '$NAME.');
     const cards = el('div', 'cards');
     (this.doc.points || []).forEach((point, index) => {
       const card = el('div', 'card');

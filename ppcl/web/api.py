@@ -495,6 +495,29 @@ def api_seq_render(body, ws=None):
     return {"ok": True, "text": sequence.render(seq)}
 
 
+def _sequence_point_types(seq, ws):
+    """``({NAME: TYPE}, notes)`` for linting a compiled sequence.
+
+    The loaded point database first, because it is what the panel holds;
+    then the types the sequence declares for points the database does not
+    have. Where the two disagree the database is used, and a note says so.
+    """
+    db = getattr(ws, "point_db", None)
+    known = dict(db.types()) if db else {}
+    notes = []
+    for point in seq.points:
+        info = points.type_info(point.ptype)
+        if info is None:
+            continue
+        held = known.setdefault(point.name.upper(), info.name)
+        if held != info.name:
+            notes.append(
+                "%s: the sequence says %s but the point database says %s; "
+                "the database is what the panel holds, so it is used."
+                % (point.name, info.name, held))
+    return known, notes
+
+
 def api_seq_compile(body, ws=None):
     """Document or text -> PPCL, then lint the result.
 
@@ -513,12 +536,13 @@ def api_seq_compile(body, ws=None):
     except sequence.CompileError as exc:
         return {"ok": False, "error": str(exc), "line": 0, "source": ""}
 
+    point_types, notes = _sequence_point_types(seq, ws)
     prog = ppcl_parser.parse(text, name=seq.name)
-    diags = linter.lint(prog, firmware=_firmware(body))
+    diags = linter.lint(prog, firmware=_firmware(body), point_types=point_types)
     return {
         "ok": True,
         "text": text,
-        "warnings": warnings,
+        "warnings": warnings + notes,
         "diagnostics": _diag_payload(diags),
         "counts": linter.summarize(diags),
         "document": sequence.to_dict(seq),
