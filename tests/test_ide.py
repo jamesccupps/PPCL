@@ -290,6 +290,18 @@ def test_csv_import_maps_columns_by_alias_not_position():
     assert record.kind == "analog"
 
 
+@pytest.mark.parametrize("ptype, kind", [
+    ("LAI", "analog"), ("AV", "analog"), ("LDO", "two-state"),
+    ("BI", "two-state"), ("L2SL", "two-state"), ("MV", "multistate"),
+    ("LOOAP", "status"), ("LFSSL", "status"), ("LPACI", "counter"),
+    ("LCTLR", "controller"), ("LENUM", "unknown"), ("", "unknown"),
+])
+def test_a_point_record_says_what_its_type_reads_as(ptype, kind):
+    """A pulse counter and an On/Off/Auto motor used to come out "digital",
+    and every BACnet multistate object "unknown"."""
+    assert points.PointRecord(name="X", ptype=ptype).kind == kind
+
+
 def test_a_named_state_imports_as_a_number():
     db = points.load_csv(CSV)
     assert db.lookup("AHU1.SFAN").value == 1.0

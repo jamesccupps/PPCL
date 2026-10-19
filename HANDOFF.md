@@ -85,7 +85,7 @@ runs on any engineering workstation with no install. Windows is the primary
 platform.
 
 ```bash
-python -m pytest tests -q          # 602 tests, ~1 min
+python -m pytest tests -q          # 614 tests, ~1 min
 python -m ppcl.cli serve           # the app
 python -m ppcl.cli lint samples    # exercises the CLI on real programs
 python -m ppcl.cli help            # the built-in documentation
@@ -95,7 +95,7 @@ python -m ppcl.cli help            # the built-in documentation
 
 ## 2. Current state
 
-**602 tests passing**, and CI runs them on Python 3.10-3.14 on Linux plus
+**614 tests passing**, and CI runs them on Python 3.10-3.14 on Linux plus
 3.10 and 3.14 on Windows. ~22,500 lines Python, ~5,000 lines UI, ~6,300
 lines tests. 90 lint rules, 66 commands, 99 BACnet properties, 30 block types,
 17 CLI subcommands, 11 MCP tools, 12 help pages, 21 settings, 6 firmware

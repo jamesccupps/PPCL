@@ -174,17 +174,15 @@ class PointRecord:
 
     @property
     def kind(self):
-        """``analog``, ``digital`` or ``unknown``, from the point type."""
-        upper = (self.ptype or "").upper()
-        if upper in spec.ANALOG_TYPES:
-            return "analog"
-        if upper in spec.POINT_TYPES:
-            return "digital"
-        if upper in ("AI", "AO", "AV"):
-            return "analog"
-        if upper in ("BI", "BO", "BV"):
-            return "digital"
-        return "unknown"
+        """What a read of the point gives, from its type: one of
+        :data:`READS_HINT`'s keys, or ``unknown``.
+
+        This used to call every non-analog APOGEE type "digital" -- a pulse
+        counter and an On/Off/Auto motor included -- and every BACnet
+        multistate object "unknown".
+        """
+        info = type_info(self.ptype)
+        return info.reads if info else "unknown"
 
     def to_dict(self):
         data = asdict(self)
