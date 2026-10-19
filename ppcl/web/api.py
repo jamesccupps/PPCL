@@ -144,10 +144,13 @@ def api_lint(body, ws=None):
     """Parse and lint a program. The editor calls this on every idle keystroke."""
     text = _text(body)
     prog = ppcl_parser.parse(text, name=body.get("name", "editor"))
+    # The point database loaded in Settings, unless the caller sent its own.
+    # Without it every type-aware rule stays silent: ON to an LAI passed.
+    db = getattr(ws, "point_db", None)
     diags = linter.lint(
         prog,
         firmware=_firmware(body),
-        point_types=body.get("point_types") or {},
+        point_types=body.get("point_types") or (db.types() if db else {}),
         disabled=body.get("disabled") or (),
         options=body.get("options") or {},
     )

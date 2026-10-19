@@ -592,3 +592,48 @@ def test_no_other_page_may_frame_the_ui(live):
     port, _ = live
     with urllib.request.urlopen("http://127.0.0.1:%d/" % port, timeout=10) as resp:
         assert "frame-ancestors 'none'" in resp.headers["Content-Security-Policy"]
+
+
+# --------------------------------------------------------------------------
+# The loaded point database reaches the linter
+# --------------------------------------------------------------------------
+
+_ON_TO_AN_INPUT = "00010\tON(SFAN)\n00020\tGOTO 10\n"
+
+
+def _errors(payload):
+    return [d["code"] for d in payload["diagnostics"]
+            if d["severity"] == "error"]
+
+
+def test_editor_lint_uses_the_loaded_point_database(ws):
+    """Nothing sent the database's types to the linter, so every type-aware
+    rule was silent in the UI: ON to an analog input linted clean."""
+    from ppcl import points
+
+    _s, before = api.dispatch("/api/lint", {"text": _ON_TO_AN_INPUT}, ws)
+    assert "E316" not in _errors(before)
+
+    ws.point_db = points.load("name,type\nSFAN,LAI\n", source="t")
+    _s, after = api.dispatch("/api/lint", {"text": _ON_TO_AN_INPUT}, ws)
+    assert "E316" in _errors(after)
+
+    # A caller that sends its own types still gets exactly those.
+    _s, own = api.dispatch("/api/lint", {"text": _ON_TO_AN_INPUT,
+                                         "point_types": {"SFAN": "LDO"}}, ws)
+    assert "E316" not in _errors(own)
+
+
+def test_block_lint_uses_the_loaded_point_database(ws):
+    from ppcl import points
+
+    ws.point_db = points.load("name,type\nSFAN,LAI\n", source="t")
+    diagram = {"name": "t", "blocks": [
+        {"id": "k", "type": "constant", "params": {"value": 1}},
+        {"id": "c", "type": "command",
+         "params": {"point": "SFAN", "action": "on"}}],
+        "wires": [{"src": "k", "src_pin": "out", "dst": "c",
+                   "dst_pin": "when"}]}
+    _s, out = api.dispatch("/api/blocks/compile", {"diagram": diagram}, ws)
+    assert out["ok"]
+    assert "E316" in _errors(out)

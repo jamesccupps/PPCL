@@ -743,5 +743,6 @@ def compile_and_lint(diagram: Diagram, firmware=spec.Firmware.APOGEE,
     text, warnings = compile_diagram(diagram, firmware=firmware,
                                      point_types=point_types)
     program = ppcl_parser.parse(text, name=diagram.name)
-    diagnostics = linter.lint(program, firmware=firmware)
+    diagnostics = linter.lint(program, firmware=firmware,
+                              point_types=point_types)
     return text, warnings, diagnostics
