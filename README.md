@@ -592,3 +592,7 @@ four of which are the regression fixtures in `samples/`.
 
 There is no other linter, simulator, debugger or block editor for this
 language that I could find.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
