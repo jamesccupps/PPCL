@@ -539,7 +539,16 @@ def format_text(program: Program, pad: int = 5, sep: str = "\t",
 
     out = [stmt_to_text(d) for d in program.directives]
     for ln in lines:
-        body = stmt_to_text(ln.stmt) if normalize else ln.body
+        if not normalize or ln.unknown:
+            # An UNKNOWN (...) line is the compiler's own wrapper around a
+            # statement it rejected; it is kept exactly as the compiler wrote.
+            body = ln.body
+        else:
+            body = stmt_to_text(ln.stmt)
+            if ln.disabled:
+                # The PXC.A disable lives in the text. Re-rendered without it,
+                # the line would load enabled.
+                body = "# " + body
         out.append("%s%s%s" % (str(ln.number).zfill(pad), sep, body))
     return "\n".join(out) + "\n"
 

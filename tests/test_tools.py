@@ -1050,3 +1050,19 @@ def test_renumber_refuses_a_branch_it_cannot_parse(body):
     assert result.text == ""
     assert result.refused == "unreadable"
     assert "line 100" in result.warnings[0]
+
+
+def test_normalize_keeps_a_disabled_line_disabled():
+    """Re-rendered from the parse, "# OFF(SFAN)" came back as a live
+    OFF(SFAN): loading it would have switched the line back on."""
+    prog = parser.parse("00100\t# OFF( SFAN )\n00110\tGOTO 100\n")
+    out = formatter.format_text(prog, normalize=True)
+    assert out.splitlines()[0] == "00100\t# OFF(SFAN)"
+
+
+def test_normalize_leaves_an_unknown_line_as_the_compiler_wrote_it():
+    """UNKNOWN (...) is the compiler's wrapper around a statement it
+    rejected; re-rendering made it a comment."""
+    prog = parser.parse("00100\tUNKNOWN (FOO(1,2))\n00110\tGOTO 100\n")
+    out = formatter.format_text(prog, normalize=True)
+    assert out.splitlines()[0] == "00100\tUNKNOWN (FOO(1,2))"
