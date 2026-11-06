@@ -117,7 +117,11 @@ const MAX_OPEN = 4 * 1024 * 1024;  // the API refuses more than this anyway
  * remembers which, so Save writes the file back the same way. */
 function decodeProgram(buffer) {
   let text;
-  let encoding = 'utf-8';
+  const bytes = new Uint8Array(buffer);
+  // A byte-order mark is kept as the encoding's name, as the server does,
+  // so Save writes it back.
+  let encoding = bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF
+    ? 'utf-8-sig' : 'utf-8';
   try {
     text = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
   } catch (err) {

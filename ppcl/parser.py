@@ -439,6 +439,9 @@ def parse_statement_text(body: str) -> Stmt:
 def parse(text: str, name: str = "", path: str = "") -> Program:
     """Parse a complete PPCL program."""
     prog = Program(name=name, path=path)
+    # A byte-order mark is not whitespace to the line-number pattern, so
+    # left in place it turned line 1 into an unnumbered parse error.
+    text = text.lstrip("\ufeff")
 
     for src_no, logical, continued in _join_continuations(text.splitlines()):
         if not logical.strip():
@@ -527,7 +530,8 @@ def parse_file(path: str) -> Program:
     """Parse a PPCL file from disk."""
     import os
 
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
-        text = fh.read()
+    from . import textio
+
+    text = textio.read(path).text
     name = os.path.splitext(os.path.basename(path))[0]
     return parse(text, name=name, path=path)

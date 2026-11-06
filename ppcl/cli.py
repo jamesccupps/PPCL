@@ -10,7 +10,7 @@ import textwrap
 
 from . import __version__, analyzer, formatter, generator, linter, parser as ppcl_parser
 from . import report as report_mod
-from . import spec
+from . import spec, textio
 from .diagnostics import Severity
 
 SEVERITY_ORDER = ["error", "warning", "info", "style"]
@@ -21,14 +21,26 @@ SEVERITY_ORDER = ["error", "warning", "info", "style"]
 # --------------------------------------------------------------------------
 
 
-def collect_files(paths, recursive: bool = True):
-    """Expand paths into a sorted list of PPCL files."""
+#: What a folder expands to for a command that only reads.
+READ_EXTENSIONS = (".ppcl", ".pcl", ".txt")
+#: ...and for one that rewrites what it finds. Never .txt: in a program
+#: folder that is as likely to be notes or a panel report, and a folder run
+#: of fmt -i once rewrote a README to an empty line.
+PROGRAM_EXTENSIONS = (".ppcl", ".pcl")
+
+
+def collect_files(paths, recursive: bool = True, extensions=READ_EXTENSIONS):
+    """Expand paths into a sorted list of PPCL files.
+
+    A file named outright is always included; ``extensions`` only decides
+    what a folder expands to.
+    """
     out = []
     for path in paths:
         if os.path.isdir(path):
             for root, _dirs, names in os.walk(path):
                 for name in sorted(names):
-                    if name.lower().endswith((".ppcl", ".pcl", ".txt")):
+                    if name.lower().endswith(extensions):
                         out.append(os.path.join(root, name))
                 if not recursive:
                     break
@@ -171,20 +183,55 @@ def cmd_lint(args):
 # --------------------------------------------------------------------------
 
 
+def _read_program(path):
+    source = textio.read(path)
+    name = os.path.splitext(os.path.basename(path))[0]
+    return source, ppcl_parser.parse(source.text, name=name, path=path)
+
+
+def _would_drop(path, prog, args):
+    """True, after saying so, when rewriting would lose lines.
+
+    The formatter rebuilds a file from its numbered lines, so a line with no
+    number -- an export header, stray text, anything the parser could not
+    attribute -- would vanish from the output with exit code 0.
+    """
+    dropped = [(src, msg) for src, number, msg in prog.errors if number is None]
+    if not dropped:
+        return False
+    if args.force:
+        for src, msg in dropped:
+            print("%s:%d: dropped: %s" % (path, src, msg), file=sys.stderr)
+        return False
+    print("%s: refusing to rewrite it: %d line(s) have no line number and "
+          "would be lost" % (path, len(dropped)), file=sys.stderr)
+    for src, msg in dropped[:10]:
+        print("  source line %d: %s" % (src, msg), file=sys.stderr)
+    print("Fix or remove them, or pass --force to drop them.", file=sys.stderr)
+    return True
+
+
 def cmd_fmt(args):
-    for path in collect_files(args.paths):
-        prog = ppcl_parser.parse_file(path)
+    rc = 0
+    for path in collect_files(args.paths, extensions=PROGRAM_EXTENSIONS):
+        source, prog = _read_program(path)
+        if _would_drop(path, prog, args):
+            rc = 2
+            continue
         text = formatter.format_text(
             prog, pad=args.pad, sort=not args.no_sort, normalize=args.normalize
         )
-        _write_or_print(path, text, args)
-    return 0
+        rc = max(rc, _write_or_print(path, text, args, source))
+    return rc
 
 
 def cmd_renumber(args):
     rc = 0
-    for path in collect_files(args.paths):
-        prog = ppcl_parser.parse_file(path)
+    for path in collect_files(args.paths, extensions=PROGRAM_EXTENSIONS):
+        source, prog = _read_program(path)
+        if _would_drop(path, prog, args):
+            rc = 2
+            continue
         result = formatter.renumber(
             prog,
             start=args.start,
@@ -205,25 +252,36 @@ def cmd_renumber(args):
             % (path, len(result.mapping), result.rewritten_references),
             file=sys.stderr,
         )
-        _write_or_print(path, result.text, args)
+        rc = max(rc, _write_or_print(path, result.text, args, source))
     return rc
 
 
-def _write_or_print(path, text, args):
-    if args.in_place:
-        if args.backup:
-            with open(path + ".bak", "w", encoding="utf-8", newline="\n") as fh:
-                with open(path, "r", encoding="utf-8", errors="replace") as src:
-                    fh.write(src.read())
-        with open(path, "w", encoding="utf-8", newline="\n") as fh:
-            fh.write(text)
-        print("wrote %s" % path, file=sys.stderr)
+def _write_or_print(path, text, args, source=None, target=None):
+    """Print ``text``, or write it as ``source`` was written. Returns rc.
+
+    Written files keep the encoding, byte-order mark and line endings they
+    were read with, go through a temporary file so a failure cannot leave
+    half of one, and -- in place -- are backed up byte for byte first unless
+    --no-backup. ``target`` is where in-place output goes when that is not
+    the file read, as for a block diagram.
+    """
+    source = source or textio.TextFile(text="")
+    if getattr(args, "in_place", False):
+        dest = target or path
     elif getattr(args, "output", None):
-        with open(args.output, "w", encoding="utf-8", newline="\n") as fh:
-            fh.write(text)
-        print("wrote %s" % args.output, file=sys.stderr)
+        dest = args.output
     else:
         sys.stdout.write(text)
+        return 0
+    try:
+        data = textio.encode(text, source.encoding, source.newline)
+    except ValueError as exc:
+        print("%s: %s" % (dest, exc), file=sys.stderr)
+        return 2
+    textio.write(dest, data,
+                 backup=args.in_place and getattr(args, "backup", True))
+    print("wrote %s" % dest, file=sys.stderr)
+    return 0
 
 
 # --------------------------------------------------------------------------
@@ -597,8 +655,7 @@ loop Discharge
 def _load_sequence(path):
     from ppcl import sequence
 
-    with open(path, "r", encoding="utf-8") as fh:
-        text = fh.read()
+    text = textio.read(path).text
     if path.lower().endswith(".json"):
         return sequence.loads(text)
     return sequence.parse(text)
@@ -627,14 +684,13 @@ def cmd_seq(args):
         return 1
 
     if action == "fmt":
-        text = sequence.render(seq)
-        if args.in_place:
-            with open(args.path, "w", encoding="utf-8", newline="\n") as fh:
-                fh.write(text)
-            print("wrote %s" % args.path, file=sys.stderr)
-        else:
-            sys.stdout.write(text)
-        return 0
+        if args.in_place and args.path.lower().endswith(".json"):
+            print("%s is the JSON form; fmt -i would replace it with the text "
+                  "form. Use 'ppcl seq text' to convert it." % args.path,
+                  file=sys.stderr)
+            return 2
+        return _write_or_print(args.path, sequence.render(seq), args,
+                               textio.read(args.path))
 
     if action == "json":
         print(sequence.dumps(seq))
@@ -1142,16 +1198,29 @@ def cmd_blocks(args):
             print("%s %s line %s: %s"
                   % (d.severity.value, d.code, d.line, d.message),
                   file=sys.stderr)
-    _write_or_print(args.path, text, args)
-    return 1 if errors else 0
+    # In place means next to the diagram: AHU1.blocks.json -> AHU1.ppcl.
+    # Writing to args.path itself would replace the diagram with its PPCL.
+    target = _beside_diagram(args.path)
+    source = textio.read(target) if os.path.exists(target) else None
+    rc = _write_or_print(args.path, text, args, source, target=target)
+    return rc or (1 if errors else 0)
+
+
+def _beside_diagram(path):
+    base = path
+    for ext in (".blocks.json", ".json"):
+        if base.lower().endswith(ext):
+            base = base[:-len(ext)]
+            break
+    return base + ".ppcl"
 
 
 def cmd_transform(args):
     """Apply one source transform, reporting exactly what changed."""
     from . import transforms
 
-    with open(args.path, "r", encoding="utf-8") as fh:
-        text = fh.read()
+    source = textio.read(args.path)
+    text = source.text
 
     lines = [int(n) for n in (args.lines or "").replace(",", " ").split()]
     renames = {}
@@ -1180,8 +1249,7 @@ def cmd_transform(args):
         print(note, file=sys.stderr)
     for note in result.warnings:
         print("warning: %s" % note, file=sys.stderr)
-    _write_or_print(args.path, result.text, args)
-    return 0
+    return _write_or_print(args.path, result.text, args, source)
 
 
 def cmd_db(args):
@@ -1268,14 +1336,25 @@ def build_parser():
     p.add_argument("--version", action="version", version="ppcl %s" % __version__)
     sub = p.add_subparsers(dest="command", required=True)
 
-    def add_common_output(sp):
+    def add_write_options(sp, in_place_help="rewrite the file instead of "
+                                            "printing"):
         sp.add_argument("-i", "--in-place", action="store_true",
-                        help="rewrite the file instead of printing")
-        sp.add_argument("--backup", action="store_true",
-                        help="with --in-place, keep a .bak copy")
+                        help=in_place_help)
+        sp.add_argument("--no-backup", dest="backup", action="store_false",
+                        help="with --in-place, do not keep a .bak copy of "
+                             "the file as it was")
+        # Accepted for scripts written when the backup was opt-in.
+        sp.add_argument("--backup", dest="backup", action="store_true",
+                        help=argparse.SUPPRESS)
         sp.add_argument("-o", "--output", help="write to this file")
+
+    def add_common_output(sp):
+        add_write_options(sp)
         sp.add_argument("--pad", type=int, default=5,
                         help="zero-pad line numbers to this width (default 5)")
+        sp.add_argument("--force", action="store_true",
+                        help="write even when lines without a line number "
+                             "would be dropped")
 
     # lint
     sp = sub.add_parser("lint", help="check programs against the PPCL rules")
@@ -1405,8 +1484,7 @@ def build_parser():
              "fmt: canonicalise the text form; json/text: convert between forms",
     )
     sp.add_argument("path", nargs="?", help="the .seq or .json document")
-    sp.add_argument("-o", "--output")
-    sp.add_argument("-i", "--in-place", action="store_true")
+    add_write_options(sp)
     sp.add_argument("--author")
     sp.add_argument("--firmware", default="apogee",
                     choices=[f.value for f in spec.Firmware])
@@ -1477,9 +1555,7 @@ def build_parser():
     sp.add_argument("path")
     sp.add_argument("--firmware", default="apogee",
                     choices=[f.value for f in spec.Firmware])
-    sp.add_argument("-o", "--output", help="write here instead of stdout")
-    sp.add_argument("--in-place", action="store_true",
-                    help="write next to the diagram")
+    add_write_options(sp, "write the PPCL next to the diagram: AHU1.blocks.json becomes AHU1.ppcl")
     sp.set_defaults(func=cmd_blocks)
 
     # transform
@@ -1499,8 +1575,7 @@ def build_parser():
     sp.add_argument("--step", type=int, help="clone: increment for the copy")
     sp.add_argument("--rename", action="append",
                     help="clone: OLD=NEW, repeatable")
-    sp.add_argument("-o", "--output")
-    sp.add_argument("--in-place", action="store_true")
+    add_write_options(sp)
     sp.set_defaults(func=cmd_transform)
 
     # db

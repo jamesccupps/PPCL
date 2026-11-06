@@ -473,6 +473,21 @@ def test_a_utf8_file_opens_and_saves_as_utf8(ws):
         assert fh.read() == "00010\tC 85\N{DEGREE SIGN}F\n".encode("utf-8")
 
 
+def test_a_byte_order_mark_survives_open_and_save(ws):
+    """Kept in the text, the mark hid line 1's number from the parser."""
+    path = os.path.join(ws.root, "programs", "bom.ppcl")
+    with open(path, "wb") as fh:
+        fh.write(b"\xef\xbb\xbf00010\tONPWRT(20)\n00020\tGOTO 10\n")
+    _s, opened = api.dispatch("/api/open", {"path": "programs/bom.ppcl"}, ws)
+    assert opened["encoding"] == "utf-8-sig"
+    assert opened["text"].startswith("00010")
+    api.dispatch("/api/save", {"path": "programs/bom.ppcl",
+                               "text": opened["text"],
+                               "encoding": opened["encoding"]}, ws)
+    with open(path, "rb") as fh:
+        assert fh.read().startswith(b"\xef\xbb\xbf00010")
+
+
 def test_open_a_missing_file_is_404(ws):
     status, payload = api.dispatch("/api/open", {"path": "nope.ppcl"}, ws)
     assert status == 404

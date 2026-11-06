@@ -380,3 +380,12 @@ def test_ordinary_at_names_still_lex_whole():
     assert parser.parse("00010\tON(@1FAN)\n00020\tGOTO 10\n").errors == []
     assert parser.parse("00010\tIF(FAN .EQ. @OPER) THEN ON(H)\n"
                         "00020\tGOTO 10\n").errors == []
+
+
+def test_a_byte_order_mark_does_not_cost_line_one():
+    """The mark is not whitespace to the line-number pattern, so line 1
+    became an unnumbered error and a rewrite dropped it."""
+    prog = parser.parse("\N{ZERO WIDTH NO-BREAK SPACE}00010\tONPWRT(20)\n"
+                        "00020\tGOTO 10\n")
+    assert [ln.number for ln in prog.lines] == [10, 20]
+    assert not prog.errors

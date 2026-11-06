@@ -396,10 +396,19 @@ Engineering helpers compute the values the manual gives formulas for:
 `proportional_gain(device_range, throttling_range)`, `integral_gain(pg)`,
 `loop_bias(lo, hi)`, `duty_cycle_pattern(slots)`, `table_statement(...)`.
 
+**Writing files.** `fmt`, `renumber`, `transform`, `blocks` and `seq fmt` write
+a file back the way it was read: the same encoding (a Windows-1252 degree sign
+stays `B0`), byte-order mark and line endings. With `-i` they keep a byte-exact
+`.bak` unless told `--no-backup`, and write through a temporary file so a
+failure leaves the original whole. A line with no line number -- an export
+header, stray text -- would be lost by a rewrite, so the file is refused until
+it is fixed or `--force` is given. A folder only expands to `.ppcl` and `.pcl`
+files for these commands; a `.txt` has to be named outright.
+
 ### `renumber` — renumber safely
 
 ```bash
-python -m ppcl.cli renumber AHU1.ppcl --preserve-blocks -i --backup
+python -m ppcl.cli renumber AHU1.ppcl --preserve-blocks -i
 ```
 
 Rewrites every `GOTO`, `GOSUB`, `ACT`, `DEACT`, `ENABLE`, `DISABL` and `ONPWRT`
@@ -463,7 +472,8 @@ python -m ppcl.cli blocks diagrams/ahu1-freeze.blocks.json --in-place
 ```
 
 Compiles the JSON a Blocks-pane drawing saves to, lints the result, and writes
-the PPCL. Exits non-zero if the program has errors, so it works in CI.
+the PPCL -- with `--in-place`, beside the diagram as `ahu1-freeze.ppcl`. Exits
+non-zero if the program has errors, so it works in CI.
 
 ### `transform` — the edits that are exact by machine
 

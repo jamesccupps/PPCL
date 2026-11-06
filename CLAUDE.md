@@ -31,6 +31,7 @@ so it runs on any engineering workstation without a package install.
 | `ppcl/points.py` | The panel point database, and the unresolved-reference check that produces Desigo's `U`. |
 | `ppcl/report.py` | Reads a panel's `PPCL DISPLAY REPORT`: which lines are disabled, which have an unresolved point, which have ever executed. Exported program text carries none of that. |
 | `ppcl/settings.py` | Declared settings with types, ranges and help. Unknown keys are preserved and reported. |
+| `ppcl/textio.py` | **The one place program files are decoded and encoded.** UTF-8, then Windows-1252, then Latin-1; the byte-order mark and line endings are kept; writes are atomic and backups are byte copies. The CLI and the web IDE both go through it. |
 | `ppcl/helpdocs.py` | The in-app documentation, as data. |
 | `ppcl/plant/` | Equipment models and the test bench. |
 | `ppcl/web/` | JSON API — `api.py` core, `api_ide.py` for blocks/debug/points/settings/transforms/completion/help — and a stdlib server. The UI is ES modules under `static/js/`, no framework, no build step. |
@@ -139,7 +140,7 @@ on idiomatic PPCL gets turned off.
 ## Testing
 
 ```bash
-python -m pytest tests -q          # 621 tests, ~1 min; CI runs 3.10-3.14
+python -m pytest tests -q          # 634 tests, ~1 min; CI runs 3.10-3.14
 python -m ppcl.cli lint samples    # exercises the CLI against real programs
 ```
 
