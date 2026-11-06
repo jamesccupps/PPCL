@@ -77,7 +77,10 @@ _NUMBER_RE = re.compile(r"\d+(?:\.\d+)?|\.\d+")
 # subpoint, and ``PROGRAM:name`` reaches another program's local. A time
 # literal always begins with a digit, so it is matched before this and the
 # two never collide.
-_IDENT_RE = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*(?::[A-Za-z0-9_$.]+)?")
+# The part after a colon takes no dots of its own: with them,
+# DEV201:DAYCLG.GT.75.0 was one name and the comparison vanished. A dotted
+# tail is absorbed afterwards by the same loop that stops at an operator.
+_IDENT_RE = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*(?::[A-Za-z0-9_$]+)?")
 _MACRO_RE = re.compile(r"%[A-Za-z0-9_.]+%")
 _ATNAME_RE = re.compile(r"@[A-Za-z0-9_.]+")
 # ``[NodeName]PointSystemName`` names a point on another PXC.A device on the
@@ -90,7 +93,9 @@ _NODEREF_RE = re.compile(
 )
 
 # Longest-first so that ".NAND." is preferred over any shorter prefix.
-_DOTOPS = sorted(spec.DOTTED_OPS, key=len, reverse=True)
+#: Longest first, then alphabetical, so the order never depends on how a
+#: set happened to hash.
+_DOTOPS = tuple(sorted(spec.DOTTED_OPS, key=lambda op: (-len(op), op)))
 
 
 def tokenize(text: str) -> list:
@@ -146,11 +151,12 @@ def tokenize(text: str) -> list:
             # condition written without spaces around a dotted operator after
             # an @priority failed to parse. Siemens' own optimum-start-stop
             # programs are written that way throughout.
-            for opword in _DOTOPS:
-                cut = word.upper().find(opword)
-                if cut > 0:
-                    word = word[:cut]
-                    break
+            # Cut at the EARLIEST operator in it. Taking the first one found
+            # in a list ordered by length cut @1FAN.OR.X.AND.Y at .AND.
+            cuts = [c for c in (word.upper().find(op) for op in _DOTOPS)
+                    if c > 0]
+            if cuts:
+                word = word[:min(cuts)]
             kind = Tok.PRIORITY if word.upper() in spec.PRIORITY_RANK else Tok.ATNAME
             tokens.append(Token(kind, word, i))
             i += len(word)

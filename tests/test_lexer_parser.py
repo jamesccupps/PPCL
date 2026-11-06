@@ -422,3 +422,23 @@ def test_odd_input_is_a_parse_error_not_a_crash(line):
     Either way one line took the whole program down with it."""
     prog = parser.parse(line + "\n00110\tGOTO 100\n")
     assert [ln.number for ln in prog.lines][-1] == 110
+
+
+def test_a_colon_name_stops_at_a_dotted_operator():
+    """The colon part of a name took dots, so DEV201:DAYCLG.GT.75.0 lexed
+    as one point name and the comparison vanished without an error."""
+    prog = parser.parse("00100\tIF(DEV201:DAYCLG.GT.75.0) THEN ON(SFAN)\n")
+    assert not prog.errors
+    cond = prog.lines[0].stmt.cond
+    assert cond.op == ".GT." and cond.left.name == "DEV201:DAYCLG"
+    # A dotted name after the colon still belongs to it.
+    prog = parser.parse("00100\tX = DEV201:AHU.SAT\n")
+    assert prog.lines[0].stmt.expr.name == "DEV201:AHU.SAT"
+
+
+def test_an_at_name_is_cut_at_the_first_operator_in_it():
+    """Operators were tried longest first and the name cut at the first one
+    found, so @1FAN.OR.X.AND.Y was cut at .AND., keeping @1FAN.OR.X."""
+    toks = [(t.kind.name, t.text) for t in tokenize("@1FAN.OR.X.AND.Y")]
+    assert toks[:3] == [("ATNAME", "@1FAN"), ("DOTOP", ".OR."),
+                        ("IDENT", "X")]
