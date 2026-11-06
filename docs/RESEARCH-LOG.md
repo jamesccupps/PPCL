@@ -3964,3 +3964,99 @@ M16 (the MCP launch command), M17 (dropped renumber warnings, unbounded MCP
 lint output) -- are not yet reproduced. TOD's level-commanded writes need
 evidence before they change. The Lows, performance and accessibility items are
 untouched.
+
+---
+
+## 2026-11-06 (fortieth pass) — the review's remaining Mediums
+
+The four Mediums the last pass left unreproduced all reproduced. Each fix is
+its own commit with a test that failed first; three more defects turned up
+next to them and got the same treatment.
+
+### M10, and two found beside it
+
+A rule with several actions compiled to a line per action, each repeating the
+test, so an action that wrote what the test reads changed the lines after it:
+"when DMPR < 50: DMPR 100, FAN on" never turned the fan on. Such a rule now
+takes its test once into a local. Only those rules spend one; the shipped
+sequences contain no rules and compile byte for byte as before.
+
+The first test written for it was wrong, and worth recording: it expected the
+fan on after one simulated pass, but `run_pass` executes one line per program
+line, which goes round a short main loop more than once, and on the second
+round the rule correctly sees DMPR at 100. The review's own case -- no
+otherwise -- is the one that separates old from new on every scan.
+
+Beside it: the sequence compiler put every local in one `LOCAL` statement
+(E111 past sixteen; the block compiler already chunked), and "rule when X"
+compiled silently to a test of a point named "when X".
+
+### M11 -- W332 was right about the wrong thing
+
+W332 called two writers unconditional when neither line had an IF. Across the
+42 real programs all 62 of its warnings were mode blocks reached by a GOTO
+dispatch -- occupied, unoccupied, safety -- of which one runs per pass; **not
+one** had two writers that both run on every pass. Meanwhile it skipped what
+the review named: one command twice, ON/OFF pairs, assignments.
+
+A writer now counts as unconditional when it has no IF *and* the main loop
+cannot go round without it (`Analysis.runs_every_pass`, over the wrapping CFG).
+A fight is two such writers where one's value is replaced before this program
+reads it, which keeps a `$LOC` reused as a temporary quiet. Warnings went 62
+to 2 -- two dead-band switches on different inputs commanding one target every
+pass, a real fight -- and infos 15 to 80: the 62 demoted plus three where an
+assignment meets OFF or LOOP (the commit message folds those three into the
+62; this is the exact count). No other rule's output moved.
+
+The shipped schedule template caught the one trap: two TODs for different day
+modes on the same fans looked like a fight. TOD, TODSET, WAIT, DC and DCR write
+on a schedule or an event, not each time they execute, and are excluded from
+the every-pass test. The test for it was vacuous at first -- the wrong TOD
+signature, so nothing was written -- and was checked to fire without the
+exclusion before it was trusted.
+
+W322 had no tests at all. It called the outputs of ADAPTM/S, LSQ2, LSTSQR and
+GETVAL "never assigned" at the line assigning them, because the analyzer
+recorded them as reads. The simulator already had the right positions; there
+is now one table, the analyzer's, and the simulator builds its own from it.
+Golden record byte for byte; real-program lint unchanged (none feeds a local
+from these).
+
+### M16 -- verified by the bytes, and one recommendation declined
+
+Both shadowing claims reproduced: from a project folder holding a decoy
+`ppcl/` or `json.py`, `python -m ppcl.mcp_server` ran the decoy. The review's
+fix needed `${CLAUDE_PLUGIN_ROOT}` in the arguments, so how Claude Code expands
+it was read out of the shipped binary rather than assumed: a plugin gets an
+exact-text `replaceAll`, so a `${VAR:-default}` would never expand; and
+`claude mcp get` shows a project's `.mcp.json` keeps it unexpanded -- which is
+how this repository, opened as a project, runs the server today. The launch
+now drops the current directory from `sys.path` before importing anything and
+runs `ppcl_mcp.py`, falling back to the one in the current directory when the
+substituted path is not a file.
+
+The review also said to switch to `python3`. On this workstation `python3` is
+the Microsoft Store stub and `python` the real install, and Windows is where
+Siemens tooling runs. Kept `python`; PLUGIN.md says how to change it.
+
+### M17
+
+Three separate defects. A successful renumber's warnings -- duplicates split,
+a reference left dangling -- reached neither the editor nor MCP. MCP simulate
+and bench said "the program does not parse" and not where. And `ppcl_lint`
+returned 34,000 characters for the largest real program: every finding with
+its full detail, W104 alone 47% of findings, no filters. It now takes the
+CLI's `min_severity` and `workstation_only` plus `disabled`, explains each code
+once, and stops at 60 worst-first with the rest counted by code: largest 8.5K,
+median 4.0K, and 342 at warning-and-above for a workstation site.
+
+### Found, not fixed
+
+The lint stats count comment lines as main-loop lines -- "2 executable lines,
+4 in the main loop" -- in the editor's status bar and the MCP lint header.
+Added to the gap list.
+
+### Left
+
+TOD's level-commanded writes still need evidence. The review's Lows,
+performance and accessibility items are untouched.

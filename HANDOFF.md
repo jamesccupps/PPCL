@@ -337,6 +337,8 @@ The engine is deep and the UI now covers it. What remains:
   step. This is the most likely first complaint.
 - No diff view against the file on disk.
 - No column selection or multi-cursor.
+- The lint stats count comment lines as main-loop lines, so the status bar
+  and the MCP lint header can say "2 executable lines, 4 in the main loop".
 
 ### Bench
 - Still one AHU preset family. No VAV boxes, no multi-zone, no central plant
