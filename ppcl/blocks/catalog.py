@@ -213,15 +213,17 @@ def _emit_resident(ctx, block):
 # --------------------------------------------------------------------------
 
 
-def _logic(op_name, op_text, summary, help_text):
+def _logic(op_name, op_text, summary, help_text, inputs=4):
+    pins = (
+        Pin("a", "a", "digital"),
+        Pin("b", "b", "digital"),
+        Pin("c", "c", "digital", required=False),
+        Pin("d", "d", "digital", required=False),
+    )[:inputs]
+
     @block_type(
         op_name, op_name.upper(), "Logic", summary,
-        inputs=(
-            Pin("a", "a", "digital"),
-            Pin("b", "b", "digital"),
-            Pin("c", "c", "digital", required=False),
-            Pin("d", "d", "digital", required=False),
-        ),
+        inputs=pins,
         outputs=(Pin("out", "out", "digital"),),
         help=help_text,
         manual="125-1896 Rev.5 Table 2-4, logical operators",
@@ -229,12 +231,17 @@ def _logic(op_name, op_text, summary, help_text):
     def _emit(ctx, block, _op=op_text):
         parts = [
             ctx.as_boolean(v)
-            for v in ctx.inputs_present(block, ("a", "b", "c", "d"))
+            for v in ctx.inputs_present(block, [p.name for p in pins])
         ]
         if len(parts) < 2:
             raise BlockError(
                 "%s needs at least two inputs wired" % op_name.upper(), block.id
             )
+        if _op == ".NAND." and len(parts) > 2:
+            # PPCL evaluates A.NAND.B.NAND.C left to right, as
+            # (A NAND B) NAND C -- true when all three are true. NOT of all
+            # of them is (A AND B) NAND C, at the same operator cost.
+            parts = [ctx.join(".AND.", parts[:-1], digital=True), parts[-1]]
         ctx.set_out(block, "out", ctx.join(_op, parts, digital=True))
 
     return _emit
@@ -245,8 +252,11 @@ _logic("and", ".AND.", "True when every wired input is true.",
        "are the same block.")
 _logic("or", ".OR.", "True when any wired input is true.",
        "Unwired inputs are ignored.")
+# Two inputs only: chained, A.XOR.B.XOR.C is parity -- true when all three
+# are -- not "exactly one", which is what the block says it computes.
 _logic("xor", ".XOR.", "True when exactly one of two inputs is true.",
-       "Useful for detecting disagreement between a command and its status.")
+       "Useful for detecting disagreement between a command and its status.",
+       inputs=2)
 _logic("nand", ".NAND.", "False only when every wired input is true.",
        "The inverse of AND.")
 
@@ -483,7 +493,8 @@ def _emit_function(ctx, block):
         block, "out",
         ctx.expr("%s(%s)" % (fn, value.text),
                  operands=value.operands,
-                 operators=value.operators + 1),
+                 operators=value.operators + 1,
+                 prec=2),  # a function binds tighter than any operator
     )
 
 
@@ -574,17 +585,21 @@ def _emit_scale(ctx, block):
     # A falling slope is written as (low - x) * |slope| rather than
     # (x - low) * -|slope|, so the source never contains an operator pair
     # like "*-2.5" that a panel compiler may read differently than intended.
+    # The input goes through the same bracketing as a Subtract block: on the
+    # right of the minus, X+Y has to stay (X+Y).
     if slope < 0:
-        head = "(%s-%s)" % (ctx.fmt(in_low), value.text)
+        head = "(%s-%s)" % (ctx.fmt(in_low),
+                            ctx._arith_operand(value, "-", right=True))
         slope = -slope
     else:
-        head = "(%s-%s)" % (value.text, ctx.fmt(in_low))
+        head = "(%s-%s)" % (ctx._arith_operand(value, "-"), ctx.fmt(in_low))
     ctx.set_out(
         block, "out",
         ctx.expr(
             "%s*%s+%s" % (head, ctx.fmt(round(slope, 6)), ctx.fmt(out_low)),
             operands=value.operands + 3,
             operators=value.operators + 3,
+            prec=5,
         ),
     )
 

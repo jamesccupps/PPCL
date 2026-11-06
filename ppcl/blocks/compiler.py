@@ -76,6 +76,9 @@ class Value:
     inverse: str = None
     #: For a point read, what the read gives -- see :data:`points.READS_HINT`.
     reads: str = None
+    #: Precedence of the loosest operator at the top of an arithmetic
+    #: expression, from spec.PRECEDENCE; 0 when not known.
+    prec: int = 0
 
 
 # --------------------------------------------------------------------------
@@ -231,8 +234,9 @@ class Context:
         return Value(self.fmt(value), operands=1, operators=0)
 
     def expr(self, text, operands=1, operators=0, digital=False,
-             is_point=False, inverse=None):
-        return Value(text, operands, operators, is_point, digital, inverse)
+             is_point=False, inverse=None, prec=0):
+        return Value(text, operands, operators, is_point, digital, inverse,
+                     prec=prec)
 
     def render_point(self, name):
         """Quote a point reference the way PPCL requires."""
@@ -417,24 +421,30 @@ class Context:
         a, b = self._fit([a, b], 1, block, "N")
         return Value(
             "%s%s%s" % (self._arith_operand(a, op), op,
-                        self._arith_operand(b, op)),
+                        self._arith_operand(b, op, right=True)),
             a.operands + b.operands,
             a.operators + b.operators + 1,
+            prec=spec.PRECEDENCE[op],
         )
 
     @staticmethod
-    def _arith_operand(value, op):
+    def _arith_operand(value, op, right=False):
         """Parenthesise only where precedence would otherwise change meaning.
 
         Multiplication and division bind tighter than addition, and every
         relational or logical operator binds looser than all of them, so those
-        cases need brackets. Parentheses cost nothing against the statement
-        limits, but gratuitous ones make the generated program harder to read
-        at the panel than the code it replaced.
+        cases need brackets. So does a sum or difference on the right of a
+        minus: PPCL evaluates left to right, so Z-(X+Y) written Z-X+Y is
+        (Z-X)+Y. An operand whose shape is not known is bracketed. Parentheses
+        cost nothing against the statement limits, but gratuitous ones make
+        the generated program harder to read at the panel than the code it
+        replaced.
         """
         if value.operators == 0:
             return value.text
         if value.digital or op in ("*", "/"):
+            return "(%s)" % value.text
+        if right and op == "-" and (value.prec == 0 or value.prec >= 5):
             return "(%s)" % value.text
         return value.text
 
@@ -442,12 +452,17 @@ class Context:
         a, b = self._fit([a, b], 1, block, "C")
         flipped = {".GT.": ".LE.", ".GE.": ".LT.", ".LT.": ".GE.",
                    ".LE.": ".GT.", ".EQ.": ".NE.", ".NE.": ".EQ."}[op]
+        # A logical operand binds looser than the comparison: NOT of
+        # (A OR B), written A.OR.B.EQ.0.0, is A OR (B = 0). Arithmetic binds
+        # tighter and needs nothing.
+        left, right = (("(%s)" % v.text) if v.digital and v.operators
+                       else v.text for v in (a, b))
         return Value(
-            "%s%s%s" % (a.text, op, b.text),
+            "%s%s%s" % (left, op, right),
             operands=a.operands + b.operands,
             operators=a.operators + b.operators + 1,
             digital=True,
-            inverse="%s%s%s" % (a.text, flipped, b.text),
+            inverse="%s%s%s" % (left, flipped, right),
         )
 
     def join(self, op, values, digital=True, block=None):
@@ -688,8 +703,12 @@ def _check_wire(diagram, wire):
             "%s has no output called %r" % (src.type, wire.src_pin), src.id
         )
     if dst_type is None or dst_type.input(wire.dst_pin) is None:
+        have = ", ".join(p.name for p in dst_type.inputs) if dst_type else ""
         raise BlockError(
-            "%s has no input called %r" % (dst.type, wire.dst_pin), dst.id
+            "%s has no input called %r%s" % (
+                dst.type, wire.dst_pin,
+                "; its inputs are %s" % have if have else ""),
+            dst.id,
         )
     landing = [
         w for w in diagram.wires
