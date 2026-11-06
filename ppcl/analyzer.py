@@ -195,6 +195,8 @@ class Analysis:
     one_shot: set = field(default_factory=set)
     #: Lowest line number of the main steady-state loop, if there is one.
     loop_entry: int = None
+    _every_pass: dict = field(default_factory=dict, repr=False,
+                              compare=False)
 
     # -- convenience -------------------------------------------------------
 
@@ -231,6 +233,65 @@ class Analysis:
         for u in self.uses:
             seen.setdefault(u.name.upper(), u.name)
         return sorted(seen.values())
+
+    # -- the main loop -----------------------------------------------------
+
+    def _loop_successors(self, number: int):
+        ln = self.index.get(number)
+        if ln is None:
+            return []
+        return [s for s in _successors_wrapping(self, ln)
+                if s in self.steady_state]
+
+    def runs_every_pass(self, number: int) -> bool:
+        """True when every trip round the main loop executes this line.
+
+        Being on the loop is not enough. A mode dispatch reaches each block
+        by GOTO, so a line in the occupied block and a line in the
+        unoccupied block are both on the loop, neither has an IF, and only
+        one of them runs on any given pass. A line counts here when going
+        round the loop without it is impossible.
+        """
+        cache = self._every_pass
+        if number in cache:
+            return cache[number]
+        ln = self.index.get(number)
+        entry = self.loop_entry
+        if (ln is None or ln.disabled or ln.unknown or entry is None
+                or number not in self.steady_state):
+            result = False
+        elif number == entry:
+            result = True
+        else:
+            result = True
+            seen = set()
+            stack = list(self._loop_successors(entry))
+            while stack:
+                n = stack.pop()
+                if n == entry:
+                    result = False    # round the loop without touching it
+                    break
+                if n == number or n in seen:
+                    continue
+                seen.add(n)
+                stack.extend(self._loop_successors(n))
+        cache[number] = result
+        return result
+
+    def lines_after(self, number: int, stops) -> set:
+        """Lines a pass can execute after ``number`` before reaching a stop.
+
+        Follows the loop, through the wrap, and does not expand ``stops``.
+        """
+        seen = set()
+        stack = list(self._loop_successors(number))
+        while stack:
+            n = stack.pop()
+            if n in seen or n in stops:
+                continue
+            seen.add(n)
+            stack.extend(self._loop_successors(n))
+        return seen
 
 
 # --------------------------------------------------------------------------

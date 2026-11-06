@@ -1378,3 +1378,66 @@ def test_a_placeholder_is_not_also_reported_as_an_overlong_point_name():
     got = codes(text)
     assert "W122" in got
     assert "E105" not in got
+
+
+# W332 counts a writer as unconditional only when it runs on every pass, and
+# a fight only when one writer's value is replaced before the program reads it.
+
+def test_one_command_twice_on_every_pass_is_a_fight():
+    text = "10\tSET(50.0,VLV)\n20\tSET(0.0,VLV)\n30\tGOTO 10\n"
+    assert severity_of(text, "W332") == "warning"
+
+
+def test_on_and_off_both_on_every_pass_is_a_fight():
+    text = "10\tON(FAN)\n20\tOFF(FAN)\n30\tGOTO 10\n"
+    assert severity_of(text, "W332") == "warning"
+
+
+def test_an_assignment_fights_a_command():
+    text = "10\tVLV = 50.0\n20\tTABLE(OAT,VLV,0,10,60,90)\n30\tGOTO 10\n"
+    assert severity_of(text, "W332") == "warning"
+
+
+def test_mode_blocks_reached_by_goto_are_not_a_fight():
+    """Neither block has an IF on its lines, and only one runs per pass.
+    These were warnings, 62 of them across 42 real programs."""
+    text = (
+        "10\tIF(DAYMODE.EQ.ON) THEN GOTO 100\n"
+        "20\tOFF(FAN)\n"
+        "30\tSET(0.0,VLV)\n"
+        "40\tGOTO 200\n"
+        "100\tON(FAN)\n"
+        "110\tTABLE(OAT,VLV,0,10,60,90)\n"
+        "200\tGOTO 10\n"
+    )
+    found = [d for d in linter.lint(parser.parse(text)) if d.code == "W332"]
+    assert [(d.severity.value, d.message.split()[0]) for d in found] == [
+        ("info", "VLV")]
+
+
+def test_a_local_reused_as_a_temporary_is_not_a_fight():
+    text = (
+        '10\tLOCAL("T")\n'
+        '20\t$T = A * 2.0\n'
+        "30\tB = $T\n"
+        '40\t$T = C * 3.0\n'
+        "50\tD = $T\n"
+        "60\tGOTO 20\n"
+    )
+    assert "W332" not in codes(text)
+
+
+def test_a_disabled_line_does_not_fight():
+    text = "10\tSET(50.0,VLV)\n20\t# SET(0.0,VLV)\n30\tGOTO 10\n"
+    assert "W332" not in codes(text)
+
+
+def test_tods_for_different_day_modes_on_one_point_are_a_schedule():
+    """TOD writes at its scheduled times, not every time it executes. The
+    schedule template's weekday and weekend TODs read as a fight."""
+    text = (
+        "10\tTOD(1,1,7:00,18:00,FAN)\n"
+        "20\tTOD(8,1,0:00,0:01,FAN)\n"
+        "30\tGOTO 10\n"
+    )
+    assert "W332" not in codes(text)

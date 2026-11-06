@@ -9,6 +9,7 @@ from ..ast_nodes import (
     BinOp,
     CommandCall,
     FuncCall,
+    Gosub,
     If,
     Num,
     PriorityRef,
@@ -682,6 +683,15 @@ def _w341_placeholder(ctx):
     return ()
 
 
+#: Commands that write when something happens, not each time they execute,
+#: so running on every pass does not make them overwrite anything: TOD and
+#: TODSET at their scheduled times, WAIT when its trigger changes, DC on its
+#: 5-minute pattern slots and DCR on its 5-minute decision (Chapter 4, each
+#: command's notes). A TOD start and a TOD stop on the same fan are a
+#: schedule, not a fight.
+_EVENT_WRITERS = frozenset({"TOD", "TODSET", "WAIT", "DC", "DCR"})
+
+
 @rule("W332", "Same point commanded from several places", Severity.WARNING)
 def conflicting_writers(ctx):
     a = ctx.analysis
@@ -691,15 +701,17 @@ def conflicting_writers(ctx):
         "ON", "OFF", "AUTO", "FAST", "SLOW", "SET", "STATE",
         "EMON", "EMOFF", "EMSET", "EMAUTO", "EMFAST", "EMSLOW",
         "TOD", "TODSET", "TABLE", "MAX", "MIN", "DBSWIT", "LOOP", "WAIT",
-        "DC", "DCR",
+        "DC", "DCR", "assign",
     }
     # A statement that reads the point it writes is refining the value that is
     # already there, not competing for it. MAX to a floor followed by MIN to a
     # ceiling is the standard PPCL clamp and must not read as a conflict.
     reads_at = {}
+    reads_by_point = {}
     for use in a.uses:
         if use.kind == "read":
             reads_at.setdefault(use.line, set()).add(use.name.upper())
+            reads_by_point.setdefault(use.name.upper(), set()).add(use.line)
 
     by_point = {}
     for use in a.uses:
@@ -714,41 +726,77 @@ def conflicting_writers(ctx):
         for ln in ctx.program.lines
         if any(isinstance(s, If) for s in substatements(ln.stmt))
     }
+    # A subroutine may read anything, and its body is not on the loop.
+    gosub_lines = {
+        ln.number
+        for ln in ctx.program.lines
+        if any(isinstance(s, Gosub) for s in substatements(ln.stmt))
+    }
 
     for name, uses in sorted(by_point.items()):
         commands = {u.context for u in uses}
-        # Complementary pairs are the normal way to write PPCL.
-        if commands <= {"ON", "OFF"} or commands <= {"FAST", "SLOW", "OFF"}:
-            continue
-        if commands <= {"AUTO", "ON", "OFF"}:
-            continue
-        if len(commands) < 2:
+        lines = sorted({u.line for u in uses})
+        # A fight is two writers that both run on every pass -- no IF on the
+        # line, and no way round the loop that skips it -- where one's value
+        # is replaced before anything in this program reads it. Only the
+        # outside world sees that value: the output, other programs, the
+        # operator. No IF is not enough: the mode blocks of a GOTO dispatch
+        # have none, and only one of them runs on a pass. And a value read
+        # before the next write is a computation step, the way a $LOC is
+        # reused, not a fight.
+        level_lines = {u.line for u in uses if u.context not in _EVENT_WRITERS}
+        always = [line for line in sorted(level_lines)
+                  if line not in guarded_lines and a.runs_every_pass(line)]
+        stops = set(always)
+        point_reads = reads_by_point.get(name, set()) | gosub_lines
+        unread = [
+            line for line in always
+            if len(always) > 1
+            and not (a.lines_after(line, stops) & point_reads)
+        ]
+        if unread:
+            yield Diagnostic(
+                code="W332",
+                severity=Severity.WARNING,
+                message="%s is commanded by %s at lines %s"
+                % (uses[0].name, "/".join(sorted(commands)),
+                   ", ".join(str(n) for n in lines)),
+                line=lines[0],
+                detail="Lines %s run on every pass with no IF, and what line "
+                "%d writes is replaced before this program reads it. "
+                "Whichever executes last in the pass wins, so the outcome "
+                "depends on line order rather than on logic."
+                % (", ".join(str(n) for n in always), unread[0]),
+                suggestion="Decide the point's state in one place, then "
+                "command it once.",
+            )
             continue
 
-        lines = sorted({u.line for u in uses})
-        # Two writers that both run unconditionally always fight. When at
-        # least one sits behind an IF, the author has probably separated the
-        # cases -- the override idiom (compute, then conditionally overrule)
-        # looks exactly like this -- so it is noted rather than warned about.
-        unguarded = [line for line in lines if line not in guarded_lines]
-        all_guarded = len(unguarded) < 2
+        # Complementary pairs are the normal way to write PPCL, and one
+        # command used in several places is usually one per case. An
+        # assignment writes a value the way SET does, so for this purpose
+        # the two are one kind of command.
+        kinds = {"SET" if c == "assign" else c for c in commands}
+        if kinds <= {"ON", "OFF"} or kinds <= {"FAST", "SLOW", "OFF"}:
+            continue
+        if kinds <= {"AUTO", "ON", "OFF"}:
+            continue
+        if len(kinds) < 2:
+            continue
+        # Different commands that never overwrite each other within a pass:
+        # the override idiom (compute, then conditionally overrule), or one
+        # command per mode block. Noted, not warned about.
         yield Diagnostic(
             code="W332",
-            severity=Severity.INFO if all_guarded else Severity.WARNING,
+            severity=Severity.INFO,
             message="%s is commanded by %s at lines %s"
             % (uses[0].name, "/".join(sorted(commands)),
                ", ".join(str(n) for n in lines)),
             line=lines[0],
-            detail=(
-                "At most one of these runs unconditionally, so this is "
-                "probably a deliberate override. Confirm the guards really are "
-                "exclusive and that the override comes last."
-                if all_guarded
-                else "Several commands drive this point and %d of them run "
-                "unconditionally. Whichever executes last in the pass wins, so "
-                "the outcome depends on line order rather than on logic."
-                % len(unguarded)
-            ),
+            detail="No two of these overwrite each other within a pass -- an "
+            "IF or a GOTO separates them, or the program reads the value in "
+            "between -- so this is probably deliberate. Confirm the cases "
+            "really are exclusive and that any override comes last.",
             suggestion="Decide the point's state in one place, then command it "
             "once.",
         )
