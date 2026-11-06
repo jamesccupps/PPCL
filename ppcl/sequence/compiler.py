@@ -315,6 +315,36 @@ class Compiler:
             self._locals.append(upper)
         return upper
 
+    def _fresh_local(self, base: str) -> str:
+        """A local name no point, flag or other local already has."""
+        taken = set(self._locals) | {p.name.upper() for p in self.seq.points}
+        name, n = base, 1
+        while name in taken:
+            n += 1
+            name = "%s_%d" % (base, n)
+        return self._local(name)
+
+    def _rule_changes_its_test(self, rule) -> bool:
+        """True when a rule spans several lines and writes what it tests.
+
+        PPCL allows one statement per IF branch, so a rule with more than
+        one action becomes a line per action, each repeating the test. If
+        an action writes a point the test reads, the lines after it see the
+        new value: "when DMPR < 50, set DMPR 100, FAN on" set the damper,
+        then skipped the fan and ran the otherwise line instead.
+        """
+        if rule.when is None:
+            return False
+        seq = self.seq
+        then_writes = [p for p, a in rule.then if render_action(p, a, seq=seq)]
+        else_writes = [p for p, a in rule.otherwise
+                       if render_action(p, a, seq=seq)]
+        if len(then_writes) == 1 and len(else_writes) == 1:
+            return False      # one IF/THEN/ELSE line tests it once
+        reads = {resolve(name, seq).upper() for name in rule.when.points()}
+        writes = {resolve(p, seq).upper() for p in then_writes + else_writes}
+        return bool(reads & writes)
+
     def _check_names(self) -> None:
         """Refuse a name that two things in the sequence would share."""
         seq = self.seq
@@ -362,6 +392,11 @@ class Compiler:
         for p in seq.points:
             if p.is_local:
                 self._local(p.name)
+        self._rule_locals = {}
+        for index, rule in enumerate(seq.rules):
+            if self._rule_changes_its_test(rule):
+                self._rule_locals[index] = self._fresh_local("RULE%d"
+                                                             % (index + 1))
 
         b = Builder(start=seq.start_line, step=seq.line_step)
         self._header(b)
@@ -676,7 +711,7 @@ class Compiler:
     def _emit_rules(self, b: Builder) -> None:
         b.blank()
         b.rule("Additional rules")
-        for rule in self.seq.rules:
+        for index, rule in enumerate(self.seq.rules):
             if rule.description:
                 b.comment(rule.description)
             if rule.when is None:
@@ -700,6 +735,18 @@ class Compiler:
                 continue
             # PPCL allows only one statement per branch, so multiple actions
             # become separate lines repeating the test.
+            latch = self._rule_locals.get(index)
+            if latch is not None:
+                # An action writes what the test reads, so the test is taken
+                # once and every line acts on that answer.
+                flag = '"$%s"' % latch
+                b.code("IF(%s) THEN %s = 1.0 ELSE %s = 0.0"
+                       % (test, flag, flag))
+                for stmt in then_stmts:
+                    b.code("IF(%s.EQ.1.0) THEN %s" % (flag, stmt))
+                for stmt in else_stmts:
+                    b.code("IF(%s.EQ.0.0) THEN %s" % (flag, stmt))
+                continue
             for stmt in then_stmts:
                 b.code("IF(%s) THEN %s" % (test, stmt))
             if else_stmts:

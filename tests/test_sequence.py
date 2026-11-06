@@ -707,3 +707,57 @@ def test_a_trip_holds_against_a_reset_that_is_also_true():
     sim.run(passes=3)
     assert sim.panel.value("SFAN") == 0.0
     assert sim.panel.get("SFAN").priority == "@SMOKE"
+
+
+_REARMS = '''sequence "t"
+points
+  DMPR  LAO
+  FAN   LDO
+  ALM   LDO
+modes
+  Normal  otherwise
+table
+          Normal
+  ALM     off
+when DMPR < 50
+  DMPR 100
+  FAN on
+'''
+
+
+def test_a_rule_whose_action_changes_its_condition_still_does_all_of_it():
+    """Each action was its own line repeating the test, so once
+    SET(100,DMPR) ran, the ON(FAN) line saw DMPR at 100 and skipped. The
+    fan never came on, on any scan."""
+    from ppcl.simulator import Simulator
+
+    out, _w = compile_sequence(sequence.parse(_REARMS))
+    sim = Simulator(parser.parse(out))
+    sim.panel.load({"DMPR": 20.0, "FAN": 0.0})
+    sim.run(passes=3)
+    assert sim.panel.value("DMPR") == 100.0
+    assert sim.panel.value("FAN") == 1.0
+
+
+def test_the_otherwise_lines_do_not_run_in_the_same_scan_as_the_rule():
+    """With an otherwise, the scan that set DMPR also ran OFF(FAN): the rule
+    ran both of its branches at once. Taken once, the test gives one answer
+    per scan -- FAN on in this scan, off in the next because DMPR is now
+    100, which is what the rule says."""
+    from ppcl.simulator import Simulator
+
+    text = _REARMS + "  otherwise\n  FAN off\n"
+    out, _w = compile_sequence(sequence.parse(text))
+    sim = Simulator(parser.parse(out))
+    sim.panel.load({"DMPR": 20.0, "FAN": 0.0})
+    sim.run(passes=2)
+    fan = [e.text for e in sim.events if e.kind == "write" and "FAN" in e.text]
+    assert fan and "ON" in fan[0].upper(), fan
+
+
+def test_a_rule_that_cannot_change_its_condition_spends_no_local():
+    text = _REARMS.replace("  DMPR 100\n", "  ALM on\n") + (
+        "  otherwise\n  FAN off\n")
+    out, _w = compile_sequence(sequence.parse(text))
+    assert "RULE" not in out
+    assert out.count("IF(DMPR.LT.50.0) THEN") == 2
