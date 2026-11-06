@@ -494,16 +494,19 @@ class Compiler:
                 raise CompileError(
                     "interlock %r has no trip condition" % il.name
                 )
-            b.code('IF(%s) THEN "$%s" = 1.0'
-                   % (render_condition(il.trip, seq), flag))
             if il.reset is None:
                 raise CompileError(
                     "interlock %r has no reset condition. A latch that never "
                     "clears leaves its points stuck at %s forever."
                     % (il.name, il.priority)
                 )
+            # Reset first, trip last, so with both true the trip wins: a
+            # safety stays tripped until what tripped it has cleared. The
+            # other way round, a held reset released it every pass.
             b.code('IF(%s) THEN "$%s" = 0.0'
                    % (render_condition(il.reset, seq), flag))
+            b.code('IF(%s) THEN "$%s" = 1.0'
+                   % (render_condition(il.trip, seq), flag))
 
     def _emit_interlock_forces(self, b: Builder, locals_by_name: dict) -> None:
         """Force and release the points an interlock owns.

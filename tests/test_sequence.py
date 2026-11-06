@@ -690,3 +690,20 @@ def test_an_ambiguous_interlock_name_is_refused(change, says):
     with pytest.raises(CompileError) as err:
         compile_sequence(sequence.parse(_TWO_SAFETIES.replace(*change)))
     assert says in str(err.value)
+
+
+def test_a_trip_holds_against_a_reset_that_is_also_true():
+    """The reset was emitted after the trip, so with both true the reset
+    won: a held reset button released the safety while the smoke was
+    still there."""
+    from ppcl.simulator import Simulator
+
+    text = _TWO_SAFETIES.replace("  reset when SMK is off",
+                                 "  reset when RST is on").replace(
+        "  SMD    LDI", "  SMD    LDI\n  RST    LDI")
+    out, _w = compile_sequence(sequence.parse(text))
+    sim = Simulator(parser.parse(out))
+    sim.panel.load({"SMK": 1.0, "RST": 1.0, "SMD": 0.0})
+    sim.run(passes=3)
+    assert sim.panel.value("SFAN") == 0.0
+    assert sim.panel.get("SFAN").priority == "@SMOKE"
