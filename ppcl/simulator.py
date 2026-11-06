@@ -74,6 +74,9 @@ EXP_WARNING = (
     "EXP is simulated as e**x, but whether PPCL's EXP is base e or base 10 is "
     "not established -- see open question 12 in docs/PPCL-REFERENCE.md. Treat "
     "results built on it as unconfirmed")
+NEGATIVE_ROOT_WARNING = (
+    ".ROOT. of a negative value is not a real number; it was simulated as 0, "
+    "and what a panel returns for it is not documented")
 
 #: Functions that read something a simulator does not have. ALMPRI is a
 #: point's alarm priority, which lives in the panel's alarm configuration.

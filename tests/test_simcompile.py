@@ -97,3 +97,13 @@ def test_the_write_hook_still_sees_compiled_commands():
     sim.command = hooked
     sim.run(passes=1)
     assert ("FAN", 10) in seen and ("SP", 20) in seen and ("X", 30) in seen
+
+
+def test_a_root_of_a_negative_value_warns_instead_of_crashing():
+    """Python raises nothing for (-0.01) ** 0.5: it returns a complex
+    number, and the simulator fell over a line later. FLOW = K*(DP.ROOT.2)
+    with DP a hair below zero as a fan starts is the real trigger."""
+    sim = _sim("10 DP = -0.01", "20 FLOW = 2.0*(DP.ROOT.2)", "30 GOTO 10")
+    sim.run(passes=2)
+    assert sim.panel.value("FLOW") == 0.0
+    assert any("ROOT" in w and "negative" in w for w in sim.warnings)

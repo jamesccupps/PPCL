@@ -53,6 +53,7 @@ from .ast_nodes import (
 )
 from .simulator import (
     EXP_WARNING,
+    NEGATIVE_ROOT_WARNING,
     OFF,
     ON,
     UNKNOWABLE_FUNCTION_WARNING,
@@ -187,6 +188,12 @@ def _compile_binop(sim, node, cache):
         def root():
             base, power = left(), right()
             if power == 0:
+                return 0.0
+            if base < 0:
+                # Python does not raise for (-0.01) ** 0.5: it returns a
+                # complex number, and the simulator fell over a line later.
+                # What a panel returns is not documented, so say so.
+                sim._warn(NEGATIVE_ROOT_WARNING)
                 return 0.0
             try:
                 return base ** (1.0 / power)
