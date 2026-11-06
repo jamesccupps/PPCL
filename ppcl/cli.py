@@ -1130,17 +1130,33 @@ def cmd_redact(args):
     files = collect_files(args.paths)
     result = redact_files(files, keep_generic=not args.aggressive)
 
+    leaked = result.leaks()
+    if leaked:
+        # Whatever path a name took through the rewriting, if it is still in
+        # the output the output is not redacted, and nothing is written.
+        print("refusing to write: %d original name(s) are still in the "
+              "redacted output: %s. This is a defect in the redactor; please "
+              "report the construct that carried them."
+              % (len(leaked), ", ".join(leaked[:10])), file=sys.stderr)
+        return 2
+
+    # A site's file names identify it as well as its point names do, so the
+    # copies are numbered; the mapping file records which is which.
+    for i, path in enumerate(sorted(result.files), start=1):
+        ext = os.path.splitext(path)[1] or ".pcl"
+        result.names[os.path.basename(path)] = "program%02d%s" % (i, ext)
+
     if args.outdir:
         os.makedirs(args.outdir, exist_ok=True)
         for path, text in result.files.items():
-            dest = os.path.join(args.outdir, os.path.basename(path))
-            with open(dest, "w", encoding="utf-8", newline="\n") as fh:
-                fh.write(text)
+            dest = os.path.join(args.outdir,
+                                result.names[os.path.basename(path)])
+            textio.write(dest, textio.encode(text))
             print("wrote %s" % dest, file=sys.stderr)
     else:
         for path, text in result.files.items():
             if len(result.files) > 1:
-                print("===== %s =====" % path)
+                print("===== %s =====" % result.names[os.path.basename(path)])
             sys.stdout.write(text)
 
     if args.mapping:

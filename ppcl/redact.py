@@ -15,7 +15,8 @@ import json
 import re
 from dataclasses import dataclass, field
 
-from . import spec
+from . import spec, textio
+from .lexer import LexError, Tok, tokenize
 
 #: Generic HVAC and controls vocabulary. These segments say what a point does,
 #: not where it is, so they survive redaction and keep the program readable.
@@ -45,15 +46,44 @@ class Redaction:
     files: dict = field(default_factory=dict)  # path -> redacted text
     #: Generic terms left in place, for the caller to eyeball.
     preserved: set = field(default_factory=set)
+    #: Original file name -> the name its redacted copy was written under.
+    names: dict = field(default_factory=dict)
 
     def reverse(self) -> dict:
         return {v: k for k, v in self.mapping.items()}
+
+    def leaks(self) -> list:
+        """Original names that still appear in any redacted file.
+
+        The check that makes the rest trustworthy: whatever path a name
+        took through the rewriting, if it is anywhere in the output it is
+        reported. A name that is also some other name's replacement --
+        AHU01 renumbered while another unit became AHU01 -- cannot be told
+        from it and is not counted.
+        """
+        replacements = {v.upper() for v in self.mapping.values()}
+        out = []
+        for original in sorted(self.mapping):
+            if original.upper() in replacements or not original.strip():
+                continue
+            if original.isdigit() or len(original) == 1:
+                # A numeric segment (AHU.1) or a single letter is redacted
+                # where it is a name, but the same text is a constant, a
+                # line number or a menu keystroke everywhere else, and
+                # cannot identify a site on its own.
+                continue
+            pattern = re.compile(r"(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])"
+                                 % re.escape(original), re.IGNORECASE)
+            if any(pattern.search(text) for text in self.files.values()):
+                out.append(original)
+        return out
 
     def save_mapping(self, path: str) -> None:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(
                 {"note": "Keep this file local. It reverses the redaction.",
-                 "mapping": self.mapping},
+                 "mapping": self.mapping,
+                 "files": self.names},
                 fh,
                 indent=2,
                 sort_keys=True,
@@ -113,15 +143,25 @@ class Redactor:
         return self._counters[key]
 
     def name(self, name: str) -> str:
-        """Redact a full, possibly dotted, point name."""
+        """Redact a full point name: dotted, colon-qualified, or behind a
+        DEFINE abbreviation (``%X%TAIL``) -- each part on its own, keeping
+        the separators, so an abbreviation maps the same way as in the
+        DEFINE that declares it."""
         sigil = ""
         body = name
         if body.startswith("$"):
             sigil, body = "$", body[1:]
         elif body.startswith("@"):
             sigil, body = "@", body[1:]
-        redacted = ".".join(self.segment(part) for part in body.split("."))
-        return sigil + redacted
+        out = []
+        for part in re.split(r"(%[^%]*%|[.:])", body):
+            if part in (".", ":") or not part:
+                out.append(part)
+            elif part.startswith("%") and part.endswith("%"):
+                out.append("%" + self.segment(part[1:-1]) + "%")
+            else:
+                out.append(self.segment(part))
+        return sigil + "".join(out)
 
     def keystroke_sequence(self, seq: str) -> str:
         """Redact an OIP keystroke sequence without destroying its structure.
@@ -172,9 +212,14 @@ class Redactor:
                 out.append(self._redact_statement(raw))
                 continue
             stripped = body.strip()
-            if _is_comment_body(stripped):
-                out.append("%s\tC %s" % (str(number).zfill(5), "[redacted]")
-                           if stripped[1:].strip() else "%s\tC" % str(number).zfill(5))
+            # A PXC.A disabled line keeps its "# "; behind it a comment is
+            # still prose, numbers and all.
+            marker = "# " if stripped.startswith("# ") else ""
+            inner = stripped[len(marker):].strip()
+            if _is_comment_body(inner):
+                out.append("%s\t%sC%s" % (str(number).zfill(5), marker,
+                                          " [redacted]" if inner[1:].strip()
+                                          else ""))
                 continue
             out.append("%s\t%s" % (str(number).zfill(5),
                                    self._redact_statement(body)))
@@ -182,7 +227,52 @@ class Redactor:
 
     _OIP_CALL = re.compile(r"\bOIP\s*\(", re.I)
 
+    def _keep(self, word: str) -> bool:
+        """A word the language owns, which says nothing about the site."""
+        upper = word.upper()
+        return (upper in spec.RESERVED_WORDS or spec.is_resident(upper)
+                or spec.is_builtin_local(word))
+
     def _redact_statement(self, body: str) -> str:
+        """Redact one statement from its tokens.
+
+        The lexer already knows a name from an operator, so every name --
+        quoted, bare and dotted, @-prefixed, or behind a DEFINE abbreviation
+        -- is redacted whole, part by part, and nothing else is touched. The
+        text pass this replaced skipped anything after a "." or an "@", to
+        keep its hands off .EQ. and @EMER, and so left every segment after
+        the first of an unquoted name, and every @ name, as it found them.
+        A line the lexer cannot read falls back to that text pass.
+        """
+        prefix = ""
+        if body.startswith("# "):
+            prefix, body = "# ", body[2:]
+        try:
+            tokens = tokenize(body)
+        except LexError:
+            return prefix + self._redact_text_pass(body)
+        is_oip = bool(self._OIP_CALL.search(body))
+        edits = []
+        for tok in tokens:
+            if tok.kind is Tok.QUOTED:
+                start = body.index('"', tok.col)
+                end = body.index('"', start + 1) + 1
+                inner = body[start + 1:end - 1]
+                if is_oip and "/" in inner:
+                    new = '"%s"' % self.keystroke_sequence(inner)
+                else:
+                    new = '"%s"' % self.name(inner)
+                edits.append((start, end, new))
+            elif tok.kind in (Tok.IDENT, Tok.ATNAME, Tok.MACRO):
+                if tok.kind is Tok.IDENT and self._keep(tok.text):
+                    continue
+                edits.append((tok.col, tok.col + len(tok.text),
+                              self.name(tok.text)))
+        for start, end, new in sorted(edits, reverse=True):
+            body = body[:start] + new + body[end:]
+        return prefix + body
+
+    def _redact_text_pass(self, body: str) -> str:
         # An OIP sequence is keystrokes, not a name, and must be split on its
         # own separator before anything else touches the quotes.
         is_oip = bool(self._OIP_CALL.search(body))
@@ -230,8 +320,7 @@ def redact_files(paths, keep_generic: bool = True) -> Redaction:
     r = Redactor(keep_generic=keep_generic)
     result = Redaction()
     for path in paths:
-        with open(path, "r", encoding="utf-8", errors="replace") as fh:
-            result.files[path] = r.redact_text(fh.read())
+        result.files[path] = r.redact_text(textio.read(path).text)
     result.mapping = dict(r.mapping)
     result.preserved = set(r.preserved)
     return result

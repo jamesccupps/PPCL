@@ -1112,3 +1112,64 @@ def test_renumber_refuses_its_own_defect(monkeypatch):
     result = formatter.renumber(prog)
     assert result.text == "" and result.refused == "self_check"
     assert "defect in the workbench" in result.warnings[0]
+
+
+# --------------------------------------------------------------------------
+# Redaction from tokens
+# --------------------------------------------------------------------------
+
+_SITE = ('00020\tON("BLDX.AHU07.SFAN")\n'
+         '00030\tIF(BLDX.AHU09.ZNT .GT. 75.0) THEN ON(@1STFLR.TENANTQ.DMPR)\n'
+         '00040\tSET(55.0,BLDX.WESTWING.DASP)\n'
+         '00050\tDEFINE(WW,"BLDX.WESTWING.")\n'
+         '00060\tSET(@EMER,60.0,"%WW%SAT")\n'
+         '00070\t# C TENANTQ FLOOR 3\n'
+         '00080\tGOTO 20\n')
+
+
+def test_redaction_reaches_every_segment_and_at_names():
+    """Unquoted, every segment after the first survived -- AHU09, WESTWING
+    -- and an @ name was not touched at all."""
+    from ppcl.redact import Redactor
+
+    out = Redactor().redact_text(_SITE)
+    for word in ("BLDX", "AHU07", "AHU09", "1STFLR", "TENANTQ", "WESTWING"):
+        assert word not in out, (word, out)
+    # The logic is untouched.
+    for kept in (".GT.", "75.0", "@EMER", "GOTO 20", "SFAN", "ZNT", "DASP"):
+        assert kept in out, (kept, out)
+    assert parser.parse(out).errors == []
+
+
+def test_a_define_and_its_references_redact_alike():
+    from ppcl.redact import Redactor
+
+    out = Redactor().redact_text(_SITE)
+    define = [l for l in out.splitlines() if "DEFINE(" in l][0]
+    abbrev = define.split("(")[1].split(",")[0]
+    assert ('"%%%s%%SAT"' % abbrev) in out
+
+
+def test_redaction_reports_any_name_that_survived():
+    from ppcl.redact import Redaction
+
+    result = Redaction(mapping={"WESTWING": "PT001", "AHU07": "AHU01"},
+                       files={"a": "SET(55.0,PT001.WESTWING.DASP)\n"})
+    assert result.leaks() == ["WESTWING"]
+
+
+def test_redact_names_its_output_files_by_number(tmp_path):
+    """A site's file names are as identifying as its point names."""
+    from ppcl import cli
+
+    src = tmp_path / "in"
+    src.mkdir()
+    (src / "BLDX_WESTWING_AHU.pcl").write_text(_SITE, encoding="utf-8")
+    out = tmp_path / "out"
+    assert cli.main(["redact", str(src / "BLDX_WESTWING_AHU.pcl"),
+                     "--outdir", str(out),
+                     "--mapping", str(tmp_path / "map.json")]) == 0
+    assert [p.name for p in out.iterdir()] == ["program01.pcl"]
+    import json
+    files = json.loads((tmp_path / "map.json").read_text())["files"]
+    assert list(files.values()) == ["program01.pcl"]
