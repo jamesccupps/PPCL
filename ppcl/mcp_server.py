@@ -21,9 +21,14 @@ from __future__ import annotations
 import json
 import sys
 import traceback
+from collections import Counter
 
 from . import spec
+from .diagnostics import Severity
 from .web.api import Workspace, dispatch
+
+#: Findings ppcl_lint lists before it counts the rest by code.
+LINT_LIMIT = 60
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "ppcl"
@@ -83,6 +88,28 @@ TOOLS = [
                         "apogee allows 66 and 16 operands, older families 13. "
                         "Ask which panel if it matters and you do not know."
                     ),
+                },
+                "min_severity": {
+                    "type": "string",
+                    "enum": [s.value for s in Severity],
+                    "description": (
+                        "Report this severity and worse. 'warning' drops "
+                        "info and style findings."
+                    ),
+                },
+                "workstation_only": {
+                    "type": "boolean",
+                    "description": (
+                        "The program is only ever loaded from a workstation, "
+                        "never typed at a panel's MMI port. Silences the "
+                        "statement half of W104 (line length), which is most "
+                        "of the warnings on a real program."
+                    ),
+                },
+                "disabled": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Rule codes to leave out, e.g. [\"S601\"].",
                 },
             },
             "required": ["text"],
@@ -363,14 +390,35 @@ def _render_lint(result):
     diags = result.get("diagnostics", [])
     if not diags:
         lines.append("No findings.")
-    for d in diags:
+    # A real program runs to a hundred findings, half of them one code, and
+    # each carried the same detail, fix and citation: 34,000 characters for
+    # one file. A code's explanation is printed once, and the list stops at
+    # LINT_LIMIT -- worst first, so an error is never the one cut -- with the
+    # rest counted by code rather than silently gone.
+    per_code = Counter(d["code"] for d in diags)
+    explained = set()
+    for d in diags[:LINT_LIMIT]:
         where = "line %s" % d["line"] if d.get("line") else "program"
         lines.append("%-8s %-6s %-12s %s"
                      % (d["severity"], d["code"], where, d["message"]))
+        if d["code"] in explained:
+            continue
+        explained.add(d["code"])
         for key, label in (("detail", "  "), ("suggestion", "  fix: "),
                            ("manual", "  manual: ")):
             if d.get(key):
                 lines.append("%s%s" % (label, d[key]))
+        if per_code[d["code"]] > 1:
+            lines.append("  (%d %s findings; this is explained once)"
+                         % (per_code[d["code"]], d["code"]))
+    rest = Counter(d["code"] for d in diags[LINT_LIMIT:])
+    if rest:
+        lines.append("")
+        lines.append(
+            "... %d more not shown: %s. Narrow with min_severity, "
+            "workstation_only or disabled."
+            % (sum(rest.values()),
+               ", ".join("%s x%d" % kv for kv in rest.most_common())))
     return "\n".join(lines)
 
 

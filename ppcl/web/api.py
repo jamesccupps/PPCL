@@ -22,6 +22,7 @@ import traceback
 from .. import (analyzer, formatter, linter, points, sequence, spec,
                textio)
 from .. import parser as ppcl_parser
+from ..diagnostics import Severity
 
 MAX_UPLOAD = 4 * 1024 * 1024  # a PPCL program is never megabytes
 
@@ -181,13 +182,25 @@ def api_lint(body, ws=None):
     # The point database loaded in Settings, unless the caller sent its own.
     # Without it every type-aware rule stays silent: ON to an LAI passed.
     db = getattr(ws, "point_db", None)
+    # The CLI's --workstation-only and --min-severity, so every caller can
+    # narrow a report the same way. W104's statement half alone is 61-76%
+    # of the warnings on real programs.
+    options = dict(body.get("options") or {})
+    if body.get("workstation_only"):
+        options["wrap_long_lines"] = False
+    order = [s.value for s in Severity]
+    floor = body.get("min_severity") or order[-1]
+    if floor not in order:
+        raise ApiError("min_severity must be one of %s" % ", ".join(order))
     diags = linter.lint(
         prog,
         firmware=_firmware(body),
         point_types=body.get("point_types") or (db.types() if db else {}),
         disabled=body.get("disabled") or (),
-        options=body.get("options") or {},
+        options=options,
     )
+    diags = [d for d in diags
+             if order.index(d.severity.value) <= order.index(floor)]
     a = analyzer.analyze(prog)
     counts = linter.summarize(diags)
     return {

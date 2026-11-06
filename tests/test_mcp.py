@@ -287,3 +287,41 @@ def test_a_program_that_does_not_parse_says_where(ws, tool):
     assert is_error
     assert "does not parse" in text
     assert "  line 20: " in text
+
+
+def test_lint_offers_the_filters_the_cli_has():
+    props = mcp_server.BY_NAME["ppcl_lint"]["schema"]["properties"]
+    assert {"min_severity", "workstation_only", "disabled"} <= set(props)
+
+
+def _many_findings(n):
+    """n W104 warnings -- each line too long for the MMI port -- and, at the
+    end of the program, one error."""
+    body = "".join(
+        "%d\tIF(TEMP.GT.75.0.AND.HUMD.GT.60.0.AND.PRES.GT.1.5.AND.FLOW.GT."
+        "10.0) THEN ON(FAN%03d)\n" % (10 * (i + 1), i) for i in range(n))
+    return body + "%d\tON()\n%d\tGOTO 10\n" % (10 * (n + 1), 10 * (n + 2))
+
+
+def _finding_lines(text):
+    return [ln for ln in text.splitlines()
+            if ln[:8].strip() in ("error", "warning", "info", "style")]
+
+
+def test_lint_explains_a_repeated_code_once(ws):
+    text, _ = mcp_server.call_tool("ppcl_lint", {"text": _many_findings(5)}, ws)
+    shown = _finding_lines(text)
+    assert sum(" W104 " in ln for ln in shown) == 5
+    codes = {ln.split()[1] for ln in shown}
+    manuals = [ln for ln in text.splitlines() if ln.startswith("  manual: ")]
+    assert len(manuals) == len(codes)
+    assert "(5 W104 findings; this is explained once)" in text
+
+
+def test_lint_caps_the_list_worst_first_and_counts_the_rest(ws):
+    n = mcp_server.LINT_LIMIT + 15
+    text, _ = mcp_server.call_tool("ppcl_lint", {"text": _many_findings(n)}, ws)
+    shown = _finding_lines(text)
+    assert len(shown) == mcp_server.LINT_LIMIT
+    assert shown[0].startswith("error")           # never the one cut
+    assert "more not shown: W104 x" in text

@@ -757,3 +757,30 @@ def test_a_negative_content_length_is_refused(live):
                      b"Content-Length: -1\r\n\r\n" % port)
         reply = sock.recv(200)
     assert reply.startswith(b"HTTP/1.0 400") or reply.startswith(b"HTTP/1.1 400")
+
+
+_LONG = ("10\tIF(SUPPLY_AIR_TEMPERATURE.GT.SUPPLY_AIR_SETPOINT) THEN "
+         "SET(100.0,COOLING_VALVE_COMMAND)\n20\tGOTO 10\n")
+
+
+def test_lint_takes_the_clis_min_severity(ws):
+    _s, every = api.dispatch("/api/lint", {"text": _LONG}, ws)
+    _s, worst = api.dispatch("/api/lint",
+                             {"text": _LONG, "min_severity": "warning"}, ws)
+    assert {d["severity"] for d in every["diagnostics"]} - {"error", "warning"}
+    assert {d["severity"] for d in worst["diagnostics"]} <= {"error", "warning"}
+    assert worst["counts"].get("info", 0) == 0
+
+
+def test_lint_refuses_a_severity_it_does_not_know(ws):
+    status, payload = api.dispatch("/api/lint",
+                                   {"text": _LONG, "min_severity": "loud"}, ws)
+    assert status == 400 and "min_severity" in payload["error"]
+
+
+def test_lint_takes_the_clis_workstation_only(ws):
+    _s, mmi = api.dispatch("/api/lint", {"text": _LONG}, ws)
+    _s, ws_only = api.dispatch("/api/lint",
+                               {"text": _LONG, "workstation_only": True}, ws)
+    assert any(d["code"] == "W104" for d in mmi["diagnostics"])
+    assert not any(d["code"] == "W104" for d in ws_only["diagnostics"])
