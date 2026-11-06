@@ -211,7 +211,9 @@ def tokenize(text: str) -> list:
             continue
 
         # -- numbers and times --------------------------------------------
-        if ch.isdigit():
+        # ASCII only, as the patterns are: a superscript two passes
+        # isdigit(), matched nothing, and took the lexer down with it.
+        if "0" <= ch <= "9":
             m = _TIME_RE.match(text, i)
             if m:
                 tokens.append(Token(Tok.TIME, m.group(), i))
@@ -223,7 +225,10 @@ def tokenize(text: str) -> list:
             continue
 
         # -- identifiers ---------------------------------------------------
-        if ch.isalpha() or ch in "_$":
+        # ASCII letters only, for the same reason: an accented letter passes
+        # isalpha() and the identifier pattern does not take it. It now
+        # reaches the "unexpected character" error below.
+        if "A" <= ch.upper() <= "Z" and ch.isascii() or ch in "_$":
             m = _IDENT_RE.match(text, i)
             start = i
             end = m.end()

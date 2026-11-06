@@ -406,3 +406,19 @@ def test_a_statement_still_continues():
     prog = parser.parse("00100\tSFAN = &\n00110\tON\n00120\tGOTO 100\n")
     assert [ln.number for ln in prog.lines] == [100, 120]
     assert prog.lines[0].continued
+
+
+@pytest.mark.parametrize("line", [
+    "00100\t# C Temp\N{LATIN SMALL LETTER E WITH ACUTE}rature",
+    "00100\tCAF\N{LATIN CAPITAL LETTER E WITH ACUTE} = 1.0",
+    "00100\tX = 2\N{SUPERSCRIPT TWO}",
+    "00100\tX = " + "(" * 400 + "1" + ")" * 400,
+    "00100\tX = " + "-" * 1200 + "1",
+])
+def test_odd_input_is_a_parse_error_not_a_crash(line):
+    """'e'-acute passes isalpha() and superscript two passes isdigit(), but
+    the identifier and number patterns are ASCII, so the lexer took a None
+    match and raised AttributeError; deep nesting hit the recursion limit.
+    Either way one line took the whole program down with it."""
+    prog = parser.parse(line + "\n00110\tGOTO 100\n")
+    assert [ln.number for ln in prog.lines][-1] == 110

@@ -438,7 +438,13 @@ def parse_statement_text(body: str) -> Stmt:
     """Parse a bare statement string. Raises ParseError or LexError."""
     tokens = tokenize(body)
     p = _StatementParser(tokens)
-    stmt = p.parse_statement()
+    try:
+        stmt = p.parse_statement()
+    except RecursionError:
+        # A few hundred nested parentheses exceed Python's recursion limit
+        # long before any panel's. Every caller already treats a ParseError
+        # as one unreadable line; a RecursionError took the whole program.
+        raise ParseError("the expression is nested too deeply to read", 0)
     if not p.at_end():
         raise ParseError("unexpected trailing %r" % p.cur.text, p.cur.col)
     return stmt
