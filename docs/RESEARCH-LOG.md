@@ -3901,3 +3901,66 @@ The 2026 migration manual (A6V13998441) keeps the TX-I/O when a PXC Modular is
 replaced by a PXC7.A — only the controller changes — and sends the PPCL to the
 PXC.A manual for rework. That is when `pxc_a` becomes the lint firmware, and
 not before.
+
+---
+
+## 2026-11-06 (thirty-ninth pass) — an outside review, run rather than read
+
+An independent review of the whole repository came in. It had been done by
+reading only -- "the repository's code was not run" -- so every finding was
+reproduced here by running it before anything was changed, and each fix is its
+own commit with a test that failed first.
+
+### What it got right, and what it got wrong
+
+All nine of its High findings reproduced, three of them worse than written:
+`fmt -i` on a folder rewrote a README to an empty line; the sequence compiler's
+interlock flags were not merely shared but carried a trailing space; and the
+workspace would save into `.git/hooks`. One Medium did not reproduce (the
+PYTHONHASHSEED-dependent `@`-name cut), but looking at why found a real bug next
+to it: the cut was made at the first operator *found*, not the earliest.
+
+Two findings were rated lower than they deserved, both caught only because the
+42 real programs were run through each fix:
+
+- **SECND1–SECND7.** Rated a Medium "?". The real programs reset one to zero
+  and test it against 90 or 300 seconds; simulated as the second of the minute,
+  every one of those delays never ended.
+- **A GOTO to a missing line.** The review's fix was to refuse such a file.
+  Run against the real programs, that refused eleven of 47: 36 GOTOs name a
+  block-header line that does not exist, an idiom this log already recorded as
+  compiling and running (W202). Renumber now follows the redirect instead, and
+  refuses only what nothing documents.
+
+### The pattern, again
+
+Most of the Highs were the same mistake this log keeps finding: **a writer that
+produced a file that looked right and ran something else** -- renumbering in
+file order, normalizing away a disable, leaving a reference on a missing line,
+dropping a line with no number. The fix that matters most is not any one of
+them but the one that catches the next: `formatter.check_rewrite` reads a
+writer's output back and compares what it runs with what the input runs --
+lines in run order, each reference replaced by the position it reaches -- and
+renumber and fmt refuse on any difference. It flags every one of the old
+writers' outputs and nothing across the real corpus. The block compiler got the
+same treatment as a test: 320 random diagrams, compiled and run, checked
+against the diagram evaluated directly; 23 of 40 seeds fail the old compiler.
+
+### Golden records
+
+The simulator was changed against a new golden record -- 60 passes of every
+sample, template and real program plus three bench runs, 1.9 MB -- rebuilt
+because the last one was lost with a scratch directory. Every change to
+execution was held byte-identical except the two that were meant to move it:
+SECND counters (exactly the one program whose delays elapse in the window
+changes) and DEFINE (exactly the twelve programs with DEFINEs change, and every
+change is a rename: with the old run's `%X%` names spelled out, the records
+match byte for byte).
+
+### Left
+
+The review's other Mediums -- M10 (multi-action rules), M11 (W332 and W322),
+M16 (the MCP launch command), M17 (dropped renumber warnings, unbounded MCP
+lint output) -- are not yet reproduced. TOD's level-commanded writes need
+evidence before they change. The Lows, performance and accessibility items are
+untouched.
