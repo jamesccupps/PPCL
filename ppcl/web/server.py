@@ -289,6 +289,10 @@ def serve(host="127.0.0.1", port=8765, workspace=".", open_browser=True,
     print("PPCL Workbench")
     print("  serving   %s" % url)
     print("  workspace %s" % ws.root)
+    from .api_ide import restore_point_database
+    restored = restore_point_database(ws)
+    if restored:
+        print("  " + restored)
     if host not in ("127.0.0.1", "localhost"):
         print()
         print("  WARNING: bound to %s, not localhost. This server has no" % host)

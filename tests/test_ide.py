@@ -1171,3 +1171,28 @@ def test_settings_with_a_key_from_a_newer_version_can_still_be_saved(ws):
     status, typo = call("/api/settings/save",
                         {"values": dict(values, them="light")}, ws)
     assert not typo["ok"] and "them is not a setting" in typo["rejected"][0]
+
+
+def test_the_point_database_in_settings_is_loaded_at_start(ws):
+    """After a restart the setting still named the file but nothing loaded
+    it, so the U marks and the type-aware rules were silently off."""
+    from ppcl.web import api_ide
+
+    with open(os.path.join(ws.root, "points.csv"), "w", encoding="utf-8") as fh:
+        fh.write("name,type\nSFAN,LAI\n")
+    with open(os.path.join(ws.root, settings.FILENAME), "w",
+              encoding="utf-8") as fh:
+        json.dump({"point_database": "points.csv"}, fh)
+    assert api_ide.restore_point_database(ws).endswith("(1 points)")
+    status, out = call("/api/lint", {"text": "00010\tON(SFAN)\n00020\tGOTO 10\n"}, ws)
+    assert "E316" in [d["code"] for d in out["diagnostics"]]
+
+
+def test_a_point_database_that_cannot_be_loaded_is_said_at_start(ws):
+    from ppcl.web import api_ide
+
+    with open(os.path.join(ws.root, settings.FILENAME), "w",
+              encoding="utf-8") as fh:
+        json.dump({"point_database": "gone.csv"}, fh)
+    assert "could not be loaded" in api_ide.restore_point_database(ws)
+    assert getattr(ws, "point_db", None) is None

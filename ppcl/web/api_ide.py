@@ -278,6 +278,26 @@ def _database(ws):
     return getattr(ws, "point_db", None) if ws is not None else None
 
 
+def restore_point_database(ws):
+    """Load the point database the settings name, as Import would.
+
+    The setting outlived a restart and the database did not: after one the
+    Settings pane still showed the file while unresolved-point marking and
+    every type-aware rule were silently off. Returns a line for the console
+    saying what happened, or None when no database is named.
+    """
+    named = settings.Settings(ws.root).load().get("point_database")
+    if not named:
+        return None
+    try:
+        result = api_points_import({"path": named}, ws)
+    except ApiError as exc:
+        return "points    %s could not be loaded: %s" % (named, exc.message)
+    if result.get("ok"):
+        return "points    %s (%d points)" % (named, result["count"])
+    return "points    %s could not be loaded: %s" % (named, result.get("error"))
+
+
 def api_points_import(body, ws=None):
     """Load a point export. CSV or JSON, decided from the content."""
     if ws is None:
