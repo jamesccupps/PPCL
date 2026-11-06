@@ -220,12 +220,16 @@ class Clock:
     elapsed: float = 0.0  # total simulated seconds
 
     def advance(self, seconds: float) -> None:
+        # Day wrap by arithmetic, not by a loop subtracting 24: at 1e18
+        # hours subtracting 24 changes nothing, and that loop never ended.
+        if not math.isfinite(seconds):
+            raise ValueError("the clock cannot advance by %r seconds" % seconds)
         self.elapsed += seconds
-        self.hours += seconds / 3600.0
-        while self.hours >= 24.0:
-            self.hours -= 24.0
-            self.day_of_week = self.day_of_week % 7 + 1
-            self.day_of_month += 1
+        days, self.hours = divmod(self.hours + seconds / 3600.0, 24.0)
+        if days:
+            days = int(days)
+            self.day_of_week = (self.day_of_week - 1 + days) % 7 + 1
+            self.day_of_month += days
 
 
 class Simulator:

@@ -19,7 +19,7 @@ import threading
 from .. import blocks, helpdocs, linter, points, settings, spec, transforms
 from .. import parser as ppcl_parser
 from ..debug import Breakpoint, DebugError, DebugSession
-from .api import ApiError, _diag_payload, _firmware, _text
+from .api import ApiError, _diag_payload, _firmware, _hour, _text
 
 #: How many debugger sessions this process will keep. One browser needs one.
 MAX_SESSIONS = 8
@@ -154,7 +154,7 @@ def api_debug_start(body, ws=None):
         except ValueError as exc:
             return {"ok": False, "error": str(exc)}
     if body.get("start_hour") is not None:
-        session.sim.clock.hours = float(body["start_hour"])
+        session.sim.clock.hours = _hour(body, "start_hour", 8.0)
     for name in body.get("watch") or []:
         session.add_watch(str(name))
 

@@ -14,6 +14,7 @@ Two safety rules hold throughout, because this process can write files:
 
 from __future__ import annotations
 
+import math
 import os
 import shutil
 import traceback
@@ -141,6 +142,27 @@ def _firmware(body):
             "unknown firmware %r; expected one of %s"
             % (name, ", ".join(f.value for f in spec.Firmware))
         )
+
+
+def _number(body, key, default):
+    """A finite number from the request, or an ApiError naming it.
+
+    JSON as Python reads it accepts Infinity and NaN, and an infinite clock
+    input hung a request thread -- or the single-threaded MCP server -- for
+    good.
+    """
+    try:
+        value = float(body.get(key, default))
+    except (TypeError, ValueError):
+        raise ApiError("%s must be a number" % key)
+    if not math.isfinite(value):
+        raise ApiError("%s must be a finite number" % key)
+    return value
+
+
+def _hour(body, key, default):
+    """A time of day in decimal hours, wrapped into 0-24."""
+    return _number(body, key, default) % 24.0
 
 
 def _diag_payload(diags):
@@ -290,14 +312,17 @@ def api_run(body, ws=None):
         except ValueError as exc:
             raise ApiError(str(exc))
 
-    clock = Clock(hours=float(body.get("time", 8.0)),
+    clock = Clock(hours=_hour(body, "time", 8.0),
                   day_of_week=int(body.get("day_of_week", 2)))
     sim = Simulator(prog, panel=panel, clock=clock,
                     firmware=_firmware(body))
 
     passes = int(body.get("passes", 10))
     passes = max(1, min(passes, RUN_MAX_PASSES))
-    sim.run(passes=passes, seconds_per_pass=float(body.get("interval", 60.0)))
+    # A pass is at most a day: a longer interval says nothing more and can
+    # only push the clock somewhere absurd.
+    interval = max(0.0, min(_number(body, "interval", 60.0), 86400.0))
+    sim.run(passes=passes, seconds_per_pass=interval)
 
     return {
         "ok": True,
@@ -616,7 +641,7 @@ def api_bench(body, ws=None):
                 " Debug runs any program: step through it and set point "
                 "values as it goes."}
     bench.sample_interval = max(10.0, seconds / 400.0)
-    bench.clock.hours = float(body.get("start_hour", 5.0))
+    bench.clock.hours = _hour(body, "start_hour", 5.0)
 
     # A request has to come back while someone is watching. The panel's real
     # rate is ~500 lines/second, and simulating a full day at that rate is tens

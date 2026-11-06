@@ -1173,3 +1173,53 @@ def test_redact_names_its_output_files_by_number(tmp_path):
     import json
     files = json.loads((tmp_path / "map.json").read_text())["files"]
     assert list(files.values()) == ["program01.pcl"]
+
+
+# --------------------------------------------------------------------------
+# A clock that cannot hang
+# --------------------------------------------------------------------------
+
+
+def _finishes(fn, seconds=5.0):
+    import threading
+
+    done = []
+    t = threading.Thread(target=lambda: done.append(fn()), daemon=True)
+    t.start()
+    t.join(seconds)
+    return bool(done)
+
+
+def test_the_clock_advances_any_finite_distance_at_once():
+    """Day wrap was a loop subtracting 24: at 1e18 hours, subtracting 24
+    changes nothing, and it spun for ever."""
+    clock = Clock(hours=6.0)
+    assert _finishes(lambda: clock.advance(1e18))
+    assert 0.0 <= clock.hours < 24.0
+    assert 1 <= clock.day_of_week <= 7
+    with pytest.raises(ValueError):
+        Clock(hours=6.0).advance(float("inf"))
+
+
+def test_a_day_of_advance_matches_the_old_arithmetic():
+    clock = Clock(hours=22.0, day_of_week=7, day_of_month=15)
+    clock.advance(5 * 3600.0)
+    assert (clock.hours, clock.day_of_week, clock.day_of_month) == (3.0, 1, 16)
+
+
+@pytest.mark.parametrize("path, body", [
+    ("/api/run", {"text": "10\tGOTO 10\n", "time": 1e300, "passes": 3}),
+    ("/api/run", {"text": "10\tGOTO 10\n", "interval": 1e300, "passes": 3}),
+    ("/api/run", {"text": "10\tGOTO 10\n", "time": float("inf")}),
+    ("/api/bench", {"text": "10\tON(SFAN)\n20\tGOTO 10\n", "seconds": 600,
+                    "start_hour": float("nan")}),
+])
+def test_an_absurd_clock_input_is_answered_not_hung(path, body):
+    """Over MCP one of these hung the single-threaded server for the rest
+    of the session."""
+    from ppcl.web import api
+
+    result = []
+    assert _finishes(lambda: result.append(api.dispatch(path, body, None)))
+    status, payload = result[0]
+    assert status in (200, 400) and "traceback" not in payload
