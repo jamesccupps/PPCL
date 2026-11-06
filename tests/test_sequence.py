@@ -778,3 +778,13 @@ def test_more_than_sixteen_locals_take_more_than_one_local_statement():
         assert '"L%d"' % i in out
     codes = {d.code for d in linter.lint(parser.parse(out))}
     assert "E111" not in codes
+
+
+@pytest.mark.parametrize("head", ["when", "rule", "rule when", "Rule When"])
+def test_every_rule_heading_tests_the_point_it_names(head):
+    """'rule when DMPR < 50' stripped only 'rule ', and compiled without a
+    word of warning to a test of a point named "when DMPR"."""
+    text = ('sequence "t"\npoints\n  DMPR  LAO\n  FAN  LDO\n'
+            "%s DMPR < 50\n  FAN on\n" % head)
+    rule = sequence.parse(text).rules[0]
+    assert list(rule.when.points()) == ["DMPR"]

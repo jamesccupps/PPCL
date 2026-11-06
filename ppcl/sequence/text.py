@@ -566,9 +566,12 @@ def _parse_loop(seq, lines, i):
 def _parse_rule(seq, lines, i):
     line_no, raw = lines[i]
     stripped = raw.strip()
-    body = stripped[5:] if stripped.lower().startswith("when ") else stripped
-    if stripped.lower().startswith("rule "):
-        body = stripped[5:]
+    # "when X", "rule X" and "rule when X" all head a rule. Stripping only
+    # one keyword left "rule when X" testing a point named "when X".
+    body = stripped
+    for keyword in ("rule ", "when "):
+        if body.lower().startswith(keyword):
+            body = body[len(keyword):].lstrip()
     rule = Rule(when=parse_condition(body, line_no))
     block, i = _block(lines, i + 1, _indent(raw))
     target = rule.then
