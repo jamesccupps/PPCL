@@ -22,7 +22,19 @@ const PANES = ['editor', 'builder', 'blocks', 'bench', 'settings', 'help'];
 
 let META = null;
 let SETTINGS = {};
-let CURRENT_FILE = null;
+/* Paths the workspace listing last showed, so a Save can tell when it would
+ * replace a different file. Each tab, the Builder document and the diagram
+ * keep their own path: one global "current file" sent the editor's text
+ * over whatever was opened last, a .seq included. */
+let WORKSPACE_FILES = new Set();
+
+/** True when saving to `path` may go ahead: asks first if that would
+ *  replace a different file already in the workspace. */
+function mayWrite(path, own) {
+  if (path === own || !WORKSPACE_FILES.has(path)) return true;
+  return window.confirm(path + ' already exists in the workspace, and it is ' +
+    'not the file this came from. Replace it?');
+}
 
 /* ------------------------------------------------------------- panes */
 
@@ -43,6 +55,7 @@ async function loadFiles() {
   const node = $('files');
   clear(node);
   if (r.error) { node.appendChild(el('div', 'empty', r.error)); return; }
+  WORKSPACE_FILES = new Set(r.files.map((f) => f.path));
   if (!r.files.length) {
     node.appendChild(el('div', 'empty',
       'No .ppcl, .seq or .blocks.json files in ' + r.root +
@@ -60,12 +73,19 @@ async function loadFiles() {
 }
 
 async function openFile(file) {
+  // Opening a file again over a tab with unsaved edits used to replace them
+  // with the copy on disk without a word.
+  const open = editor.tabs.find((t) => t.path === file.path);
+  if (open && open.text !== open.saved && !window.confirm(
+    file.path + ' is open with unsaved changes. Replace them with the ' +
+    'copy on disk?')) {
+    return;
+  }
   const r = await post('/api/open', { path: file.path });
   if (r.error) { toast(r.error, 'bad'); return; }
-  CURRENT_FILE = file.path;
   if (/\.blocks\.json$/i.test(file.path)) {
     try {
-      blocks.load(JSON.parse(r.text));
+      blocks.load(JSON.parse(r.text), file.path);
       switchPane('blocks');
     } catch (err) {
       toast('that file is not a block diagram: ' + err.message, 'bad');
@@ -73,7 +93,7 @@ async function openFile(file) {
     return;
   }
   if (file.kind === 'sequence') {
-    await builder.fromText(r.text);
+    if (await builder.fromText(r.text)) builder.path = file.path;
     builder.section = 'table';
     builder.renderSection();
     switchPane('builder');
@@ -85,21 +105,20 @@ async function openFile(file) {
 }
 
 async function saveActive() {
-  const suggestion = CURRENT_FILE ||
-    (editor.tab ? editor.tab.path : 'programs/new.ppcl');
+  const own = editor.tab ? editor.tab.path : '';
   const answer = await ask('Save program', [{
-    name: 'path', label: 'Path', type: 'text', value: suggestion,
+    name: 'path', label: 'Path', type: 'text',
+    value: own || 'programs/new.ppcl',
     doc: 'Relative to the workspace directory. A .bak of the previous ' +
          'contents is kept unless that is switched off in Settings.',
   }], 'Save');
-  if (!answer || !answer.path) return;
+  if (!answer || !answer.path || !mayWrite(answer.path, own)) return;
   const r = await post('/api/save', {
     path: answer.path, text: editor.get(),
     encoding: editor.tab ? editor.tab.encoding : undefined,
     backup: SETTINGS.backup_on_save !== false,
   });
   if (r.error) { toast(r.error, 'bad'); return; }
-  CURRENT_FILE = answer.path;
   editor.markSaved(answer.path);
   loadFiles();
   toast('saved ' + answer.path + ' (' + r.bytes + ' bytes)', 'good');
@@ -147,7 +166,6 @@ async function openLocal(files) {
       file.name + ' is already open with unsaved changes. Replace it?')) {
       continue;
     }
-    CURRENT_FILE = null;
     editor.set(text, file.name);
     editor.tab.encoding = encoding;
     switchPane('editor');
@@ -305,7 +323,10 @@ function initKeyboard() {
     switch (e.key.toLowerCase()) {
       case 's':
         e.preventDefault();
-        saveActive();
+        // Save what is in front of you, not always the editor's tab.
+        if ($('pane-builder').classList.contains('on')) builder.save();
+        else if ($('pane-blocks').classList.contains('on')) $('btn-dia-save').click();
+        else saveActive();
         break;
       case 'o':
         e.preventDefault();
@@ -495,19 +516,24 @@ async function boot() {
   });
 
   $('btn-dia-save').onclick = async () => {
+    const own = blocks.path || '';
     const answer = await ask('Save block diagram', [{
       name: 'path', label: 'Path', type: 'text',
-      value: 'diagrams/' + slug(blocks.diagram.name) + '.blocks.json',
+      value: own || 'diagrams/' + slug(blocks.diagram.name) + '.blocks.json',
       doc: 'Saved as JSON. Reopen it from the workspace list.',
     }], 'Save');
-    if (!answer || !answer.path) return;
+    if (!answer || !answer.path || !mayWrite(answer.path, own)) return;
     const r = await post('/api/save', {
       path: answer.path, text: JSON.stringify(blocks.diagram, null, 2),
     });
     if (r.error) { toast(r.error, 'bad'); return; }
+    blocks.path = answer.path;
     loadFiles();
     toast('saved ' + answer.path, 'good');
   };
+
+  builder.mayWrite = mayWrite;
+  builder.onSaved = loadFiles;
 
   $('btn-dia-open').onclick = () => {
     switchPane('editor');

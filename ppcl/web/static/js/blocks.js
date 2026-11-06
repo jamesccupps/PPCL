@@ -100,13 +100,16 @@ export const blocks = {
   async starter() {
     const r = await post('/api/blocks/new', {});
     this.diagram = r.diagram;
+    this.path = null;
     this.selected = null;
     this.render();
     this.compile();
   },
 
-  load(diagram) {
+  load(diagram, path) {
     this.diagram = diagram;
+    // Where Save writes it back to; a new diagram has none yet.
+    this.path = path || null;
     this.selected = null;
     this.render();
     this.compile();

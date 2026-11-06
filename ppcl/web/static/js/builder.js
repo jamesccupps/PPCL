@@ -48,6 +48,7 @@ export const builder = {
 
   async starter() {
     await this.fromText(STARTER);
+    this.path = null;
   },
 
   async fromText(text) {
@@ -684,13 +685,18 @@ export const builder = {
   },
 
   async save() {
+    const own = this.path || '';
     const answer = await ask('Save sequence document', [{
-      name: 'path', label: 'Path', type: 'text', value: 'sequences/new.seq',
+      name: 'path', label: 'Path', type: 'text',
+      value: own || 'sequences/new.seq',
       doc: 'Relative to the workspace directory.',
     }], 'Save');
     if (!answer || !answer.path) return;
+    if (this.mayWrite && !this.mayWrite(answer.path, own)) return;
     const r = await post('/api/save', { path: answer.path, text: this.text });
     if (r.error) { toast(r.error, 'bad'); return; }
+    this.path = answer.path;
+    if (this.onSaved) this.onSaved();
     toast('saved ' + answer.path, 'good');
   },
 };
