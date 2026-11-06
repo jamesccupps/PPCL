@@ -224,7 +224,13 @@ class Settings:
         rejected = []
         for key, value in (changes or {}).items():
             if key not in BY_KEY:
-                rejected.append("%s is not a setting" % key)
+                # A key this version does not know is kept from the file and
+                # sent to the UI, which sends it back with everything else.
+                # Coming back unchanged it is just kept; refusing it made one
+                # key from a newer version block every save. A new or changed
+                # one is still refused, as a typo would be.
+                if self.values.get(key, object()) != value:
+                    rejected.append("%s is not a setting" % key)
                 continue
             try:
                 self.values[key] = coerce(key, value)

@@ -1150,3 +1150,24 @@ def test_serve_refuses_a_number_that_is_not_a_port(tmp_path, capsys):
                    "--workspace", str(tmp_path)])
     assert rc == 2
     assert "not a port" in capsys.readouterr().err
+
+
+def test_settings_with_a_key_from_a_newer_version_can_still_be_saved(ws):
+    """Unknown keys are kept and sent to the UI, which sends them back --
+    and update() refused them, so one key from a newer version made the
+    Settings pane impossible to save."""
+    path = os.path.join(ws.root, settings.FILENAME)
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump({"theme": "dark", "from_a_newer_version": 3}, fh)
+    status, loaded = call("/api/settings", {}, ws)
+    values = dict(loaded["values"], theme="light")
+    status, saved = call("/api/settings/save", {"values": values}, ws)
+    assert saved["ok"], saved
+    with open(path, encoding="utf-8") as fh:
+        kept = json.load(fh)
+    assert kept["theme"] == "light" and kept["from_a_newer_version"] == 3
+
+    # A new or changed unknown key is still refused, as a typo would be.
+    status, typo = call("/api/settings/save",
+                        {"values": dict(values, them="light")}, ws)
+    assert not typo["ok"] and "them is not a setting" in typo["rejected"][0]
