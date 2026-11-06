@@ -9,6 +9,7 @@ survives unchanged.
 
 from __future__ import annotations
 
+import bisect
 import re
 from dataclasses import dataclass, field
 
@@ -116,6 +117,11 @@ def line_reference_tokens(body: str):
     Scanning tokens rather than the AST means references nested inside an
     IF/THEN/ELSE or behind a SAMPLE are found with no special cases.
     """
+    return [tok for tok, _word in line_references(body)]
+
+
+def line_references(body: str):
+    """``[(token, word)]``: each line-number token and the command it is in."""
     try:
         tokens = tokenize(body)
     except LexError:
@@ -137,7 +143,7 @@ def line_reference_tokens(body: str):
                 if j < n and tokens[j].kind is Tok.LPAREN:
                     j += 1
                 if j < n and tokens[j].kind is Tok.NUMBER:
-                    refs.append(tokens[j])
+                    refs.append((tokens[j], word))
                     i = j + 1
                     continue
             elif word in LINE_REFERENCING or word in ("LSQ2", "PDL"):
@@ -154,12 +160,13 @@ def line_reference_tokens(body: str):
                         for arg in args[-2:]:
                             tok = _lone_number(arg)
                             if tok is not None:
-                                refs.append(tok)
+                                refs.append((tok, word))
                     elif word == "PDL":
-                        refs.extend(_pdl_group_bounds(args))
+                        refs.extend((tok, word)
+                                    for tok in _pdl_group_bounds(args))
                     else:
                         for arg in args:
-                            refs.extend(tok for tok in arg
+                            refs.extend((tok, word) for tok in arg
                                         if tok.kind is Tok.NUMBER)
                     i = k + 1
                     continue
@@ -200,6 +207,13 @@ def unreadable_references(program: Program):
         except LexError as exc:
             out.append((ln.number, str(exc)))
     return out
+
+
+def _as_line(tok):
+    try:
+        return int(float(tok.text))
+    except ValueError:
+        return None
 
 
 def rewrite_references(body: str, mapping: dict):
@@ -370,6 +384,47 @@ def renumber(program: Program, start: int = 10, step: int = 10,
             result.refused = "block_overflow"
             return result
 
+    # A reference to a line that does not exist, left unchanged, would reach
+    # whatever was renumbered nearest the old number. A GOTO or GOSUB to one
+    # runs the next existing line -- the panel redirects, and real programs
+    # rely on it: GOTO 2000 for a block whose first line is 2010 -- so it is
+    # pointed at that line's new number, which keeps what runs. Nothing
+    # documents what ACT, ENABLE, ONPWRT and the rest do with a missing line,
+    # and past the last line there is nothing to land on: those are refused.
+    # A stale number in a comment runs nowhere, so only statements count.
+    existing = sorted({ln.number for ln in program.lines})
+    targets = dict(mapping)
+    missing = []
+    for ln in program.lines:
+        if ln.is_comment:
+            continue
+        for tok, word in line_references(ln.body or ""):
+            old = _as_line(tok)
+            if old is None or old in targets:
+                continue
+            at = bisect.bisect_right(existing, old)
+            lands = existing[at] if at < len(existing) else None
+            if word in ("GOTO", "GOSUB") and lands is not None:
+                targets[old] = mapping[lands]
+                result.warnings.append(
+                    "line %d: %s %d names a line that does not exist; control "
+                    "lands on line %d, so it now points there explicitly"
+                    % (ln.number, word, old, lands))
+            else:
+                missing.append((ln.number, old))
+    if missing:
+        result.warnings.insert(0,
+            "refusing to renumber: %s. Nothing to follow: past the last line "
+            "there is no next line, and nothing documents what a command "
+            "other than GOTO or GOSUB does with a missing line. Left "
+            "unchanged, the reference would reach whatever was renumbered "
+            "nearest the old number. Point %s at the line meant first."
+            % ("; ".join("line %d references line %d, which does not exist"
+                         % pair for pair in missing[:8]),
+               "it" if len(missing) == 1 else "them"))
+        result.refused = "missing_target"
+        return result
+
     numbers = [ln.number for ln in program.lines]
     if numbers != sorted(numbers):
         result.warnings.append(
@@ -425,7 +480,7 @@ def renumber(program: Program, start: int = 10, step: int = 10,
 
     out = [stmt_to_text(d) for d in program.directives]
     for ln, new_number in assignments:
-        body, count, unresolved = rewrite_references(ln.body, mapping)
+        body, count, unresolved = rewrite_references(ln.body, targets)
         result.rewritten_references += count
         for target in unresolved:
             result.warnings.append(

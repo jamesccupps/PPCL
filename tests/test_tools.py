@@ -1000,3 +1000,32 @@ def test_preserve_blocks_refuses_a_block_that_overflows():
     fits = formatter.renumber(prog, preserve_blocks=True, step=5)
     numbers = [l.split("\t")[0] for l in fits.text.splitlines()]
     assert len(numbers) == len(set(numbers)) == 121
+
+
+def test_a_goto_to_a_missing_line_follows_the_line_it_reaches():
+    """GOTO 115 with no line 115 runs line 120: the panel redirects to the
+    next existing line, and real programs rely on it (GOTO 2000 for a block
+    whose first line is 2010). Left as 115 it would reach whatever was
+    renumbered near 115, so it is pointed at 120's new number, and said."""
+    prog = parser.parse("00110\tA = 1.0\n00120\tB = 1.0\n00130\tGOTO 115\n")
+    result = formatter.renumber(prog)
+    assert result.text.splitlines()[-1] == "00030\tGOTO 20"
+    assert any("lands on line 120" in w for w in result.warnings)
+
+
+@pytest.mark.parametrize("body", ["GOTO 500", "ACT(115)", "ONPWRT(115)"])
+def test_renumber_refuses_a_missing_target_it_cannot_follow(body):
+    """Past the last line there is nothing to land on, and nothing documents
+    what ACT, ENABLE or ONPWRT do with a line that is not there."""
+    prog = parser.parse("00110\tA = 1.0\n00120\tB = 1.0\n00130\t%s\n" % body)
+    result = formatter.renumber(prog)
+    assert result.text == ""
+    assert result.refused == "missing_target"
+    assert "line 130" in result.warnings[0]
+
+
+def test_a_stale_number_in_a_comment_does_not_block_renumbering():
+    prog = parser.parse("00100\tC SEE GOTO 115 BELOW\n00110\tA = 1.0\n"
+                        "00120\tGOTO 110\n")
+    result = formatter.renumber(prog)
+    assert result.text and not result.refused
