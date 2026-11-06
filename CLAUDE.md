@@ -57,6 +57,14 @@ so it runs on any engineering workstation without a package install.
 - **Refuse rather than guess.** Duplicate line numbers make renumbering
   ambiguous, so it refuses by default and makes the user choose. Keep that
   posture for any transform that could silently change what the panel runs.
+- **Writers check themselves.** `renumber` and `fmt` (CLI and web) read their
+  output back through `formatter.check_rewrite`, which compares what it runs
+  -- lines in run order, statements with each line reference replaced by the
+  position it reaches -- and refuse on any difference. A new writer that
+  promises not to change what runs goes through it too; do not bypass it to
+  make a refusal go away -- the refusal is the bug report.
+  `tests/test_blocks_differential.py` does the same job for the block
+  compiler, against the diagram evaluated directly.
 - **`LOOP` simulation is approximate and must keep saying so at runtime.**
   Siemens does not publish the PID internals.
 - **`simcompile.py` is the one implementation of execution.** Do not add a
