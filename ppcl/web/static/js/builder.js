@@ -28,7 +28,11 @@ export const builder = {
   init(context) {
     this.meta = (context && context.meta) || {};
     $('btn-seq-compile').onclick = () => this.compile();
-    $('btn-seq-new').onclick = () => this.starter();
+    $('btn-seq-new').onclick = () => {
+      if (this.dirty && !window.confirm('This sequence has unsaved changes. ' +
+        'Start a new one anyway?')) return;
+      this.starter();
+    };
     $('btn-seq-save').onclick = () => this.save();
 
     $('seq-subtabs').addEventListener('click', (e) => {
@@ -51,6 +55,12 @@ export const builder = {
     this.path = null;
   },
 
+  /** Edited since it was opened or saved: compared, not tracked, so no
+   *  kind of edit can be missed. */
+  get dirty() {
+    return !!this.doc && JSON.stringify(this.doc) !== this.saved;
+  },
+
   async fromText(text) {
     const r = await post('/api/seq/parse', { text });
     if (!r.ok) {
@@ -60,6 +70,7 @@ export const builder = {
     }
     $('seq-status').textContent = '';
     this.doc = r.document;
+    this.saved = JSON.stringify(this.doc);
     this.text = text;
     this.renderSection();
     this.compile();
@@ -696,6 +707,7 @@ export const builder = {
     const r = await post('/api/save', { path: answer.path, text: this.text });
     if (r.error) { toast(r.error, 'bad'); return; }
     this.path = answer.path;
+    this.saved = JSON.stringify(this.doc);
     if (this.onSaved) this.onSaved();
     toast('saved ' + answer.path, 'good');
   },

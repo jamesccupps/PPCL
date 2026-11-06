@@ -28,7 +28,11 @@ export const blocks = {
     this.renderPalette('');
 
     $('palq').addEventListener('input', (e) => this.renderPalette(e.target.value));
-    $('btn-dia-new').onclick = () => this.starter();
+    $('btn-dia-new').onclick = () => {
+      if (this.dirty && !window.confirm('This diagram has unsaved changes. ' +
+        'Start a new one anyway?')) return;
+      this.starter();
+    };
     $('btn-dia-tidy').onclick = () => this.tidy();
     $('btn-dia-delete').onclick = () => this.removeSelected();
     $('btn-dia-compile').onclick = () => this.compile();
@@ -101,6 +105,7 @@ export const blocks = {
     const r = await post('/api/blocks/new', {});
     this.diagram = r.diagram;
     this.path = null;
+    this.markSaved();
     this.selected = null;
     this.render();
     this.compile();
@@ -110,9 +115,20 @@ export const blocks = {
     this.diagram = diagram;
     // Where Save writes it back to; a new diagram has none yet.
     this.path = path || null;
+    this.markSaved();
     this.selected = null;
     this.render();
     this.compile();
+  },
+
+  markSaved() {
+    this.saved = JSON.stringify(this.diagram);
+  },
+
+  /** Edited since it was opened or saved: compared, not tracked, so no
+   *  kind of edit can be missed. */
+  get dirty() {
+    return !!this.diagram && JSON.stringify(this.diagram) !== this.saved;
   },
 
   nextId() {

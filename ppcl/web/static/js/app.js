@@ -84,6 +84,8 @@ async function openFile(file) {
   const r = await post('/api/open', { path: file.path });
   if (r.error) { toast(r.error, 'bad'); return; }
   if (/\.blocks\.json$/i.test(file.path)) {
+    if (blocks.dirty && !window.confirm('The diagram on the Blocks pane has ' +
+      'unsaved changes. Open ' + file.path + ' in its place?')) return;
     try {
       blocks.load(JSON.parse(r.text), file.path);
       switchPane('blocks');
@@ -93,6 +95,8 @@ async function openFile(file) {
     return;
   }
   if (file.kind === 'sequence') {
+    if (builder.dirty && !window.confirm('The sequence in the Builder has ' +
+      'unsaved changes. Open ' + file.path + ' in its place?')) return;
     if (await builder.fromText(r.text)) builder.path = file.path;
     builder.section = 'table';
     builder.renderSection();
@@ -528,12 +532,23 @@ async function boot() {
     });
     if (r.error) { toast(r.error, 'bad'); return; }
     blocks.path = answer.path;
+    blocks.markSaved();
     loadFiles();
     toast('saved ' + answer.path, 'good');
   };
 
   builder.mayWrite = mayWrite;
   builder.onSaved = loadFiles;
+
+  // Closing or reloading the tab used to drop every unsaved tab, the
+  // Builder's sequence and the diagram without a word.
+  window.addEventListener('beforeunload', (e) => {
+    if (editor.tabs.some((t) => t.text !== t.saved) || builder.dirty ||
+        blocks.dirty) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
 
   $('btn-dia-open').onclick = () => {
     switchPane('editor');
