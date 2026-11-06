@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 
 from . import lexer
 from . import parser as ppcl_parser
+from .formatter import line_reference_tokens
 from .lexer import Tok
 
 #: Text a disabled line carries so the state survives a save. The panel has a
@@ -336,6 +337,11 @@ def clone_lines(text, first, last, renames, start=None, step=None):
         if body.startswith("# "):
             prefix, body = "# ", body[2:]
         edits = []
+        # The numbers that ARE line references, found the way renumbering
+        # finds them. Every number on a line that merely mentioned GOTO or
+        # ACT used to qualify, so a limit of 100 in a block holding line 100
+        # was rewritten to the copy's line number.
+        references = {tok.col for tok in line_reference_tokens(body)}
         for token in lexer.tokenize(body):
             if (token.kind is Tok.QUOTED and "/" in token.text
                     and _OIP_BODY.search(body)):
@@ -352,7 +358,7 @@ def clone_lines(text, first, last, renames, start=None, step=None):
                     renamed += 1
                     edits.append((token.col, _span(token),
                                   _requote(token, replacement)))
-            elif token.kind is Tok.NUMBER and _looks_like_reference(body):
+            elif token.kind is Tok.NUMBER and token.col in references:
                 try:
                     target = int(float(token.text))
                 except ValueError:
@@ -420,13 +426,6 @@ def _rename_in_keystrokes(seq, lookup):
             parts[i] = replacement
             hits += 1
     return "/".join(parts), hits
-
-
-def _looks_like_reference(body):
-    return bool(
-        re.search(r"\b(GOTO|GOSUB|ACT|DEACT|ENABLE|DISABL|ONPWRT)\b",
-                  body, re.IGNORECASE)
-    )
 
 
 def _guess_step(numbers):

@@ -248,6 +248,17 @@ def test_cloning_renames_points_and_retargets_branches():
     assert ppcl_parser.parse(result.text).errors == []
 
 
+def test_cloning_moves_line_references_and_nothing_else():
+    """Every number on a line mentioning GOTO or ACT was treated as a line
+    reference, so a damper limit of 100 in a block holding line 100 became
+    the new line number: IF(DMPR.GT.1010)."""
+    src = ("00100\tIF(DMPR.GT.100) THEN GOTO 140\n00110\tA = 1.0\n"
+           "00120\tB = 1.0\n00130\tC = 1.0\n00140\tD = 1.0\n00150\tGOTO 100\n")
+    result = transforms.clone_lines(src, 100, 140, {}, start=1010, step=10)
+    first = [l for l in result.text.splitlines() if l.startswith("01010")]
+    assert first == ["01010\tIF(DMPR.GT.100) THEN GOTO 1050"]
+
+
 def test_cloning_without_renames_warns_that_the_copy_fights_the_original():
     result = transforms.clone_lines(DEFINED, 30, 40, {})
     assert "commanding one point fight" in " ".join(result.warnings)
