@@ -2,11 +2,13 @@
   "mcpServers": {
     "ppcl": {
       "command": "python",
-      "args": ["-m", "ppcl.mcp_server"],
-      "env": {
-        "PYTHONPATH": "${CLAUDE_PLUGIN_ROOT}",
-        "PYTHONIOENCODING": "utf-8"
-      }
+      "args": [
+        "-E",
+        "-s",
+        "-c",
+        "import sys; del sys.path[0]; import os, runpy; p = sys.argv[1]; runpy.run_path(p if os.path.isfile(p) else 'ppcl_mcp.py', run_name='__main__')",
+        "${CLAUDE_PLUGIN_ROOT}/ppcl_mcp.py"
+      ]
     }
   }
 }

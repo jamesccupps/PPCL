@@ -48,9 +48,19 @@ one-line fix instead of a retraining run.
 
 ## Install
 
-The MCP server needs the `ppcl` package importable. The plugin points
-`PYTHONPATH` at its own root, so installing the repository as the plugin is
-enough — no `pip install` required.
+The MCP server needs the `ppcl` package importable. `.mcp.json` runs
+`ppcl_mcp.py` from the plugin's own root, so installing the repository as the
+plugin is enough — no `pip install` required. It starts Python with `-E -s`
+and takes the current directory off `sys.path` first: when Claude Code starts
+a plugin's server, the current directory is your project, and a `ppcl` folder
+or a `json.py` in it would otherwise be imported in place of the real one.
+Opening this repository itself as a project uses the same file.
+
+The command is `python`. On a Windows workstation that is the python.org
+installer's name, and `python3` is usually the Microsoft Store stub. On macOS
+and most Linux distributions it is the other way round: there is no `python`
+unless you add one (`python-is-python3` on Debian and Ubuntu), or change
+`command` in `.mcp.json` to `python3`.
 
 ```bash
 git clone https://github.com/jamesccupps/PPCL
@@ -73,7 +83,7 @@ python -m pytest tests -q
 To check the MCP server by hand:
 
 ```bash
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | python -m ppcl.mcp_server
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | python -E -s ppcl_mcp.py
 ```
 
 ## What it will not do

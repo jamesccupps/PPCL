@@ -37,7 +37,7 @@ so it runs on any engineering workstation without a package install.
 | `ppcl/web/` | JSON API — `api.py` core, `api_ide.py` for blocks/debug/points/settings/transforms/completion/help — and a stdlib server. The UI is ES modules under `static/js/`, no framework, no build step. |
 | `ppcl/cli.py` | Subcommands. |
 | `ppcl/mcp_server.py` | MCP server over `web.api.dispatch`, stdlib JSON-RPC. Exposes analysis, NOT file writing. |
-| `skills/`, `commands/`, `.claude-plugin/`, `.mcp.json` | The repo is also a Claude Code plugin. See `PLUGIN.md`. |
+| `skills/`, `commands/`, `.claude-plugin/`, `.mcp.json`, `ppcl_mcp.py` | The repo is also a Claude Code plugin. See `PLUGIN.md`. |
 
 ## Invariants — do not break these
 
@@ -151,7 +151,7 @@ on idiomatic PPCL gets turned off.
 ## Testing
 
 ```bash
-python -m pytest tests -q          # 794 tests, ~1 min; CI runs 3.10-3.14
+python -m pytest tests -q          # 798 tests, ~1 min; CI runs 3.10-3.14
 python -m ppcl.cli lint samples    # exercises the CLI against real programs
 ```
 

@@ -7,6 +7,11 @@ inside someone else's session.
 """
 
 
+import json
+import os
+import subprocess
+import sys
+
 import pytest
 
 from ppcl import mcp_server, spec
@@ -187,3 +192,77 @@ def test_a_tool_call_sent_as_a_notification_is_not_run(monkeypatch, tmp_path):
                       '{"name":"ppcl_lint","arguments":{"text":"10 GOTO 10"}}}'],
                      monkeypatch, tmp_path)
     assert replies == []
+
+
+# -- how .mcp.json starts the server ----------------------------------------
+
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _launch(cwd, plugin_root):
+    """Start the server the way Claude Code does from .mcp.json.
+
+    Claude Code replaces the exact text ${CLAUDE_PLUGIN_ROOT} for a plugin
+    and leaves it as it is for a project's own .mcp.json, so plugin_root=None
+    is this repository opened as a project.
+    """
+    with open(os.path.join(_ROOT, ".mcp.json"), encoding="utf-8") as fh:
+        server = json.load(fh)["mcpServers"]["ppcl"]
+    def expand(text):
+        if plugin_root is None:
+            return text
+        return text.replace("${CLAUDE_PLUGIN_ROOT}",
+                            plugin_root.replace("\\", "/"))
+
+    args = [expand(a) for a in server["args"]]
+    program = "10\tC 55°F\n20\tGOTO 10\n"
+    requests = [
+        {"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
+            "name": "ppcl_format", "arguments": {"text": program}}},
+    ]
+    stdin = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in requests)
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PYTHON")}
+    env.update({k: expand(v) for k, v in server.get("env", {}).items()})
+    done = subprocess.run(
+        [sys.executable] + args, cwd=str(cwd), env=env, timeout=60,
+        input=stdin.encode("utf-8"), capture_output=True,
+    )
+    replies = [json.loads(line) for line in done.stdout.decode().splitlines()
+               if line.strip()]
+    return replies, done.stderr.decode("utf-8", "replace")
+
+
+def _decoy_project(tmp_path):
+    project = tmp_path / "someone-elses-project"
+    (project / "ppcl").mkdir(parents=True)
+    (project / "ppcl" / "__init__.py").write_text("")
+    (project / "ppcl" / "mcp_server.py").write_text(
+        'raise SystemExit("the project folder\'s ppcl ran")\n')
+    for name in ("json", "runpy"):
+        (project / (name + ".py")).write_text(
+            'raise SystemExit("the project folder\'s %s.py ran")\n' % name)
+    return project
+
+
+def test_a_plugin_server_ignores_the_project_folder(tmp_path):
+    """Under python -m the current folder -- the user's project -- came
+    first on sys.path, so a ppcl folder or a json.py there ran instead."""
+    replies, err = _launch(_decoy_project(tmp_path), plugin_root=_ROOT)
+    assert "ran" not in err, err
+    assert [r["id"] for r in replies] == [1, 2], err
+    assert replies[0]["result"]["tools"]
+
+
+def test_the_repository_opened_as_a_project_still_starts_its_server():
+    replies, err = _launch(_ROOT, plugin_root=None)
+    assert [r["id"] for r in replies] == [1, 2], err
+
+
+@pytest.mark.parametrize("plugin", [True, False])
+def test_the_server_reads_utf8_without_pythonioencoding(tmp_path, plugin):
+    """-E drops PYTHONIOENCODING; a degree sign must still arrive intact."""
+    cwd = _decoy_project(tmp_path) if plugin else _ROOT
+    replies, err = _launch(cwd, plugin_root=_ROOT if plugin else None)
+    text = replies[1]["result"]["content"][0]["text"]
+    assert "55°F" in text, (text, err)
