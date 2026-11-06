@@ -626,3 +626,26 @@ def test_a_diagram_saved_with_the_old_analog_digital_switch_still_loads():
     loaded = blocks.from_dict(old)
     assert all("kind" not in b.params for b in loaded.blocks)
     assert compile_text(loaded) == compile_text(_gated(""))
+
+
+@pytest.mark.parametrize("params, expected", [({}, 1.0),
+                                              ({"priority": "set"}, 1.0),
+                                              ({"priority": "reset"}, 0.0)])
+def test_a_latch_holds_its_trip_unless_told_reset_wins(params, expected):
+    """The default was reset-wins, against the block's own help text: with
+    both inputs true a safety latch let go every pass."""
+    from ppcl.simulator import Simulator
+
+    d = diagram(
+        ("t", "point_in", {"point": "TRIP", "ptype": "BV"}),
+        ("r", "point_in", {"point": "RST", "ptype": "BV"}),
+        ("l", "latch", params),
+        ("w", "assign", {"point": "OUT"}),
+    )
+    d.connect("t", "out", "l", "set")
+    d.connect("r", "out", "l", "reset")
+    d.connect("l", "out", "w", "in")
+    sim = Simulator(ppcl_parser.parse(compile_text(d)))
+    sim.panel.load({"TRIP": 1.0, "RST": 1.0})
+    sim.run(passes=3)
+    assert sim.panel.value("OUT") == expected

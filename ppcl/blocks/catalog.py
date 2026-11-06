@@ -375,10 +375,16 @@ def _emit_select(ctx, block):
     ),
     outputs=(Pin("out", "latched", "digital"),),
     params=(
-        Param("priority", "Reset wins", "choice", "reset", ("reset", "set"),
-              doc="Which input wins when both are true at the same instant. "
-                  "For a safety, reset should win only if you have thought "
-                  "about it -- normally set wins so the trip is not missed."),
+        # Set wins by default, as the help always said; the default used to
+        # be reset, so a held reset let a safety go every pass.
+        Param("priority", "When both are true", "choice", "set",
+              ("set", "reset"),
+              doc="Which input wins when set and reset are true at the same "
+                  "instant. Set wins unless you choose otherwise, so a trip "
+                  "is never missed: a safety stays tripped until whatever "
+                  "tripped it has cleared.",
+              options=(("set", "Set wins: the trip holds", ""),
+                       ("reset", "Reset wins", ""))),
     ),
     stateful=True,
     help="This is how you write a safety trip that stays tripped. A latch "
@@ -390,8 +396,9 @@ def _emit_latch(ctx, block):
     set_in = ctx.as_boolean(ctx.value_in(block, "set"))
     reset_in = ctx.as_boolean(ctx.value_in(block, "reset"))
     out = ctx.new_local(block, "LATCH")
+    # The line emitted last wins when both are true.
     order = [(set_in, "1.0"), (reset_in, "0.0")]
-    if ctx.text(block, "priority", "reset") == "set":
+    if ctx.text(block, "priority", "set") == "set":
         order.reverse()
     for cond, value in order:
         ctx.emit("IF(%s) THEN %s = %s" % (cond.text, out.text, value))
