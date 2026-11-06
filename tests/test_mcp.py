@@ -276,3 +276,14 @@ def test_a_successful_renumber_still_reports_its_warnings(ws):
     assert not is_error
     assert "reference(s) rewritten" in text
     assert "  ! line 10: GOTO 25 names a line that does not exist" in text
+
+
+@pytest.mark.parametrize("tool", ["ppcl_simulate", "ppcl_bench"])
+def test_a_program_that_does_not_parse_says_where(ws, tool):
+    """Only "the program does not parse" came back; the API's list of
+    which line and why was dropped."""
+    bad = "10\tSET(1.0,X)\n20\tIF(X.GT.) THEN ON(FAN)\n30\tGOTO 10\n"
+    text, is_error = mcp_server.call_tool(tool, {"text": bad}, ws)
+    assert is_error
+    assert "does not parse" in text
+    assert "  line 20: " in text

@@ -587,7 +587,14 @@ def call_tool(name, arguments, workspace=None):
     status, payload = dispatch(tool["endpoint"], dict(arguments or {}),
                                workspace)
     if status != 200 or "error" in payload:
-        return "%s failed: %s" % (name, payload.get("error", status)), True
+        lines = ["%s failed: %s" % (name, payload.get("error", status))]
+        # "The program does not parse" is no use without where and why;
+        # simulate and bench send both, and this used to drop them.
+        for err in payload.get("errors") or ():
+            where = ("line %s" % err["line"] if err.get("line") is not None
+                     else "source line %s" % err.get("source_line"))
+            lines.append("  %s: %s" % (where, err.get("message")))
+        return "\n".join(lines), True
     render = RENDERERS.get(tool["format"], _render_text)
     try:
         return render(payload), False
