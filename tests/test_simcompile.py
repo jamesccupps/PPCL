@@ -107,3 +107,43 @@ def test_a_root_of_a_negative_value_warns_instead_of_crashing():
     sim.run(passes=2)
     assert sim.panel.value("FLOW") == 0.0
     assert any("ROOT" in w and "negative" in w for w in sim.warnings)
+
+
+_DEFINED = ['00005\tDEFINE(A,"CT1.")', "00010\tON(%A%FAN)",
+            "00020\tSPD = 40.0", "00030\tIF(%A%FAN .EQ. ON) THEN SPD = 90.0",
+            '00040\tSET(55.0,"%A%SP")', "00050\tGOTO 10"]
+
+
+def test_define_abbreviations_name_the_points_they_spell():
+    """DEFINE was a no-op: "%A%SP" was a point of that literal name, and a
+    bare %A%FAN read 0 and dropped its writes, so ON(%A%FAN) did nothing
+    and the IF testing it took the wrong branch."""
+    sim = Simulator(parser.parse(chr(10).join(_DEFINED) + chr(10)))
+    sim.run(passes=2)
+    assert sim.panel.value("CT1.FAN") == 1.0
+    assert sim.panel.value("SPD") == 90.0
+    assert sim.panel.value("CT1.SP") == 55.0
+    assert not any("%" in name for name in sim.panel.points)
+    assert not any("DEFINE" in w for w in sim.warnings)
+
+
+def test_expanding_defines_leaves_the_parsed_program_alone():
+    """The linter and the editor share the parse; the simulator compiles
+    expanded copies of its own."""
+    prog = parser.parse(chr(10).join(_DEFINED) + chr(10))
+    before = repr(prog.lines[1].stmt)
+    Simulator(prog).run(passes=1)
+    assert repr(prog.lines[1].stmt) == before and "%A%FAN" in before
+
+
+def test_a_debugger_condition_can_name_a_point_through_its_define():
+    sim = _sim(*[l.replace("\t", " ") for l in _DEFINED])
+    sim.run(passes=1)
+    cond = parser.parse("1 IF(%A%FAN .EQ. ON) THEN ON(Y)" + chr(10)).lines[0].stmt.cond
+    assert sim._eval(cond) == 1.0
+
+
+def test_an_abbreviation_with_no_define_says_so():
+    sim = _sim("10 ON(%NONE%FAN)", "20 GOTO 10")
+    sim.run(passes=1)
+    assert any("%NONE% has no DEFINE" in w for w in sim.warnings)

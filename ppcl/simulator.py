@@ -30,11 +30,12 @@ Times are handled throughout in decimal hours, so ``TIME``, ``CRTIME`` and a
 from __future__ import annotations
 
 import math
+import re
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, is_dataclass, replace
 
 from . import spec
-from .ast_nodes import Program, Ref
+from .ast_nodes import CommandCall, MacroRef, Program, Ref
 
 ON = 1.0
 OFF = 0.0
@@ -91,7 +92,7 @@ UNMODELLED = frozenset(
     {"PDL", "PDLDAT", "PDLDPG", "PDLMTR", "PDLSET", "SSTO", "SSTOCO",
      "OIP", "DC", "DCR", "DPHONE", "EPHONE", "DISCOV", "ENCOV",
      "DISALM", "ENALM", "ALARM", "NORMAL", "HLIMIT", "LLIMIT", "INITTO",
-     "DEFINE", "DAY", "NIGHT",
+     "DAY", "NIGHT",
      # Added 2026-09-24. These seven used to fall past every branch of
      # _exec_command to a bare `return None` -- not modelled AND not warned
      # about, which is the worst of both. A program whose ADAPTM drives a
@@ -236,6 +237,57 @@ class Clock:
             self.day_of_month += days
 
 
+# --------------------------------------------------------------------------
+# DEFINE
+# --------------------------------------------------------------------------
+
+_MACRO_IN_NAME = re.compile(r"%([^%]+)%")
+
+
+def _collect_defines(program: Program) -> dict:
+    """``{ABBREV: text}`` for every DEFINE in the program.
+
+    DEFINE is "executed when added to the panel; it does not need enabling
+    and does not participate in normal program flow", so where it sits does
+    not matter -- unless the line is disabled.
+    """
+    out = {}
+    for ln in program.lines:
+        stmt = ln.stmt
+        if (ln.disabled or not isinstance(stmt, CommandCall)
+                or stmt.name != "DEFINE" or len(stmt.args) < 2):
+            continue
+        key, text = stmt.args[0], stmt.args[1]
+        if isinstance(key, Ref) and isinstance(text, Ref):
+            out[key.name.upper()] = text.name
+    return out
+
+
+def _expand_names(node, expand):
+    """``node`` with DEFINE abbreviations in its point names expanded.
+
+    Only what changes is copied: a statement with no %X% in it comes back as
+    the very same object.
+    """
+    if isinstance(node, MacroRef):
+        return Ref(name=expand(node.name), quoted=True, col=node.col)
+    if isinstance(node, Ref):
+        return replace(node, name=expand(node.name)) if "%" in node.name else node
+    if isinstance(node, list):
+        out = [_expand_names(item, expand) for item in node]
+        return out if any(a is not b for a, b in zip(out, node)) else node
+    if is_dataclass(node) and not isinstance(node, type):
+        changes = {}
+        for f in fields(node):
+            value = getattr(node, f.name)
+            if isinstance(value, list) or is_dataclass(value):
+                new = _expand_names(value, expand)
+                if new is not value:
+                    changes[f.name] = new
+        return replace(node, **changes) if changes else node
+    return node
+
+
 class Simulator:
     """Executes a parsed PPCL program against a simulated panel."""
 
@@ -312,10 +364,26 @@ class Simulator:
         # arguments.
         from . import simcompile
 
+        # DEFINE is a text substitution the panel makes when the program is
+        # loaded, so it is made here, once: each statement naming a %X%
+        # abbreviation is compiled from a copy with the names expanded. Left
+        # alone, "%X%TEMP" was a point of that literal name and a bare %X%TEMP
+        # read 0 and dropped its writes. The copies are kept for as long as
+        # the simulator, as compiled nodes must be; the parsed program, which
+        # the linter and editor share, is not touched.
+        self._defines = _collect_defines(program)
+        self._expanded = {}
+        for n, skip in zip(self.numbers, self._skip_at):
+            if not skip:
+                stmt = self.index[n].stmt
+                copy = _expand_names(stmt, self.expand)
+                if copy is not stmt:
+                    self._expanded[n] = copy
         self._expr_code = {}
         self._line_code = [
             None if skip else simcompile.compile_stmt(
-                self, self.index[n].stmt, n, self._expr_code)
+                self, self._expanded.get(n, self.index[n].stmt), n,
+                self._expr_code)
             for n, skip in zip(self.numbers, self._skip_at)
         ]
 
@@ -438,6 +506,22 @@ class Simulator:
                    "" if priority == "@NONE" else " at " + priority),
             )
         return True
+
+    def expand(self, name: str) -> str:
+        """``name`` with every %X% DEFINE abbreviation replaced."""
+        if "%" not in name:
+            return name
+
+        def one(m):
+            text = self._defines.get(m.group(1).upper())
+            if text is None:
+                self._warn("%%%s%% has no DEFINE in this program, so %s is "
+                           "simulated as a point of that literal name"
+                           % (m.group(1), name))
+                return m.group(0)
+            return text
+
+        return _MACRO_IN_NAME.sub(one, name)
 
     @staticmethod
     def _is_counter(upper: str) -> bool:

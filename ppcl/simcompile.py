@@ -96,13 +96,13 @@ def compile_expr(sim, node, cache):
     elif kind is TimeLit:
         value = node.as_decimal_hours
         fn = lambda: value  # noqa: E731
-    elif kind is Ref:
-        fn = sim._reader(node.name)
+    elif kind is Ref or kind is MacroRef:
+        # A program's own names were expanded when it was loaded; this is
+        # for an expression compiled later, a debugger's condition.
+        fn = sim._reader(sim.expand(node.name))
     elif kind is PriorityRef:
         value = float(spec.PRIORITY_RANK.get(node.name, 0))
         fn = lambda: value  # noqa: E731
-    elif kind is MacroRef:
-        fn = _zero
     elif kind is UnaryOp:
         operand = compile_expr(sim, node.operand, cache)
         fn = (lambda: -operand()) if node.op == "-" else operand
@@ -629,6 +629,9 @@ def _unmodelled(sim, call, line):
 COMMANDS = {
     "LOCAL": _bind_local,
     "ONPWRT": _bind_nothing,  # only relevant on a simulated power cycle
+    # Expanded into the names that use it when the program is loaded,
+    # which is when a panel acts on it; it does nothing as it runs.
+    "DEFINE": _bind_nothing,
     "ON": _bind_state, "OFF": _bind_state, "AUTO": _bind_state,
     "FAST": _bind_state, "SLOW": _bind_state,
     "EMON": _bind_emergency, "EMOFF": _bind_emergency,

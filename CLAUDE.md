@@ -74,7 +74,10 @@ so it runs on any engineering workstation without a package install.
   in the expression cache; the debugger's temporary conditions are compiled
   per use, because their ids get reused. `tests/test_simcompile.py` holds
   all three. Change it against a golden record of bench and trace output,
-  byte for byte, not against the tests alone.
+  byte for byte, not against the tests alone. DEFINE abbreviations are
+  expanded at load: a statement naming `%X%` is compiled from a copy kept in
+  `sim._expanded` for the simulator's lifetime -- a program's own node, so
+  it may be cached -- and the shared parse is never modified.
 - **Read-only with respect to building systems.** No panel writes, no network
   code, no BACnet/P2 client. This tool reads and writes files; the engineer
   loads them.
@@ -148,7 +151,7 @@ on idiomatic PPCL gets turned off.
 ## Testing
 
 ```bash
-python -m pytest tests -q          # 765 tests, ~1 min; CI runs 3.10-3.14
+python -m pytest tests -q          # 769 tests, ~1 min; CI runs 3.10-3.14
 python -m ppcl.cli lint samples    # exercises the CLI against real programs
 ```
 
