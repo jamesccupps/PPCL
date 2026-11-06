@@ -527,8 +527,12 @@ def _render_renumber(result):
         return "Renumbering refused:\n" + "\n".join(
             "  " + w for w in result.get("warnings", [])
         )
-    return "%s\n\n%d reference(s) rewritten." % (
-        result["text"], result.get("rewritten", 0))
+    # A renumber that succeeds can still have changed something the caller
+    # must hear about -- duplicates split, a reference left dangling.
+    lines = [result["text"], "",
+             "%d reference(s) rewritten." % result.get("rewritten", 0)]
+    lines.extend("  ! " + w for w in result.get("warnings", []))
+    return "\n".join(lines)
 
 
 def _render_transform(result):

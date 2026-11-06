@@ -462,6 +462,16 @@ async function boot() {
     if (r.text) { editor.set(r.text); toast('formatted', 'good'); }
   };
 
+  /* A renumber can succeed and still have something to say: duplicates
+   * split so the program now does more than the panel's, duplicates
+   * discarded, a reference left on a line that does not exist. Those were
+   * dropped behind the success toast. */
+  const renumbered = (r) => {
+    editor.set(r.text);
+    toast('renumbered, ' + r.rewritten + ' reference(s) rewritten', 'good');
+    (r.warnings || []).forEach((w) => toast(w, 'bad'));
+  };
+
   $('btn-renumber').onclick = async () => {
     const r = await post('/api/renumber', {
       text: editor.get(),
@@ -499,12 +509,10 @@ async function boot() {
         allow_duplicates: answer.how === 'drop',
       });
       if (!retry.ok) { toast((retry.warnings || []).join(' '), 'bad'); return; }
-      editor.set(retry.text);
-      toast('renumbered, ' + retry.rewritten + ' reference(s) rewritten', 'good');
+      renumbered(retry);
       return;
     }
-    editor.set(r.text);
-    toast('renumbered, ' + r.rewritten + ' reference(s) rewritten', 'good');
+    renumbered(r);
   };
 
   $('btn-tobench').onclick = () => toBench(editor.get());

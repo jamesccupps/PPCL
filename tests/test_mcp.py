@@ -266,3 +266,13 @@ def test_the_server_reads_utf8_without_pythonioencoding(tmp_path, plugin):
     replies, err = _launch(cwd, plugin_root=_ROOT if plugin else None)
     text = replies[1]["result"]["content"][0]["text"]
     assert "55°F" in text, (text, err)
+
+
+def test_a_successful_renumber_still_reports_its_warnings(ws):
+    """Only a refusal used to show warnings. A GOTO to a missing line is
+    renumbered -- and the reader must be told it now names another line."""
+    program = "10\tGOTO 25\n30\tSET(1.0,X)\n40\tGOTO 10\n"
+    text, is_error = mcp_server.call_tool("ppcl_renumber", {"text": program}, ws)
+    assert not is_error
+    assert "reference(s) rewritten" in text
+    assert "  ! line 10: GOTO 25 names a line that does not exist" in text
