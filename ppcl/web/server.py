@@ -196,6 +196,9 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             return self._send(400, {"error": "bad Content-Length"})
+        if length < 0:
+            # rfile.read(-1) reads to the end of the stream, past any limit.
+            return self._send(400, {"error": "bad Content-Length"})
         if length > MAX_UPLOAD:
             return self._send(413, {"error": "request too large"})
         raw = self.rfile.read(length) if length else b"{}"

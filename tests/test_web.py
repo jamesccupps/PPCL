@@ -742,3 +742,18 @@ def test_every_loopback_bind_gets_the_host_check(host, loopback):
     from ppcl.web import server
 
     assert server.is_loopback(host) is loopback
+
+
+def test_a_negative_content_length_is_refused(live):
+    """It passed the size check, and rfile.read(-1) reads to the end of the
+    stream: a client that sent -1 and kept the socket open held a request
+    thread with no limit on what it read."""
+    import socket
+
+    port, _root = live
+    with socket.create_connection(("127.0.0.1", port), timeout=5) as sock:
+        sock.sendall(b"POST /api/lint HTTP/1.1\r\nHost: 127.0.0.1:%d\r\n"
+                     b"Content-Type: application/json\r\n"
+                     b"Content-Length: -1\r\n\r\n" % port)
+        reply = sock.recv(200)
+    assert reply.startswith(b"HTTP/1.0 400") or reply.startswith(b"HTTP/1.1 400")
