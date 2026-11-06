@@ -597,6 +597,12 @@ def handle(message, workspace=None):
     method = message.get("method")
     request_id = message.get("id")
 
+    if request_id is None:
+        # A notification: it gets no reply, and a request sent as one --
+        # tools/call with no id -- is not carried out, rather than answered
+        # with an id of null that no client is waiting for.
+        return None
+
     if method == "initialize":
         return _ok(request_id, {
             "protocolVersion": PROTOCOL_VERSION,
@@ -674,6 +680,15 @@ def serve(workspace="."):
             message = json.loads(raw)
         except json.JSONDecodeError as exc:
             sys.stderr.write("ppcl-mcp: bad JSON: %s\n" % exc)
+            continue
+        if not isinstance(message, dict):
+            # [] or 1 or null is valid JSON and no request. It used to reach
+            # message.get -- in the except clause meant to report errors --
+            # and end the session.
+            response = _err(None, -32600, "invalid request: expected a "
+                                          "JSON object")
+            out.write(json.dumps(response) + "\n")
+            out.flush()
             continue
         try:
             response = handle(message, ws)

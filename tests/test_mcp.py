@@ -155,3 +155,35 @@ def test_a_tool_error_is_reported_not_raised(ws):
     text, is_error = mcp_server.call_tool("ppcl_explain", {"topic": "NOPE"}, ws)
     assert is_error
     assert "failed" in text
+
+
+def _serve(lines, monkeypatch, tmp_path):
+    import io
+    import json
+
+    monkeypatch.setattr("sys.stdin", io.StringIO("\n".join(lines) + "\n"))
+    out = io.StringIO()
+    monkeypatch.setattr("sys.stdout", out)
+    assert mcp_server.serve(str(tmp_path)) == 0
+    return [json.loads(l) for l in out.getvalue().splitlines()]
+
+
+def test_a_line_that_is_not_an_object_does_not_end_the_session(
+        monkeypatch, tmp_path):
+    """[] parsed as JSON, then message.get raised -- in the except clause
+    meant to report errors -- and the server exited."""
+    replies = _serve(["[]", "1", "null",
+                      '{"jsonrpc":"2.0","id":7,"method":"tools/list"}'],
+                     monkeypatch, tmp_path)
+    assert [r.get("id") for r in replies] == [None, None, None, 7]
+    assert all(r["error"]["code"] == -32600 for r in replies[:3])
+    assert "tools" in replies[3]["result"]
+
+
+def test_a_tool_call_sent_as_a_notification_is_not_run(monkeypatch, tmp_path):
+    """A notification has no id and gets no reply; a tools/call without one
+    used to run and answer with id null."""
+    replies = _serve(['{"jsonrpc":"2.0","method":"tools/call","params":'
+                      '{"name":"ppcl_lint","arguments":{"text":"10 GOTO 10"}}}'],
+                     monkeypatch, tmp_path)
+    assert replies == []
