@@ -178,8 +178,9 @@ client, no BACnet or P2 connection. The workbench reads and writes *files*;
 you load the result through Insight or Desigo CC yourself.
 
 **The server binds `127.0.0.1`** and confines all file access to the workspace
-directory. Paths that escape it are refused rather than normalised, and
-extensions outside the PPCL set are refused entirely. Binding elsewhere with
+directory. Paths that escape it are refused rather than normalised; so are
+hidden files and folders (`.git`, `.claude`), drive-relative paths, files with
+no extension, and any extension outside the PPCL set. Binding elsewhere with
 `--host` prints a warning, because the API has no authentication and can write
 files. On Windows it refuses to start if the port is already taken, rather
 than silently sharing it with another instance.

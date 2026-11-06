@@ -24,6 +24,7 @@ Deliberate limits, because this process writes files:
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import mimetypes
 import os
@@ -32,6 +33,7 @@ import socketserver
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import unquote
 
 from .api import MAX_UPLOAD, Workspace, dispatch
 
@@ -51,6 +53,20 @@ CONTENT_TYPES = {
     ".svg": "image/svg+xml",
     ".ico": "image/x-icon",
 }
+
+
+def is_loopback(host) -> bool:
+    """True for any loopback bind, not only the three usual spellings.
+
+    --host 127.0.0.2 is loopback too, and checking a list of names let it
+    switch the Host check off.
+    """
+    if str(host).lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(str(host).strip("[]")).is_loopback
+    except ValueError:
+        return False
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -101,7 +117,7 @@ class Handler(BaseHTTPRequestHandler):
         and those were never the threat.
         """
         bound = self.server.server_address[0]
-        if bound in self._LOOPBACK:
+        if is_loopback(bound):
             host = (self.headers.get("Host") or "").strip().lower()
             if host not in self._own_hosts():
                 return (403, "refused: Host %r is not this workbench. Open it "
@@ -201,10 +217,16 @@ class Handler(BaseHTTPRequestHandler):
     # -- static files ------------------------------------------------------
 
     def _static(self, relative):
+        relative = unquote(relative)
         safe = os.path.normpath(relative).replace("\\", "/")
-        if safe.startswith("..") or os.path.isabs(safe):
+        if safe.startswith("..") or os.path.isabs(safe) or ":" in safe:
+            # On Windows normpath("D:secret.txt") is neither absolute nor
+            # "..", and joined to the static folder it names that drive.
             return self._send(403, {"error": "forbidden"})
-        full = os.path.join(STATIC_DIR, safe)
+        full = os.path.realpath(os.path.join(STATIC_DIR, safe))
+        root = os.path.realpath(STATIC_DIR)
+        if os.path.commonpath([full, root]) != root:
+            return self._send(403, {"error": "forbidden"})
         if not os.path.isfile(full):
             return self._send(404, {"error": "not found"})
         ext = os.path.splitext(full)[1].lower()

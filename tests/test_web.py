@@ -692,3 +692,53 @@ def test_format_refuses_to_drop_a_line_with_no_number(ws):
         "text": "00010\tON(SFAN)\nOFF(RFAN)\n00020\tGOTO 10\n"}, ws)
     assert status == 400
     assert "no line number" in payload["error"]
+
+
+# --------------------------------------------------------------------------
+# What the workspace and the static folder will hand out
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path", [
+    ".git/hooks/pre-commit", ".git/config", ".claude/settings.json",
+    ".mcp.json", ".vscode/tasks.json", "programs/.hidden.ppcl",
+    "notes", "programs/README", "C:x.ppcl", "a:b.ppcl",
+])
+def test_the_workspace_refuses_hidden_extensionless_and_drive_paths(ws, path):
+    """An empty extension passed the check and .json was allowed anywhere,
+    so Save could write a git hook or a Claude Code settings file into a
+    workspace that is itself a git repo and a plugin root."""
+    with pytest.raises(api.ApiError):
+        ws.resolve(path)
+    status, _payload = api.dispatch(
+        "/api/save", {"path": path, "text": "x"}, ws)
+    assert status == 400
+
+
+@pytest.mark.parametrize("path", ["programs/a.ppcl", "./programs/a.ppcl",
+                                  "diagrams/ahu.blocks.json", "v1.2/a.pcl"])
+def test_the_workspace_still_takes_ordinary_paths(ws, path):
+    ws.resolve(path)
+
+
+def test_static_files_stay_inside_the_static_folder(live):
+    """normpath("D:secret.txt") is neither absolute nor "..", so on Windows
+    the join escaped to that drive's current directory."""
+    port, _root = live
+    for path in ("/static/C:secret.txt", "/static/D:..%5Csecret.txt"):
+        status, _payload = _request(port, path)
+        assert status == 403, path
+    status, _payload = _request(port, "/static/js/app.js".replace(
+        "js/app.js", "nope.js"))
+    assert status == 404
+
+
+@pytest.mark.parametrize("host, loopback", [
+    ("127.0.0.1", True), ("127.0.0.2", True), ("::1", True),
+    ("localhost", True), ("0.0.0.0", False), ("192.168.1.10", False),
+])
+def test_every_loopback_bind_gets_the_host_check(host, loopback):
+    """--host 127.0.0.2 is loopback too, and turned the Host check off."""
+    from ppcl.web import server
+
+    assert server.is_loopback(host) is loopback

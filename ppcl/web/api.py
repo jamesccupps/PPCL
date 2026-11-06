@@ -66,16 +66,27 @@ class Workspace:
             raise ApiError("a file name is required")
         if os.path.isabs(relative) or relative.startswith("\\\\"):
             raise ApiError("absolute paths are not allowed")
+        if ":" in relative:
+            # A drive-relative path (C:x) is not absolute and has no "..".
+            raise ApiError("a path here cannot contain ':'")
+        if any(part.startswith(".") and part not in (".", "..")
+               for part in relative.replace("\\", "/").split("/")):
+            # .git/hooks, .claude/settings.json, .mcp.json: the workspace
+            # is often a git repository and a Claude Code plugin, and a file
+            # in any of those runs code. None of them is a program.
+            raise ApiError("hidden files and folders are not handled here")
         candidate = os.path.abspath(os.path.join(self.root, relative))
         root = os.path.realpath(self.root)
         real = os.path.realpath(candidate)
         if real != root and not real.startswith(root + os.sep):
             raise ApiError("that path is outside the workspace")
         ext = os.path.splitext(candidate)[1].lower()
-        if ext and ext not in self.ALLOWED:
+        if ext not in self.ALLOWED:
+            # An empty extension used to pass, so .git/hooks/pre-commit did.
             raise ApiError(
-                "%s files are not handled here; allowed: %s"
-                % (ext, ", ".join(self.ALLOWED))
+                "%s are not handled here; allowed: %s"
+                % ("%s files" % ext if ext else "files with no extension",
+                   ", ".join(self.ALLOWED))
             )
         return candidate
 
