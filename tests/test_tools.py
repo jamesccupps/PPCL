@@ -1239,3 +1239,17 @@ def test_a_bare_releas_clears_what_the_manual_says_it_clears(held, after, warns)
     assert pt.priority == after
     assert any("open question" in w and "@SMOKE" in w
                for w in sim.warnings) is warns
+
+
+@pytest.mark.parametrize("emergency, plain", [
+    ("EMSLOW", "SLOW"), ("EMFAST", "FAST"), ("EMON", "ON"),
+    ("EMOFF", "OFF"), ("EMAUTO", "AUTO")])
+def test_an_emergency_command_writes_what_its_plain_command_writes(
+        emergency, plain):
+    """Every EM command but EMOFF wrote 1.0, so EMSLOW set FAST's value."""
+    values = []
+    for cmd in (emergency, plain):
+        sim = Simulator(parser.parse("10\t%s(FAN)\n20\tGOTO 10\n" % cmd))
+        sim.run(passes=1)
+        values.append(sim.panel.value("FAN"))
+    assert values[0] == values[1]

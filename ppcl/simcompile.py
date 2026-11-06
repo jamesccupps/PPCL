@@ -408,7 +408,8 @@ def _bind_state(sim, call, line, cache):
 
 def _bind_emergency(sim, call, line, cache):
     name = call.name
-    value = OFF if name == "EMOFF" else ON
+    # The state its plain command writes: EMSLOW used to write 1.0, FAST's.
+    value = _STATE_VALUE[name[2:]]
     points = _points(call.args)
 
     def emergency(call_stack):
