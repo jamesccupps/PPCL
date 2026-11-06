@@ -4,6 +4,7 @@ Each rule gets a case that must fire and, where a false positive is plausible,
 a case that must stay quiet.
 """
 
+import pytest
 
 from ppcl import linter, parser, spec
 
@@ -1441,3 +1442,36 @@ def test_tods_for_different_day_modes_on_one_point_are_a_schedule():
         "30\tGOTO 10\n"
     )
     assert "W332" not in codes(text)
+
+
+def test_a_local_read_and_never_written_is_reported():
+    text = '10\tLOCAL("T")\n20\tIF($T.GT.5.0) THEN ON(FAN)\n30\tGOTO 20\n'
+    assert "W322" in codes(text)
+
+
+@pytest.mark.parametrize("command", [
+    "GETVAL($V1,AHU1,HIGH_LIMIT)",
+    "ADAPTM(SAT,$V1,55.0,60.0,10.0,1.0,1.0,1.0,1.0,1.0,20.0,40.0,60.0,$V2)",
+    "ADAPTS(SAT,$V1,55.0,1.0,1.0,1.0,1.0,0.0,100.0,0.0,100.0,1.0,1.0,$V2)",
+    "LSTSQR(1,$V1,$V2,$V3,X1,Y1,X2,Y2,X3,Y3,X4,Y4,X5,Y5,X6,Y6)",
+    "LSQ2(1,$V1,$V2,$V3,$V4,$V5,$V6,30,90)",
+])
+def test_a_command_output_counts_as_written(command):
+    """These outputs were recorded as reads, so W322 reported each one as
+    never assigned -- at the line that assigns it."""
+    names = sorted({"V%d" % i for i in range(1, 7) if "$V%d" % i in command})
+    reads = " + ".join("$" + n for n in names)
+    text = ('10\tLOCAL(%s)\n20\t%s\n30\tOUT = %s\n40\tGOTO 20\n'
+            % (",".join('"%s"' % n for n in names), command, reads))
+    assert "W322" not in codes(text)
+
+
+def test_the_simulator_names_outputs_only_for_commands_it_skips():
+    """The simulator's table is built from the analyzer's; an entry for a
+    command it does model is never looked up."""
+    from ppcl.analyzer import WRITTEN_INDEXES
+    from ppcl.simulator import UNMODELLED, UNMODELLED_OUTPUTS
+
+    for name, positions in UNMODELLED_OUTPUTS.items():
+        assert name in UNMODELLED
+        assert positions == WRITTEN_INDEXES[name]

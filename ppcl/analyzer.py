@@ -53,8 +53,10 @@ _ALL_ARGS_WRITTEN = frozenset(
 #: Commands whose leading argument is a value, with the rest written.
 _SKIP_FIRST_WRITTEN = frozenset({"SET", "EMSET", "HLIMIT", "LLIMIT", "INITTO", "STATE"})
 
-#: Explicit written-argument index sets for the irregular commands.
-_WRITTEN_INDEXES = {
+#: Explicit written-argument index sets for the irregular commands. The
+#: simulator names the same positions when it skips a command it does not
+#: model, and builds that table from this one so the two cannot disagree.
+WRITTEN_INDEXES = {
     "MAX": (0,),
     "MIN": (0,),
     "TABLE": (1,),
@@ -63,6 +65,15 @@ _WRITTEN_INDEXES = {
     "WAIT": (2,),
     "SSTO": (2, 3),
     "PDLSET": (1,),
+    # Positions are the spec's parameters: ADAPTM/ADAPTS write cv and err,
+    # LSQ2 its six coefficient points, LSTSQR c, b and a, and GETVAL its
+    # target. These were recorded as reads, so W322 called each output
+    # "never assigned" at the very line that assigns it.
+    "ADAPTM": (1, 13),
+    "ADAPTS": (1, 13),
+    "LSQ2": (1, 2, 3, 4, 5, 6),
+    "LSTSQR": (1, 2, 3),
+    "GETVAL": (0,),
 }
 
 #: Commands that reference PPCL *line numbers* rather than points.
@@ -73,8 +84,8 @@ def written_arg_indexes(call: CommandCall) -> set:
     """Indexes into ``call.args`` that the command writes to."""
     name = call.name
     n = len(call.args)
-    if name in _WRITTEN_INDEXES:
-        return {i for i in _WRITTEN_INDEXES[name] if i < n}
+    if name in WRITTEN_INDEXES:
+        return {i for i in WRITTEN_INDEXES[name] if i < n}
     if name in _ALL_ARGS_WRITTEN:
         return set(range(n))
     if name in _SKIP_FIRST_WRITTEN:

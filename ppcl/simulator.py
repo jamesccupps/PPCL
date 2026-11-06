@@ -35,6 +35,7 @@ import re
 from dataclasses import dataclass, field, fields, is_dataclass, replace
 
 from . import spec
+from .analyzer import WRITTEN_INDEXES
 from .ast_nodes import CommandCall, MacroRef, Program, Ref
 
 ON = 1.0
@@ -109,12 +110,8 @@ UNMODELLED = frozenset(
 #: was skipped" and "these values are stale and everything downstream of them
 #: is unsound". Positions are zero-based into the argument list.
 UNMODELLED_OUTPUTS = {
-    "ADAPTM": (1, 13), "ADAPTS": (1, 13),
-    "LSQ2": (1, 2, 3, 4, 5, 6),
-    "LSTSQR": (1, 2, 3),
-    "GETVAL": (0,),
-    "SSTO": (2, 3),
-    "TIMAVG": (),
+    name: WRITTEN_INDEXES[name]
+    for name in ("ADAPTM", "ADAPTS", "LSQ2", "LSTSQR", "GETVAL", "SSTO")
 }
 
 #: Resident points whose value no offline simulator can know, paired with the
