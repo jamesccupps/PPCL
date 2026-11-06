@@ -403,8 +403,12 @@ class Compiler:
 
         b.blank()
         b.rule("Declarations and power restart")
-        if self._locals:
-            b.code("LOCAL(%s)" % ",".join('"%s"' % n for n in self._locals))
+        # Sixteen names per LOCAL statement is a per-statement limit, not a
+        # per-program one; more locals take another statement.
+        per_statement = spec.ALL["LOCAL"].max_repeat
+        for start in range(0, len(self._locals), per_statement):
+            chunk = self._locals[start:start + per_statement]
+            b.code("LOCAL(%s)" % ",".join('"%s"' % n for n in chunk))
         b.label("INIT")
         b.code("ONPWRT({init})", init="INIT")
 

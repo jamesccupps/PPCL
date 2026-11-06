@@ -761,3 +761,20 @@ def test_a_rule_that_cannot_change_its_condition_spends_no_local():
     out, _w = compile_sequence(sequence.parse(text))
     assert "RULE" not in out
     assert out.count("IF(DMPR.LT.50.0) THEN") == 2
+
+
+def test_more_than_sixteen_locals_take_more_than_one_local_statement():
+    """All the locals went into one LOCAL statement, which the panel's
+    compiler refuses past sixteen names (E111)."""
+    names = "".join("  L%d  local\n" % i for i in range(20))
+    text = ('sequence "t"\npoints\n  FAN  LDO\n' + names
+            + "modes\n  Normal  otherwise\ntable\n          Normal\n"
+            "  FAN     on\n")
+    out, _w = compile_sequence(sequence.parse(text))
+    declared = [ln for ln in out.splitlines() if "LOCAL(" in ln]
+    assert len(declared) == 2
+    assert all(ln.count('"') // 2 <= 16 for ln in declared)
+    for i in range(20):
+        assert '"L%d"' % i in out
+    codes = {d.code for d in linter.lint(parser.parse(out))}
+    assert "E111" not in codes
