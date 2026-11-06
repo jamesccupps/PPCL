@@ -1223,3 +1223,19 @@ def test_an_absurd_clock_input_is_answered_not_hung(path, body):
     assert _finishes(lambda: result.append(api.dispatch(path, body, None)))
     status, payload = result[0]
     assert status in (200, 400) and "traceback" not in payload
+
+
+@pytest.mark.parametrize("held, after, warns", [
+    ("@OPER", "@OPER", False),     # "requires @OPER to release"
+    ("@EMER", "@NONE", False),     # "will release points from PDL or EMER"
+    ("@PDL", "@NONE", False),
+    ("@SMOKE", "@NONE", True),     # open question 3: assumed, and said so
+])
+def test_a_bare_releas_clears_what_the_manual_says_it_clears(held, after, warns):
+    sim = Simulator(parser.parse("10\tRELEAS(SFAN)\n20\tGOTO 10\n"))
+    pt = sim.panel.get("SFAN")
+    pt.value, pt.priority = 1.0, held
+    sim.run(passes=1)
+    assert pt.priority == after
+    assert any("open question" in w and "@SMOKE" in w
+               for w in sim.warnings) is warns

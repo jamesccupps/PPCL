@@ -575,8 +575,10 @@ section states that for logical 9.2+, CM and APOGEE firmware, "if the
 `@priority` indicator is not specified, the field panel will release points from
 PDL or EMER priority to NONE". These describe different things — the default
 priority of a *command* versus the reach of a bare `RELEAS` — but the wording
-invites confusion. This toolkit treats a bare `RELEAS` as clearing any priority
-it is capable of clearing, and warns when a program relies on it.
+invites confusion. The simulator follows what is stated: a bare `RELEAS`
+clears `@PDL` and `@EMER`, and does **not** clear `@OPER` ("a point commanded
+from the keyboard requires @OPER to release" -- it used to). `@SMOKE` is open
+question 3 below: simulated as cleared, with a runtime warning saying so.
 
 **`EQUAL` and `LESS` — are they reserved words or a misread description
 column? Settled 2026-09-18.** Neither has a documented *syntax*: no manual

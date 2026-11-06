@@ -74,6 +74,10 @@ EXP_WARNING = (
     "EXP is simulated as e**x, but whether PPCL's EXP is base e or base 10 is "
     "not established -- see open question 12 in docs/PPCL-REFERENCE.md. Treat "
     "results built on it as unconfirmed")
+BARE_RELEAS_SMOKE_WARNING = (
+    "a bare RELEAS was simulated as clearing @SMOKE priority, but whether a "
+    "panel does is not documented -- see open question 3 in "
+    "docs/PPCL-REFERENCE.md. Release smoke control at @SMOKE to be sure")
 NEGATIVE_ROOT_WARNING = (
     ".ROOT. of a negative value is not a real number; it was simulated as 0, "
     "and what a panel returns for it is not documented")
@@ -454,6 +458,19 @@ class Simulator:
                 % (name, priority, pt.priority),
             )
             return False
+        if priority is None and pt.priority == "@OPER":
+            # "A point commanded from the keyboard requires @OPER to release"
+            # -- spec.py's own RELEAS note. A bare RELEAS cleared it anyway.
+            self._emit(
+                line, "blocked",
+                "RELEAS %s does not clear @OPER priority; an operator "
+                "command is released only at @OPER" % name,
+            )
+            return False
+        if priority is None and pt.priority == "@SMOKE":
+            # The manual says a bare RELEAS releases PDL and EMER and is
+            # silent on SMOKE. Simulated as clearing it, and said.
+            self._warn(BARE_RELEAS_SMOKE_WARNING)
         if pt.priority != "@NONE" and self._traces("write"):
             self._emit(line, "write",
                        "%s released from %s to @NONE" % (name, pt.priority))
