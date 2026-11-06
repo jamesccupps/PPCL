@@ -411,6 +411,14 @@ def _join_continuations(raw_lines: list):
         stripped = raw.rstrip("\r\n")
         if buf is None:
             start, buf, continued = idx, stripped, False
+            # A comment is prose to the end of its line, "&" included. Joined
+            # first and recognised after, "C HEAT &" swallowed the statement
+            # on the next line into the comment.
+            _num, body = split_line_number(stripped)
+            if _is_comment_body(body.strip()):
+                yield start, buf, continued
+                buf = None
+                continue
         else:
             # Drop the continuation's own line number if it carries one, since
             # the fragment belongs to the statement that opened the buffer.

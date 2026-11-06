@@ -389,3 +389,20 @@ def test_a_byte_order_mark_does_not_cost_line_one():
                         "00020\tGOTO 10\n")
     assert [ln.number for ln in prog.lines] == [10, 20]
     assert not prog.errors
+
+
+def test_a_comment_ending_in_an_ampersand_does_not_swallow_the_next_line():
+    """Continuations were joined before comments were recognised, so line
+    110 became part of line 100's comment and vanished from lint,
+    simulation and renumbering -- while the warning called the join
+    faithful."""
+    prog = parser.parse("00100\tC HEAT &\n00110\tSFAN = ON\n00120\tGOTO 100\n")
+    assert [ln.number for ln in prog.lines] == [100, 110, 120]
+    assert prog.lines[0].is_comment and not prog.lines[0].continued
+    assert prog.lines[0].body == "C HEAT &"
+
+
+def test_a_statement_still_continues():
+    prog = parser.parse("00100\tSFAN = &\n00110\tON\n00120\tGOTO 100\n")
+    assert [ln.number for ln in prog.lines] == [100, 120]
+    assert prog.lines[0].continued
