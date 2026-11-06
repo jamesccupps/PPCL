@@ -271,7 +271,10 @@ def plan_renumber(program: Program, start: int = 10, step: int = 10,
             mapping.setdefault(ln.number, n)
             n += step
 
-    ordered = list(program.lines)
+    # The panel runs lines in number order, whatever order the file lists
+    # them in, so new numbers follow the old ones. Assigning them in file
+    # order put a file's line 200 ahead of its line 100.
+    ordered = sorted(program.lines, key=lambda ln: (ln.number, ln.source_line))
     if not split_duplicates:
         seen = set()
         deduped = []
@@ -348,6 +351,30 @@ def renumber(program: Program, start: int = 10, step: int = 10,
         split_duplicates=split_duplicates,
     )
     result.mapping = mapping
+
+    if preserve_blocks:
+        # A block that runs past its thousand lands on numbers the next
+        # block is also given: two lines numbered alike, of which the panel
+        # keeps one.
+        spilled = sorted({old.number // block_size
+                          for old, new in assignments
+                          if new // block_size != old.number // block_size})
+        if spilled:
+            result.warnings.append(
+                "refusing to renumber: at step %d the %s would run past the "
+                "start of the next block, and the numbers there would "
+                "collide. Use a smaller step, or renumber without "
+                "--preserve-blocks."
+                % (step, ", ".join("%d block" % (b * block_size)
+                                   for b in spilled)))
+            result.refused = "block_overflow"
+            return result
+
+    numbers = [ln.number for ln in program.lines]
+    if numbers != sorted(numbers):
+        result.warnings.append(
+            "the lines were not in number order in the file; they come back "
+            "in line-number order, which is the order the panel runs them")
 
     # The one place renumbering is NOT byte-for-byte, stated rather than
     # hidden. The parser joins a statement split across "&" continuations into

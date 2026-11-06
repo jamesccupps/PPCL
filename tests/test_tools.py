@@ -973,3 +973,30 @@ def test_every_duty_cycle_code_matches_table_3_1():
     for slots, code in table_3_1.items():
         # Put the segment first in the hour, so it is the right-most digit.
         assert duty_cycle_pattern(list(slots) + [F] * 9)[-1] == code
+
+
+def test_renumber_keeps_the_order_the_panel_runs():
+    """Numbers were assigned in file order, so a file listing 200 before
+    100 came back with what had been line 200 running first."""
+    prog = parser.parse("00200\tA = 1.0\n00100\tB = 2.0\n00300\tGOTO 100\n")
+    result = formatter.renumber(prog)
+    assert result.text.splitlines() == [
+        "00010\tB = 2.0", "00020\tA = 1.0", "00030\tGOTO 10"]
+    assert any("line-number order" in w for w in result.warnings)
+
+
+def test_preserve_blocks_refuses_a_block_that_overflows():
+    """120 lines in the first block at step 10 run to 1200, so 1010 was
+    given twice -- once in each block -- and the panel kept one."""
+    lines = ["%05d\tX%d = 1.0" % (10 + i, i) for i in range(120)]
+    lines.append("01010\tGOTO 10")
+    prog = parser.parse("\n".join(lines) + "\n")
+    result = formatter.renumber(prog, preserve_blocks=True)
+    assert result.text == ""
+    assert result.refused == "block_overflow"
+    assert "smaller step" in result.warnings[0]
+
+    # The same program fits at step 5.
+    fits = formatter.renumber(prog, preserve_blocks=True, step=5)
+    numbers = [l.split("\t")[0] for l in fits.text.splitlines()]
+    assert len(numbers) == len(set(numbers)) == 121
