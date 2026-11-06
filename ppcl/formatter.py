@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import bisect
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from . import spec
 from .analyzer import LINE_REFERENCING
-from .ast_nodes import Line, Program
+from .ast_nodes import Line, Program, Unparsed
 from .lexer import LexError, Tok, tokenize
 from .unparse import stmt_to_text
 
@@ -120,10 +120,22 @@ def line_reference_tokens(body: str):
     return [tok for tok, _word in line_references(body)]
 
 
+def _statement_offset(body: str) -> int:
+    """Where the statement starts: after a PXC.A disable marker, if any.
+
+    A line disabled with "# " still holds its references, and re-enabling it
+    has to find the lines they name, so they are rewritten like any other.
+    """
+    return 2 if body.startswith("# ") else 0
+
+
 def line_references(body: str):
     """``[(token, word)]``: each line-number token and the command it is in."""
+    offset = _statement_offset(body)
     try:
-        tokens = tokenize(body)
+        tokens = tokenize(body[offset:])
+        if offset:
+            tokens = [replace(t, col=t.col + offset) for t in tokens]
     except LexError:
         # No tokens, so no references can be found -- which is only safe if
         # the caller already knows the line holds none. renumber() checks
@@ -181,6 +193,15 @@ _REFERENCE_WORD = re.compile(
     r"\b(GOTO|GOSUB|%s|LSQ2|PDL)\b" % "|".join(sorted(LINE_REFERENCING)),
     re.IGNORECASE,
 )
+#: A reference run into the word before or after it, for a line that does
+#: not parse -- THENGOTO 110, GOTO110, ELSEACT(100) -- which lexes as part of
+#: one word, so the scanner cannot see it. Shaped like a reference rather
+#: than just containing the word, so FACTOR = ... is not taken for one.
+_REFERENCE_ANYWHERE = re.compile(
+    r"GO(?:TO|SUB)\s*\(?\s*\d|(?:THEN|ELSE)(?:%s)\s*\("
+    % "|".join(sorted(LINE_REFERENCING)),
+    re.IGNORECASE,
+)
 
 
 def unreadable_references(program: Program):
@@ -200,10 +221,16 @@ def unreadable_references(program: Program):
         if ln.is_comment:
             continue
         body = ln.body or ""
+        if (isinstance(ln.stmt, Unparsed) and not ln.unknown
+                and _REFERENCE_ANYWHERE.search(body)):
+            out.append((ln.number, "it does not parse, so a reference run "
+                        "into its keyword (THENGOTO 110, GOTO110) cannot be "
+                        "found"))
+            continue
         if not _REFERENCE_WORD.search(body):
             continue
         try:
-            tokenize(body)
+            tokenize(body[_statement_offset(body):])
         except LexError as exc:
             out.append((ln.number, str(exc)))
     return out

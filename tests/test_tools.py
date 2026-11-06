@@ -1029,3 +1029,24 @@ def test_a_stale_number_in_a_comment_does_not_block_renumbering():
                         "00120\tGOTO 110\n")
     result = formatter.renumber(prog)
     assert result.text and not result.refused
+
+
+def test_renumber_rewrites_a_reference_inside_a_disabled_line():
+    """A PXC.A line disabled with '# ' still holds its GOTO, and enabling it
+    again has to find the right line. The '#' did not lex, so renumber
+    refused the whole file as unreadable."""
+    prog = parser.parse("00100\tA = 1.0\n00110\t# GOTO 120\n00120\tGOTO 100\n")
+    result = formatter.renumber(prog)
+    assert not result.refused
+    assert result.text.splitlines()[1] == "00020\t# GOTO 30"
+
+
+@pytest.mark.parametrize("body", ["IF(X.GT.1.0)THENGOTO 110", "GOTO110"])
+def test_renumber_refuses_a_branch_it_cannot_parse(body):
+    """Joined to its keyword, the reference lexes as part of one word, so it
+    was left behind -- pointing at the old number -- with no warning."""
+    prog = parser.parse("00100\t%s\n00110\tA = 1.0\n00120\tGOTO 100\n" % body)
+    result = formatter.renumber(prog)
+    assert result.text == ""
+    assert result.refused == "unreadable"
+    assert "line 100" in result.warnings[0]
