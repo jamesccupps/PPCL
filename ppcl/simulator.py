@@ -287,6 +287,7 @@ class Simulator:
         #: _reader_for(). Filled lazily; must exist before the directives
         #: below are evaluated.
         self._readers = {}
+        self._counter_base = {}
 
         # Persistent execution state. A panel keeps running where it left off
         # rather than restarting the program on every tick, and time-based
@@ -376,6 +377,8 @@ class Simulator:
             return float(self.clock.month)
         if upper == "SECNDS":
             return float(int(self.clock.elapsed) % 60)
+        if self._is_counter(upper):
+            return self._counter(upper)
         if upper.startswith("SECND") and upper[5:].isdigit():
             return float(int(self.clock.elapsed) % 60)
         if upper == "LINK":
@@ -426,6 +429,7 @@ class Simulator:
         old = pt.value
         pt.value = value
         pt.priority = priority
+        self.note_write(name)
         if old != value and self._traces("write"):
             self._emit(
                 line, "write",
@@ -434,6 +438,27 @@ class Simulator:
                    "" if priority == "@NONE" else " at " + priority),
             )
         return True
+
+    @staticmethod
+    def _is_counter(upper: str) -> bool:
+        return (upper.startswith("SECND") and upper[5:].isdigit()
+                and 1 <= int(upper[5:]) <= 7)
+
+    def note_write(self, name: str) -> None:
+        """Start a SECND1..SECND7 counter from the value just written.
+
+        Real programs reset one to zero and test it later -- SECND3 = 0,
+        then IF(SECND3 .GT. 300) -- so it counts elapsed seconds from that
+        write, well past 60. It used to read the second of the current
+        minute and ignore writes, so a test like that never came true.
+        """
+        upper = name.upper()
+        if self._is_counter(upper):
+            self._counter_base[upper] = self.clock.elapsed
+
+    def _counter(self, upper: str) -> float:
+        return (self.panel.value(upper)
+                + self.clock.elapsed - self._counter_base.get(upper, 0.0))
 
     def release(self, name: str, priority: str, line: int) -> bool:
         pt = self.panel.get(name)
@@ -529,6 +554,8 @@ class Simulator:
             return lambda: float(clock.day_of_month)
         if upper == "MONTH":
             return lambda: float(clock.month)
+        if self._is_counter(upper):
+            return lambda: self._counter(upper)
         if upper == "SECNDS" or (upper.startswith("SECND")
                                  and upper[5:].isdigit()):
             return lambda: float(int(clock.elapsed) % 60)

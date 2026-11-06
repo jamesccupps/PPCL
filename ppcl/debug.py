@@ -173,6 +173,7 @@ class DebugSession:
         """Override a point mid-run. This is the whole reason to debug here."""
         point = self.sim.panel.get(name)
         self.sim.panel.load({name: value})
+        self.sim.note_write(name)
         point.priority = priority
         return self.point(name)
 

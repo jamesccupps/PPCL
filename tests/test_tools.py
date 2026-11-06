@@ -1253,3 +1253,17 @@ def test_an_emergency_command_writes_what_its_plain_command_writes(
         sim.run(passes=1)
         values.append(sim.panel.value("FAN"))
     assert values[0] == values[1]
+
+
+@pytest.mark.parametrize("reset", ["SECND3 = 0", "SET(0.0,SECND3)"])
+def test_a_secnd_counter_times_from_when_it_was_reset(reset):
+    """The idiom real programs use: zero SECNDn, act once it passes 300.
+    It read the second of the current minute and ignored the write, so a
+    test above 59 could never come true and the delay never ended."""
+    sim = Simulator(parser.parse(
+        "10\t%s\n20\tIF(SECND3 .GT. 300) THEN ON(FAN)\n30\tGOTO 20\n" % reset))
+    sim.run(passes=50, seconds_per_pass=5.0)      # 250 s
+    assert sim.panel.value("FAN") == 0.0
+    sim.run(passes=20, seconds_per_pass=5.0)      # 350 s
+    assert sim.panel.value("FAN") == 1.0
+    assert sim._read("SECND3") == pytest.approx(350.0, abs=10)
