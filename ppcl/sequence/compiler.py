@@ -438,6 +438,14 @@ class Compiler:
         b.comment("Evaluated before the mode so a mode can react to a trip.")
         for il in seq.interlocks:
             flag = locals_by_name[il.name]
+            if il.priority not in spec.PRIORITY_RANK:
+                # A document from JSON or the Builder has not been through
+                # the text parser's check. Anything else lexes as a name, and
+                # the force it is on runs at @NONE.
+                raise CompileError(
+                    "interlock %r forces at %r, which is not a PPCL priority; "
+                    "use one of %s" % (il.name, il.priority,
+                                       ", ".join(spec.PRIORITY_ORDER)))
             b.comment("%s%s" % (il.name,
                                 (" -- " + il.description) if il.description else ""))
             if il.trip is None:

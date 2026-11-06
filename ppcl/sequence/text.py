@@ -52,6 +52,7 @@ from .model import (
     Rule,
     Sequence,
     legacy_type,
+    priority_literal,
 )
 
 
@@ -440,6 +441,9 @@ def _parse_interlock(seq, lines, i):
     if not name:
         raise SequenceSyntaxError("interlock needs a name", line_no, raw)
     il = Interlock(name=name)
+    # One interlock forces everything it owns at one priority, given by
+    # "at" on any of its force lines. The last line's used to win for all.
+    given = None
     block, i = _block(lines, i + 1, _indent(raw))
     for bl_no, bl_raw in block:
         stripped = bl_raw.strip()
@@ -450,10 +454,20 @@ def _parse_interlock(seq, lines, i):
             il.reset = parse_condition(stripped[len("reset when "):], bl_no)
         elif low.startswith("force ") or low.startswith("then force "):
             body = stripped[stripped.lower().index("force ") + 6:]
-            priority = "@EMER"
             m = re.search(r"\s+at\s+(\S+)\s*$", body, re.IGNORECASE)
             if m:
-                priority = "@" + m.group(1).upper().lstrip("@")
+                priority = priority_literal(m.group(1))
+                if priority is None:
+                    raise SequenceSyntaxError(
+                        "%r is not a priority. Use emer, smoke, oper, pdl or "
+                        "none" % m.group(1), bl_no, bl_raw)
+                if given is not None and priority != given:
+                    raise SequenceSyntaxError(
+                        "an interlock forces its points at one priority: this "
+                        "line says %s and an earlier one %s. Give every force "
+                        "the same priority, or split it into two interlocks"
+                        % (priority, given), bl_no, bl_raw)
+                given = il.priority = priority
                 body = body[: m.start()]
             parts = body.split()
             if len(parts) < 2:
@@ -462,7 +476,6 @@ def _parse_interlock(seq, lines, i):
                     bl_no,
                     bl_raw,
                 )
-            il.priority = priority
             il.forces.append((parts[0], " ".join(parts[1:])))
         elif low.startswith("description "):
             il.description = stripped[len("description "):].strip('"')

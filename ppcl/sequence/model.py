@@ -143,6 +143,19 @@ CELL_ACTIONS = {
 #: A program local: a virtual point only this program sees, written $NAME.
 LOCAL = "local"
 
+#: The words an interlock's ``at`` accepts, and the literal each means. PPCL
+#: has exactly five priorities; anything else -- "@EMERGENCY" was one -- lexes
+#: as a name, and the command it is on runs at @NONE.
+PRIORITY_WORDS = {
+    "none": "@NONE", "pdl": "@PDL", "emer": "@EMER", "emergency": "@EMER",
+    "smoke": "@SMOKE", "oper": "@OPER", "operator": "@OPER",
+}
+
+
+def priority_literal(word):
+    """``@EMER`` for "emergency", "emer" or "@EMER"; None if not a priority."""
+    return PRIORITY_WORDS.get(str(word).strip().lstrip("@").lower())
+
 #: How a sequence written before point types read its "kind role" pair.
 #: The words are APOGEE's own -- LAI is the logical analog input -- and on
 #: APOGEE a virtual point is an LAO or LDO with no physical address. A

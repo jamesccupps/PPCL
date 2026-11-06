@@ -555,3 +555,65 @@ def test_a_document_saved_with_kind_and_role_loads():
     assert seq.points[0].ptype == "local"
     assert all(p.ptype == "LAI" for p in seq.points[1:])
     assert "kind" not in sequence.to_dict(seq)["points"][0]
+
+
+# --------------------------------------------------------------------------
+# Interlock priorities
+# --------------------------------------------------------------------------
+
+_SAFETY = """sequence "t"
+points
+  SFAN   LDO
+  OADPR  LAO
+  SMK    LDI
+modes
+  Normal  otherwise
+table
+          Normal
+  SFAN    on
+interlock Smoke
+  trip when SMK is on
+  reset when SMK is off
+%s
+"""
+
+
+def _forces(text):
+    out, _w = compile_sequence(sequence.parse(text))
+    return [l.split("\t", 1)[1] for l in out.splitlines()
+            if "\t" in l and "$SMOKE" in l and ("SFAN" in l or "OADPR" in l)]
+
+
+def test_an_interlock_forces_everything_at_the_priority_it_was_given():
+    """The last force line's priority used to apply to all of them, so
+    'force SFAN off at smoke' then 'force OADPR closed' forced both at
+    @EMER -- the smoke priority silently lost."""
+    lines = _forces(_SAFETY % "  force SFAN off at smoke\n  force OADPR closed")
+    assert lines and all("@SMOKE" in l for l in lines), lines
+
+
+def test_a_priority_word_becomes_one_of_the_five_literals():
+    """'at emergency' -- the module's own example -- emitted @EMERGENCY,
+    which is no priority at all: a @NONE command a bare RELEAS clears."""
+    lines = _forces(_SAFETY % "  force SFAN off at emergency")
+    assert lines and all("@EMER," in l and "@EMERGENCY" not in l
+                         for l in lines), lines
+
+
+@pytest.mark.parametrize("forces, says", [
+    ("  force SFAN off at urgent", "not a priority"),
+    ("  force SFAN off at smoke\n  force OADPR closed at emer",
+     "one priority"),
+])
+def test_a_priority_that_cannot_be_kept_is_refused(forces, says):
+    with pytest.raises(SequenceSyntaxError) as err:
+        sequence.parse(_SAFETY % forces)
+    assert says in err.value.message
+
+
+def test_the_compiler_refuses_a_priority_that_is_not_one():
+    """The JSON form and the Builder bypass the text parser."""
+    seq = sequence.parse(_SAFETY % "  force SFAN off")
+    seq.interlocks[0].priority = "@EMERGENCY"
+    with pytest.raises(CompileError):
+        compile_sequence(seq)
