@@ -6,6 +6,8 @@ exact string: one backward GOTO, matched releases, no time-based command
 inside a conditional.
 """
 
+import re
+
 import pytest
 
 from ppcl import linter, parser, sequence, spec
@@ -617,3 +619,74 @@ def test_the_compiler_refuses_a_priority_that_is_not_one():
     seq.interlocks[0].priority = "@EMERGENCY"
     with pytest.raises(CompileError):
         compile_sequence(seq)
+
+
+# --------------------------------------------------------------------------
+# Interlock flags and local names
+# --------------------------------------------------------------------------
+
+_TWO_SAFETIES = """sequence "t"
+points
+  SFAN   LDO
+  OADPR  LAO
+  SMK    LDI
+  SMD    LDI
+modes
+  Normal  otherwise
+table
+          Normal
+  SFAN    on
+interlock Smoke detector
+  trip when SMK is on
+  reset when SMK is off
+  force SFAN off at smoke
+interlock Smoke damper
+  trip when SMD is on
+  reset when SMD is off
+  force OADPR closed at smoke
+"""
+
+
+def _declared_and_used(text):
+    out, _w = compile_sequence(sequence.parse(text))
+    program = parser.parse(out)
+    declared = set()
+    used = set()
+    for ln in program.lines:
+        body = ln.body or ""
+        if body.startswith("LOCAL("):
+            declared |= set(re.findall(r'"([^"]+)"', body))
+        used |= set(re.findall(r'"\$([^"]+)"', body))
+    return out, declared, used
+
+
+def test_two_interlocks_get_two_flags():
+    """Both used to latch "$SMOKE " -- six characters, the space kept -- so
+    the damper's reset cleared the detector's latch."""
+    out, declared, used = _declared_and_used(_TWO_SAFETIES)
+    flags = {f for f in used if f.startswith("SMOKE")}
+    assert len(flags) == 2, flags
+    assert all(re.fullmatch(r"[A-Z0-9]+", f) for f in flags)
+    assert used <= declared, (used - declared)
+
+
+def test_a_local_point_is_declared_under_the_name_it_is_used_by():
+    """Truncated to six characters when declared but not when referenced,
+    DEMAND1 was declared DEMAND and used as $DEMAND1 -- an undeclared name."""
+    text = AHU.replace("  DMD     local", "  DEMAND1 local").replace(
+        "DMD", "DEMAND1")
+    _out, declared, used = _declared_and_used(text)
+    assert "DEMAND1" in declared and "DEMAND1" in used
+    assert used <= declared
+
+
+@pytest.mark.parametrize("change, says", [
+    # A condition naming FREEZE could mean the point or the interlock; it
+    # used to read the interlock's own flag, so the trip could never fire.
+    (("interlock Smoke damper", "interlock SMK"), "same name as a point"),
+    (("interlock Smoke damper", "interlock Smoke detector"), "two interlocks"),
+])
+def test_an_ambiguous_interlock_name_is_refused(change, says):
+    with pytest.raises(CompileError) as err:
+        compile_sequence(sequence.parse(_TWO_SAFETIES.replace(*change)))
+    assert says in str(err.value)

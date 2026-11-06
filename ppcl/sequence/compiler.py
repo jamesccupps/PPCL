@@ -39,6 +39,8 @@ Two consequences worth understanding:
 
 from __future__ import annotations
 
+import re
+
 from .. import spec
 from ..generator import Builder, integral_gain, proportional_gain, table_statement
 from .model import (
@@ -74,10 +76,31 @@ def quote(name: str) -> str:
     return name
 
 
-def flag_name(name: str) -> str:
-    """The local-variable name holding an interlock's latched state."""
-    upper = name.upper()
-    return upper[:6] if len(upper) > 6 else upper
+#: The local holding the current mode number.
+MODE_LOCAL = "MODE"
+
+
+def interlock_flags(seq: Sequence) -> dict:
+    """``{INTERLOCK NAME: FLAG}``: the local each interlock latches into.
+
+    Computed once, here, for the LOCAL declaration and every reference
+    alike. Cut to six characters with the space kept, "Smoke detector" and
+    "Smoke damper" both latched "$SMOKE " -- one flag, so either reset
+    cleared both -- and the deduplicated name a declaration chose was never
+    the one the references used. A flag is letters and digits, six at most,
+    and unique among the flags, the mode variable and the local points.
+    """
+    taken = {MODE_LOCAL} | {p.name.upper() for p in seq.points if p.is_local}
+    out = {}
+    for il in seq.interlocks:
+        base = re.sub(r"[^A-Z0-9]", "", il.name.upper())[:6] or "SAFETY"
+        flag, n = base, 1
+        while flag in taken:
+            n += 1
+            flag = base[:6 - len(str(n))] + str(n)
+        taken.add(flag)
+        out.setdefault(il.name.upper(), flag)
+    return out
 
 
 def interlock_flag(name, seq: Sequence = None):
@@ -89,10 +112,8 @@ def interlock_flag(name, seq: Sequence = None):
     """
     if seq is None or not isinstance(name, str):
         return None
-    for il in seq.interlocks:
-        if il.name.upper() == name.strip().upper():
-            return '"$%s"' % flag_name(il.name)
-    return None
+    flag = interlock_flags(seq).get(name.strip().upper())
+    return '"$%s"' % flag if flag else None
 
 
 def resolve(name: str, seq: Sequence = None) -> str:
@@ -278,7 +299,7 @@ class Compiler:
     """Turns a :class:`Sequence` into PPCL text."""
 
     #: Local flag holding the current mode index.
-    MODE_LOCAL = "MODE"
+    MODE_LOCAL = MODE_LOCAL
 
     def __init__(self, seq: Sequence):
         self.seq = seq
@@ -288,19 +309,37 @@ class Compiler:
     # -- locals ------------------------------------------------------------
 
     def _local(self, name: str) -> str:
-        upper = name.upper()[:6] if len(name) > 6 else name.upper()
-        # Keep local names short so statements stay inside the MMI limit.
-        candidate = upper
-        n = 1
-        while candidate in self._locals and candidate != upper:
-            n += 1
-            candidate = "%s%d" % (upper[:5], n)
-        if candidate not in self._locals:
-            self._locals.append(candidate)
-        return candidate
+        """Declare a local under exactly the name its references use."""
+        upper = name.upper()
+        if upper not in self._locals:
+            self._locals.append(upper)
+        return upper
 
-    def _interlock_local(self, interlock) -> str:
-        return self._local(flag_name(interlock.name))
+    def _check_names(self) -> None:
+        """Refuse a name that two things in the sequence would share."""
+        seq = self.seq
+        seen = set()
+        points = {p.name.upper() for p in seq.points}
+        for il in seq.interlocks:
+            key = il.name.strip().upper()
+            if key in seen:
+                raise CompileError(
+                    "two interlocks are named %r; a mode testing it could "
+                    "mean either. Rename one." % il.name)
+            seen.add(key)
+            if key in points:
+                # A condition naming it could mean the point or the
+                # interlock, and resolved to the interlock: "trip when
+                # FREEZE is on" read its own flag and could never trip.
+                raise CompileError(
+                    "interlock %r has the same name as a point, so a "
+                    "condition naming it could mean either. Rename the "
+                    "interlock." % il.name)
+        if seq.modes and any(p.is_local and p.name.upper() == MODE_LOCAL
+                             for p in seq.points):
+            raise CompileError(
+                "a local point is named %s, which is the local the sequence "
+                "keeps its mode number in. Rename the point." % MODE_LOCAL)
 
     # -- compilation -------------------------------------------------------
 
@@ -311,11 +350,14 @@ class Compiler:
                 "the sequence has no modes, interlocks or rules, so there is "
                 "nothing to compile"
             )
+        self._check_names()
 
         # Reserve local names before emitting anything.
         mode_local = self._local(self.MODE_LOCAL) if seq.modes else None
+        flags = interlock_flags(seq)
         interlock_locals = {
-            il.name: self._interlock_local(il) for il in seq.interlocks
+            il.name: self._local(flags[il.name.upper()])
+            for il in seq.interlocks
         }
         for p in seq.points:
             if p.is_local:
