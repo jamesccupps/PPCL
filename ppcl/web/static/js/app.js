@@ -433,6 +433,7 @@ async function boot() {
 
   $('btn-fmt').onclick = async () => {
     const r = await post('/api/format', { text: editor.get(), sort: true });
+    if (r.error) { toast(r.error, 'bad'); return; }
     if (r.text) { editor.set(r.text); toast('formatted', 'good'); }
   };
 

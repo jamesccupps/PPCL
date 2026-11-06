@@ -683,3 +683,12 @@ def test_builder_lint_prefers_the_point_database_and_says_so(ws):
                            {"text": _shipped_sequence()}, ws)
     assert "E316" in _errors(out)
     assert any("point database says LAI" in w for w in out["warnings"])
+
+
+def test_format_refuses_to_drop_a_line_with_no_number(ws):
+    """Format rebuilt the editor's text from its numbered lines, so a line
+    typed without a number vanished, with "formatted" on the toast."""
+    status, payload = api.dispatch("/api/format", {
+        "text": "00010\tON(SFAN)\nOFF(RFAN)\n00020\tGOTO 10\n"}, ws)
+    assert status == 400
+    assert "no line number" in payload["error"]

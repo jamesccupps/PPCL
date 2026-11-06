@@ -516,8 +516,99 @@ def renumber(program: Program, start: int = 10, step: int = 10,
             )
         out.append("%s%s%s" % (str(new_number).zfill(pad), sep, body))
 
-    result.text = "\n".join(out) + "\n"
+    text = "\n".join(out) + "\n"
+    # Splitting duplicates changes what runs on purpose, and says so above.
+    # Anything else that changes it is a defect in this function, so the
+    # output is read back and refused rather than trusted.
+    problems = [] if split_duplicates else check_rewrite(program, text)
+    if problems:
+        result.warnings.insert(0, self_check_message("renumber", problems))
+        result.refused = "self_check"
+        return result
+    result.text = text
     return result
+
+
+# --------------------------------------------------------------------------
+# Self-check
+# --------------------------------------------------------------------------
+
+
+def program_shape(program: Program):
+    """What a program runs, with its line numbers taken out.
+
+    ``(directives, lines)``: the PARAMETER directives, and one entry per line
+    in the order the panel runs them -- the first of any duplicated number,
+    as the panel keeps -- holding the statement's text with every line
+    reference replaced by the position of the line it reaches. A GOTO or
+    GOSUB to a missing line reaches the next one, as on a panel. Two programs
+    with the same shape run the same statements in the same order and
+    branch to the same places, whatever their numbers.
+    """
+    lines, seen = [], set()
+    for ln in sorted(program.lines, key=lambda ln: (ln.number, ln.source_line)):
+        if ln.number not in seen:
+            seen.add(ln.number)
+            lines.append(ln)
+    numbers = [ln.number for ln in lines]
+    position = {n: i for i, n in enumerate(numbers)}
+
+    def reach(old, word):
+        if old in position:
+            return position[old]
+        if word in ("GOTO", "GOSUB"):
+            at = bisect.bisect_right(numbers, old)
+            return at if at < len(numbers) else None
+        return None
+
+    shape = []
+    for ln in lines:
+        if ln.is_comment:
+            shape.append("C")
+            continue
+        if ln.unknown:
+            text = ln.body
+        else:
+            text = ("# " if ln.disabled else "") + stmt_to_text(ln.stmt)
+        refs = sorted(line_references(text), key=lambda r: r[0].col,
+                      reverse=True)
+        for tok, word in refs:
+            old = _as_line(tok)
+            text = (text[:tok.col] + "<line %s>" % reach(old, word)
+                    + text[tok.col + len(tok.text):])
+        shape.append(text)
+    return sorted(stmt_to_text(d) for d in program.directives), shape
+
+
+def check_rewrite(before: Program, after_text: str):
+    """Problems, if ``after_text`` does not run exactly what ``before`` does.
+
+    Every writer that promises not to change what runs -- renumbering,
+    formatting -- reads its own output back through this and refuses on any
+    difference, so a defect in it shows up as a refusal instead of a file.
+    """
+    from . import parser as ppcl_parser
+
+    after = ppcl_parser.parse(after_text)
+    (dir_b, shape_b), (dir_a, shape_a) = program_shape(before), program_shape(after)
+    problems = []
+    if dir_b != dir_a:
+        problems.append("the PARAMETER directives differ")
+    if len(shape_b) != len(shape_a):
+        problems.append("%d line(s) became %d" % (len(shape_b), len(shape_a)))
+    for i, (b, a) in enumerate(zip(shape_b, shape_a), start=1):
+        if b != a:
+            problems.append("line %d of the program was %r and became %r"
+                            % (i, b, a))
+            if len(problems) >= 5:
+                break
+    return problems
+
+
+def self_check_message(what, problems):
+    return ("refusing to %s: reading the result back, it would not run what "
+            "the original runs -- %s. This is a defect in the workbench, not "
+            "in the program; nothing was written." % (what, "; ".join(problems)))
 
 
 # --------------------------------------------------------------------------

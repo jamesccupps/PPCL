@@ -221,6 +221,12 @@ def cmd_fmt(args):
         text = formatter.format_text(
             prog, pad=args.pad, sort=not args.no_sort, normalize=args.normalize
         )
+        problems = formatter.check_rewrite(prog, text)
+        if problems:
+            print("%s: %s" % (path, formatter.self_check_message(
+                "format it", problems)), file=sys.stderr)
+            rc = 2
+            continue
         rc = max(rc, _write_or_print(path, text, args, source))
     return rc
 

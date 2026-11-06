@@ -1066,3 +1066,49 @@ def test_normalize_leaves_an_unknown_line_as_the_compiler_wrote_it():
     prog = parser.parse("00100\tUNKNOWN (FOO(1,2))\n00110\tGOTO 100\n")
     out = formatter.format_text(prog, normalize=True)
     assert out.splitlines()[0] == "00100\tUNKNOWN (FOO(1,2))"
+
+
+# --------------------------------------------------------------------------
+# The writers' self-check
+# --------------------------------------------------------------------------
+
+#: What the old writers produced, each against the program it came from.
+_OLD_DEFECTS = [
+    # Renumbered in file order: B now runs after A.
+    ("00200\tA = 1.0\n00100\tB = 2.0\n00300\tGOTO 100\n",
+     "00010\tA = 1.0\n00020\tB = 2.0\n00030\tGOTO 20\n"),
+    # Normalized without the PXC.A disable.
+    ("00100\t# OFF(SFAN)\n00110\tGOTO 100\n",
+     "00100\tOFF(SFAN)\n00110\tGOTO 100\n"),
+    # A GOTO to a missing line left on its old number.
+    ("00110\tA = 1.0\n00120\tB = 1.0\n00130\tGOTO 115\n",
+     "00010\tA = 1.0\n00020\tB = 1.0\n00030\tGOTO 115\n"),
+    # A line dropped.
+    ("00010\tONPWRT(20)\n00020\tGOTO 10\n", "00020\tGOTO 10\n"),
+    # A priority changed.
+    ("00010\tON(@EMER,SFAN)\n00020\tGOTO 10\n",
+     "00010\tON(SFAN)\n00020\tGOTO 10\n"),
+]
+
+
+@pytest.mark.parametrize("before, after", _OLD_DEFECTS)
+def test_the_self_check_catches_what_the_old_writers_did(before, after):
+    assert formatter.check_rewrite(parser.parse(before), after)
+
+
+def test_the_self_check_accepts_a_faithful_rewrite():
+    before = parser.parse("00200\tA = 1.0\n00100\tB = 2.0\n00300\tGOTO 100\n"
+                          "00310\t# GOTO 115\n")
+    assert formatter.check_rewrite(before, formatter.renumber(before).text) == []
+    assert formatter.check_rewrite(
+        before, formatter.format_text(before, normalize=True)) == []
+
+
+def test_renumber_refuses_its_own_defect(monkeypatch):
+    """Break the reference rewriter and renumber must refuse, not write."""
+    monkeypatch.setattr(formatter, "rewrite_references",
+                        lambda body, mapping: (body, 0, []))
+    prog = parser.parse("00100\tA = 1.0\n00110\tGOTO 100\n")
+    result = formatter.renumber(prog)
+    assert result.text == "" and result.refused == "self_check"
+    assert "defect in the workbench" in result.warnings[0]

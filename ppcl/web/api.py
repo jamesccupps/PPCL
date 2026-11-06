@@ -313,12 +313,22 @@ def api_run(body, ws=None):
 def api_format(body, ws=None):
     text = _text(body)
     prog = ppcl_parser.parse(text)
-    return {
-        "text": formatter.format_text(
-            prog, sort=bool(body.get("sort", True)),
-            normalize=bool(body.get("normalize", False)),
-        )
-    }
+    # Formatting rebuilds the text from its numbered lines, so a line with
+    # no number would vanish from the editor without a word.
+    dropped = [(src, msg) for src, number, msg in prog.errors if number is None]
+    if dropped:
+        raise ApiError(
+            "Format would drop %d line(s) that have no line number -- source "
+            "line %s. Number them or delete them first."
+            % (len(dropped), ", ".join(str(src) for src, _ in dropped[:8])))
+    out = formatter.format_text(
+        prog, sort=bool(body.get("sort", True)),
+        normalize=bool(body.get("normalize", False)),
+    )
+    problems = formatter.check_rewrite(prog, out)
+    if problems:
+        raise ApiError(formatter.self_check_message("format", problems))
+    return {"text": out}
 
 
 def api_explain(body, ws=None):
