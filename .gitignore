@@ -16,3 +16,6 @@ venv/
 *-map.json
 exports/
 points.csv
+
+# Session handoff notes for Claude: kept on the development PC, not published
+HANDOFF.md

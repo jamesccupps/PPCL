@@ -1,6 +1,6 @@
 # PPCL Workbench — project context
 
-> **Starting a fresh session? Read [HANDOFF.md](HANDOFF.md) first.** It carries
+> **Starting a fresh session? Read `HANDOFF.md` first** (a local working file: git-ignored, never committed). It carries
 > the session state, research provenance, what is verified versus approximated,
 > the honest gap list, and the prioritised roadmap. This file is conventions
 > and invariants only.

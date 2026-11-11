@@ -1,8 +1,12 @@
 # PPCL Workbench
 
 [![tests](https://github.com/jamesccupps/PPCL/actions/workflows/tests.yml/badge.svg)](https://github.com/jamesccupps/PPCL/actions/workflows/tests.yml)
+[![Latest release](https://img.shields.io/github/v/release/jamesccupps/PPCL?label=release)](https://github.com/jamesccupps/PPCL/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Read, inspect, lint, debug, optimise and **write** Siemens **PPCL**.
+**Website: [jamesccupps.github.io/PPCL](https://jamesccupps.github.io/PPCL/)** · [Download the latest release](https://github.com/jamesccupps/PPCL/releases/latest)
+
+Read, inspect, lint, debug, optimize and **write** Siemens **PPCL**.
 
 PPCL is not a legacy language. Siemens' 2025 reference manual for its current
 panels points you at the same *PPCL User's Manual* (125-1896) that covered the
@@ -13,6 +17,12 @@ firmware families.
 
 Zero dependencies, Python 3.10+, stdlib only. Everything runs locally — no
 program text ever leaves the machine.
+
+![The Editor with a sample program open: syntax coloring, two warnings marked in the gutter, and the findings below, each with its fix and the manual chapter it comes from](docs/images/editor.png)
+
+![The Bench after a three-hour design-winter run with a stuck outdoor-air damper injected at 30 minutes: the notes on what was simulated and what priority blocked, the trends, and the checks that failed and passed](docs/images/bench.png)
+
+<sub>The samples that ship in `samples/` and `sequences/`, in the browser workbench (`python -m ppcl serve`).</sub>
 
 ## Running it
 
@@ -81,7 +91,7 @@ Opens a local IDE in the browser with six panes over everything below.
 
 A PPCL editor that checks as you type. **Open** reads a program from anywhere
 on the machine — a Desigo or Insight `.pcl` export, say — or drop the file on
-the window. Multi-file tabs, syntax colouring, and
+the window. Multi-file tabs, syntax coloring, and
 error, warning and unresolved-point markers in the gutter — click a finding to
 jump to it.
 
@@ -151,7 +161,7 @@ and carry on.
 
 ### Settings and Help
 
-Firmware, editor behaviour, bench defaults, theme, and the point database
+Firmware, editor behavior, bench defaults, theme, and the point database
 import. Settings are stored as JSON in the workspace and validated on load — a
 bad value is reported with its limit rather than quietly clamped.
 
@@ -178,7 +188,7 @@ client, no BACnet or P2 connection. The workbench reads and writes *files*;
 you load the result through Insight or Desigo CC yourself.
 
 **The server binds `127.0.0.1`** and confines all file access to the workspace
-directory. Paths that escape it are refused rather than normalised; so are
+directory. Paths that escape it are refused rather than normalized; so are
 hidden files and folders (`.git`, `.claude`), drive-relative paths, files with
 no extension, and any extension outside the PPCL set. Binding elsewhere with
 `--host` prints a warning, because the API has no authentication and can write
@@ -192,7 +202,7 @@ publish the PID form — and says so at runtime. Never take a tuning constant
 from the bench to a real panel. Long bench runs lower the simulated line rate
 to stay responsive, and the response says when it did.
 
-**No statement's behaviour has been validated against a live panel.** Every
+**No statement's behavior has been validated against a live panel.** Every
 command signature traces to the manual or to Desigo CC's own Command Assist,
 which is a stronger claim than "tested" and close to the whole claim being
 made.
@@ -200,7 +210,7 @@ made.
 The grammar is a step further along. An independent project reading APOGEE P2
 traffic ran this parser over **2,644 lines recovered from programs running on
 panels** and it handled all of them; Siemens' own 115 worked examples take
-command coverage to 57 of 66. Nothing there says a modelled *behaviour* is
+command coverage to 57 of 66. Nothing there says a modeled *behavior* is
 right — only that the language is read correctly.
 
 ---
@@ -218,7 +228,7 @@ invisible on the screen and expensive in the building:
 | Duplicate line number | One line silently vanishes on load | `E102` |
 | `SAMPLE`/`TIMAVG` inside a `GOSUB` | Timing drifts unpredictably | `E213` |
 | `GOSUB` inside `IF/THEN` | Undefined per the manual | `E214` |
-| Two unconditional writers on one point | Behaviour depends on line order | `W332` |
+| Two unconditional writers on one point | Behavior depends on line order | `W332` |
 
 Every rule cites the section of the *APOGEE PPCL User's Manual* (125-1896) it
 comes from, so a finding can be argued with a vendor rather than just asserted.
@@ -242,7 +252,7 @@ python -m ppcl.cli lint programs/ --firmware logical --disable W104 --strict
 - `--strict` exits non-zero on warnings, for CI.
 
 90 rules across five groups: `E1xx` syntax, `E2xx`/`W2xx` control flow,
-`E3xx`/`W3xx` semantics and priority, `S6xx` style, `P7xx` optimisation.
+`E3xx`/`W3xx` semantics and priority, `S6xx` style, `P7xx` optimization.
 `python -m ppcl.cli rules` lists them all.
 
 ### `run` — simulate a program offline
@@ -586,7 +596,7 @@ this workbench reuses verbatim so its command list filters the way the Desigo
 editor's does.
 
 See [docs/PPCL-REFERENCE.md](docs/PPCL-REFERENCE.md) for the condensed language
-reference, the failure catalogue, and the places where the sources contradict
+reference, the failure catalog, and the places where the sources contradict
 each other -- including `ATN` versus `ARC`, where the same Desigo page spells
 the arc-tangent both ways.
 
