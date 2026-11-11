@@ -735,7 +735,7 @@ def test_static_files_stay_inside_the_static_folder(live):
 
 @pytest.mark.parametrize("host, loopback", [
     ("127.0.0.1", True), ("127.0.0.2", True), ("::1", True),
-    ("localhost", True), ("0.0.0.0", False), ("192.168.1.10", False),
+    ("localhost", True), ("0.0.0.0", False), ("203.0.113.10", False),
 ])
 def test_every_loopback_bind_gets_the_host_check(host, loopback):
     """--host 127.0.0.2 is loopback too, and turned the Host check off."""

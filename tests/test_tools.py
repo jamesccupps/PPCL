@@ -501,9 +501,9 @@ def test_redaction_hides_site_names_but_keeps_logic():
     from ppcl.redact import Redactor
 
     r = Redactor()
-    text = '00010\tIF(TIME.GT.8:00) THEN ON("PORTLAND.TOWER.AHU01.SFAN")\n'
+    text = '00010\tIF(TIME.GT.8:00) THEN ON("ACMEPLAZA.TOWER.AHU01.SFAN")\n'
     out = r.redact_text(text)
-    assert "PORTLAND" not in out
+    assert "ACMEPLAZA" not in out
     assert "TOWER" not in out
     assert "IF(TIME.GT.8:00) THEN ON(" in out
     assert "SFAN" in out  # generic vocabulary survives

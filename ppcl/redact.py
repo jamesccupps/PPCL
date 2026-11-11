@@ -100,8 +100,8 @@ class Redactor:
         self._counters = {}
         #: Generic segments that were preserved. The caller should show these
         #: to the user: the whitelist is a heuristic, and a site abbreviation
-        #: can collide with it: OCC is "occupied" here and is also a common
-        #: building abbreviation, and CT is a cooling tower and also a state.
+        #: can collide with it: OCC is "occupied" here but could as easily be
+        #: a building's initials, and CT is a cooling tower and also a state.
         self.preserved = set()
 
     def _token(self, kind: str) -> str:

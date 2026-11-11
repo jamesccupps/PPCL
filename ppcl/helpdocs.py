@@ -130,7 +130,7 @@ being made.
 
 Run `ppcl redact` on it. Real point names carry building, floor and tenant
 information. The redactor reports which generic terms it preserved, because
-`OCC` is both "occupied" and a building abbreviation.
+`OCC` means "occupied" but could as easily be a building's initials.
 """,
     "see_also": ["start", "bench"],
 },

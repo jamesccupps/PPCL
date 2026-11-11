@@ -1166,8 +1166,8 @@ found earlier this same pass -- is *the* manual for them. Which makes the
 `PPCL DISPLAY REPORT` format above not a general curiosity but the exact report
 this site's panels produce.
 
-**This corrects passes one and four**, which both asserted "OCC, which is mostly
-PXC.A". That claim came from the supervisor being Desigo CC and was never
+**This corrects passes one and four**, which both asserted that the site was
+mostly PXC.A. That claim came from the supervisor being Desigo CC and was never
 checked against a program. Everything built on it is still true *about PXC.A* --
 `Firmware.PXC_A`, rule `E119`, the 512-character limit, `OIP` being dead -- it
 simply does not describe this site. The two earlier statements are corrected in

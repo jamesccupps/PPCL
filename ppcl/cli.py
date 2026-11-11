@@ -1174,7 +1174,8 @@ def cmd_redact(args):
         print(
             "Check that none of them is actually a site identifier. A site "
             "abbreviation can collide with\nthe HVAC vocabulary -- OCC is "
-            "'occupied' here, but it is also a building name. Re-run\nwith "
+            "'occupied' here, but could as easily be a building's initials. "
+            "Re-run\nwith "
             "--aggressive to replace these too.",
             file=sys.stderr,
         )
