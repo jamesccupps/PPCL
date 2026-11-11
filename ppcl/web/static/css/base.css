@@ -375,7 +375,13 @@ button.icon:hover { color: var(--accent); border-color: var(--line); }
   display: flex; gap: 9px; align-items: baseline;
 }
 .diag:hover { background: var(--panel-2); }
-.diag .code { font-size: 11px; color: var(--faint); width: 44px; flex: 0 0 auto; }
+/* The findings list's rule code shares the class name of the editor's textarea
+   (.code: absolute, padded, full width), so it has to undo all of that, or every
+   code lands at the top-left of the window instead of beside its finding. */
+.diag .code {
+  position: static; padding: 0; overflow: visible; white-space: nowrap; line-height: inherit;
+  font-size: 11px; color: var(--faint); width: 44px; flex: 0 0 auto;
+}
 .diag .ln {
   color: var(--faint); font-family: var(--mono); font-size: 12px;
   width: 48px; flex: 0 0 auto;
