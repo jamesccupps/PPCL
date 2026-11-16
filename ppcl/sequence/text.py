@@ -34,6 +34,7 @@ because the table is meant to be lined up by hand.
 
 from __future__ import annotations
 
+import math
 import re
 
 from ..points import type_info
@@ -107,15 +108,15 @@ def parse_condition(text: str, line_no: int = 0):
     if m:
         return Between(
             m.group("left").strip(),
-            _literal(m.group("low")),
-            _literal(m.group("high")),
+            _literal(m.group("low"), line_no),
+            _literal(m.group("high"), line_no),
         )
 
     m = _COMPARE_RE.match(text)
     if m:
         op = " ".join(m.group("op").lower().split())
         return Compare(
-            m.group("left").strip(), op, _literal(m.group("right"))
+            m.group("left").strip(), op, _literal(m.group("right"), line_no)
         )
 
     raise SequenceSyntaxError(
@@ -187,12 +188,39 @@ def _balanced(text: str) -> bool:
     return depth == 0
 
 
-def _literal(text: str):
+def _literal(text: str, line_no: int = 0):
     text = text.strip().strip('"')
     try:
-        return float(text) if "." in text else int(text)
+        value = float(text) if "." in text else int(text)
     except ValueError:
         return text
+    if isinstance(value, float) and not math.isfinite(value):
+        # 1.0e999 is infinity, which no panel holds; it reached the
+        # compiler and crashed it rendering the comparison.
+        raise SequenceSyntaxError(
+            "%s is not a number a panel can hold" % text, line_no, text)
+    return value
+
+
+def _number(text: str, what: str, line_no: int, raw: str) -> float:
+    """A number the author typed, or an error naming the line.
+
+    float() on its own let 'throttling x' through as a ValueError the
+    callers did not catch -- an internal error in the Builder where a line
+    number belonged -- and took 'throttling 1e999' as infinity, which
+    compiled to a LOOP with every gain zero.
+    """
+    text = text.strip()
+    try:
+        value = float(text)
+    except ValueError:
+        raise SequenceSyntaxError(
+            "%s needs a number, not %r" % (what, text), line_no, raw
+        ) from None
+    if not math.isfinite(value):
+        raise SequenceSyntaxError(
+            "%s must be a finite number, not %r" % (what, text), line_no, raw)
+    return value
 
 
 def render_condition(cond) -> str:
@@ -509,12 +537,8 @@ def _parse_reset(seq, lines, i):
                 "expected a breakpoint like '0 -> 180'", bl_no, bl_raw
             )
         x, _, y = stripped.partition("->")
-        try:
-            reset.points.append((float(x.strip()), float(y.strip())))
-        except ValueError:
-            raise SequenceSyntaxError(
-                "breakpoints must be numbers", bl_no, bl_raw
-            )
+        reset.points.append((_number(x, "a breakpoint", bl_no, bl_raw),
+                             _number(y, "a breakpoint", bl_no, bl_raw)))
     seq.resets.append(reset)
     return i
 
@@ -540,17 +564,23 @@ def _parse_loop(seq, lines, i):
         elif key == "acting":
             loop.action = value.lower()
         elif key == "throttling":
-            loop.throttling_range = float(value.replace("range", "").strip())
+            loop.throttling_range = _number(
+                value.replace("range", ""), "throttling", bl_no, bl_raw)
         elif key == "range":
-            low, _, high = value.partition("to")
-            loop.output_low = float(low.strip())
-            loop.output_high = float(high.strip())
+            low, to, high = value.partition("to")
+            if not to:
+                raise SequenceSyntaxError(
+                    "expected 'range LOW to HIGH', e.g. 'range 0 to 100'",
+                    bl_no, bl_raw)
+            loop.output_low = _number(low, "the range", bl_no, bl_raw)
+            loop.output_high = _number(high, "the range", bl_no, bl_raw)
         elif key == "integral":
             loop.integral = value.lower() not in ("off", "no", "none", "false")
         elif key == "sample":
-            loop.sample_seconds = int(float(value.replace("seconds", "").strip()))
+            loop.sample_seconds = int(_number(
+                value.replace("seconds", ""), "sample", bl_no, bl_raw))
         elif key == "bias":
-            loop.bias = float(value)
+            loop.bias = _number(value, "bias", bl_no, bl_raw)
         else:
             raise SequenceSyntaxError(
                 "unknown loop property %r" % key, bl_no, bl_raw

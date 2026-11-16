@@ -788,3 +788,33 @@ def test_every_rule_heading_tests_the_point_it_names(head):
             "%s DMPR < 50\n  FAN on\n" % head)
     rule = sequence.parse(text).rules[0]
     assert list(rule.when.points()) == ["DMPR"]
+
+
+@pytest.mark.parametrize("old, new, says", [
+    ("  throttling 10", "  throttling x", "throttling needs a number"),
+    ("  throttling 10", "  throttling 1e999", "finite"),
+    ("  throttling 10", "  throttling nan", "finite"),
+    ("  range 0 to 100", "  range 0 to lots", "the range needs a number"),
+    ("  range 0 to 100", "  range 0", "range LOW to HIGH"),
+    ("  throttling 10", "  throttling 10\n  sample 1e999 seconds", "finite"),
+    ("  throttling 10", "  throttling 10\n  bias half", "bias needs"),
+    ("  68 -> 95", "  1e999 -> 95", "finite"),
+    ("  68 -> 95", "  68 -> warm", "a breakpoint needs a number"),
+    ("trip when MAT < 38", "trip when MAT < 1.0e999", "not a number a panel"),
+])
+def test_a_bad_number_is_a_syntax_error_on_its_line(old, new, says):
+    """float() on what the author typed raised ValueError or OverflowError,
+    which reached the Builder as an internal error; and 'throttling 1e999'
+    was taken as infinity and compiled to a LOOP with every gain zero."""
+    from ppcl import cli
+    from ppcl.web import api
+
+    text = (cli.STARTER_SEQUENCE % {"author": "A"}).replace(old, new, 1)
+    assert new in text
+    line = text[:text.index(new.split("\n")[-1])].count("\n") + 1
+    with pytest.raises(SequenceSyntaxError) as caught:
+        sequence.parse(text)
+    assert says in caught.value.message
+    assert caught.value.line_no == line
+    status, reply = api.dispatch("/api/seq/parse", {"text": text}, None)
+    assert status == 200 and reply["ok"] is False and reply["line"] == line
