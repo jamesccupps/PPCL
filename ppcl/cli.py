@@ -1141,22 +1141,23 @@ def cmd_redact(args):
         return 2
 
     # A site's file names identify it as well as its point names do, so the
-    # copies are numbered; the mapping file records which is which.
+    # copies are numbered; the mapping file records which is which. Keyed
+    # by the path as given: by file name, a/ahu.pcl and b/ahu.pcl were one
+    # key, both were written to one output, and one program went missing.
     for i, path in enumerate(sorted(result.files), start=1):
         ext = os.path.splitext(path)[1] or ".pcl"
-        result.names[os.path.basename(path)] = "program%02d%s" % (i, ext)
+        result.names[path] = "program%02d%s" % (i, ext)
 
     if args.outdir:
         os.makedirs(args.outdir, exist_ok=True)
         for path, text in result.files.items():
-            dest = os.path.join(args.outdir,
-                                result.names[os.path.basename(path)])
+            dest = os.path.join(args.outdir, result.names[path])
             textio.write(dest, textio.encode(text))
             print("wrote %s" % dest, file=sys.stderr)
     else:
         for path, text in result.files.items():
             if len(result.files) > 1:
-                print("===== %s =====" % result.names[os.path.basename(path)])
+                print("===== %s =====" % result.names[path])
             sys.stdout.write(text)
 
     if args.mapping:

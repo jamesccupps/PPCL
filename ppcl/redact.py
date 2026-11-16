@@ -46,7 +46,7 @@ class Redaction:
     files: dict = field(default_factory=dict)  # path -> redacted text
     #: Generic terms left in place, for the caller to eyeball.
     preserved: set = field(default_factory=set)
-    #: Original file name -> the name its redacted copy was written under.
+    #: Input path, as given -> the name its redacted copy was written under.
     names: dict = field(default_factory=dict)
 
     def reverse(self) -> dict:

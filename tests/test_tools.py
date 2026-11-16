@@ -1175,6 +1175,31 @@ def test_redact_names_its_output_files_by_number(tmp_path):
     assert list(files.values()) == ["program01.pcl"]
 
 
+def test_two_inputs_with_one_file_name_both_come_out(tmp_path):
+    """Keyed by file name, a/ahu.pcl and b/ahu.pcl shared one output name:
+    the second overwrote the first, the command exited 0, and one program
+    was silently missing from what was shared."""
+    import json
+    from ppcl import cli
+
+    inputs = []
+    for folder, unit in (("a", "AHU01"), ("b", "AHU02")):
+        (tmp_path / folder).mkdir()
+        path = tmp_path / folder / "ahu.pcl"
+        path.write_text('00010\tON("NORTHWIND.%s.SFAN")\n00020\tGOTO 10\n'
+                        % unit, encoding="utf-8")
+        inputs.append(str(path))
+    out = tmp_path / "out"
+    assert cli.main(["redact"] + inputs + [
+        "--outdir", str(out), "--mapping", str(tmp_path / "map.json")]) == 0
+    written = sorted(p.name for p in out.iterdir())
+    assert written == ["program01.pcl", "program02.pcl"]
+    bodies = {(out / name).read_text(encoding="utf-8") for name in written}
+    assert len(bodies) == 2
+    files = json.loads((tmp_path / "map.json").read_text())["files"]
+    assert sorted(files) == sorted(inputs)
+
+
 # --------------------------------------------------------------------------
 # A clock that cannot hang
 # --------------------------------------------------------------------------
