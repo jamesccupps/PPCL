@@ -14,9 +14,13 @@ export function el(tag, cls, text) {
   return n;
 }
 
+/* Quotes too, so the result is safe inside an attribute as well as between
+ * tags. Every caller today puts it between tags, where the two are the
+ * same; this keeps that true whatever is written next. */
 export function esc(s) {
   return String(s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 export function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
