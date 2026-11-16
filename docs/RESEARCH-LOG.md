@@ -4060,3 +4060,71 @@ Added to the gap list.
 
 TOD's level-commanded writes still need evidence. The review's Lows,
 performance and accessibility items are untouched.
+
+---
+
+## 2026-11-16 (forty-first pass) — a second outside review, at the edges
+
+A second independent review (2026-11-15) ran the project as well as reading
+it: an API fuzz, 1,500 mutated programs through every stage, 3,000 redaction
+attempts. It deliberately left the language core unread and went to the
+edges -- the web server, file handling, the debugger's budgets, error
+reporting. Every finding reproduced here, on this machine, before anything
+changed, and each fix is its own commit with a test that failed first.
+
+### What it found, and what checking it found beside
+
+- **The workspace's hidden-folder rule read the text, not the file.** On
+  Windows `CLAUDE~1/settings.json` is `.claude/settings.json`, so Save could
+  write Claude Code's settings into a workspace that is a plugin root.
+  Reproducing it showed the same gap in the extension rule (`NOTES~1.PCL`
+  names an existing `notes.pclx`) and, on any system, through a link. Both
+  rules now also apply to the path that would actually be opened.
+- **Web Save wrote LF.** `/api/open` returned the encoding but not the line
+  endings; one unchanged save of a Desigo export changed every line. The
+  browser's own decoder, used for files opened from elsewhere, had the same
+  gap. Checked in the browser both ways: byte for byte.
+- **Two redact inputs with one file name** shared an output name; one program
+  silently went missing from what was about to be shared.
+- **The debugger's step had no ceiling** -- a 200-digit count never returned.
+- **Malformed input arrived as an internal error with a traceback.** Four
+  separate causes: bad numbers in the sequence text, a lexer error in a
+  transform, unknown bench names, and wrong-typed request fields. Checking the
+  first found worse than an error: `throttling 1e999` was accepted as
+  infinity and compiled to a LOOP with every gain zero. A fuzz of every route
+  -- 45 fields, 13 wrong values, 19,890 calls -- now finds no 500 from a
+  request's types. It did find one other: Windows refusing the final move of
+  a save while another program has the file open, three times in 585 saves.
+  That is now a plain error saying the file is unchanged, which it is.
+- **Checking the request types found a renumber bug the review did not
+  reach.** `--start 0` wrote a line 0 and `--step -10` numbered the lines
+  downward, so the file's order and the panel's disagreed. The writer's
+  self-check passed both for a program that runs the same either way round:
+  a reminder that the self-check compares what runs, and a program can be
+  symmetric. Renumber now refuses them.
+- **Readers outside `textio`**: the point-type file (strict UTF-8, a
+  traceback on a 1252 export), the point database (`errors="replace"`, U+FFFD
+  for a degree sign), `db --check`'s own program files, and the scenario and
+  diagram readers. Fixing the settings file's write side found its read side
+  had the same gap: a settings file saved as ANSI raised an error the loader
+  did not catch.
+- Smaller: the traceback in a 500 is kept off a LAN bind; block ids are
+  escaped in the two selectors built from them (the review named one);
+  `esc()` escapes quotes; settings are written atomically; SECURITY.md.
+
+### Golden records
+
+`Panel.load` changed, on its error paths only; the simulator's golden record
+is byte for byte unchanged. The sequence changes left the shipped sequences
+and both starters compiling byte for byte as before.
+
+### Left
+
+- Pinning the two GitHub-owned actions by commit, with Dependabot: optional,
+  and not done. Both are GitHub's own; pinning trades a small supply-chain
+  risk for a stream of update pull requests.
+- Commit author addresses: the owner's decision is to leave them.
+- The review's own "not read": whether the language core -- `spec.py`, the
+  rules' conditions, reference rewriting, priority arbitration -- is right
+  against the manual. That is what the test suite and the self-checking
+  writers guard, and what a further pass would cover.
