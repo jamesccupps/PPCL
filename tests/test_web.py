@@ -873,3 +873,14 @@ def test_lint_takes_the_clis_workstation_only(ws):
                                {"text": _LONG, "workstation_only": True}, ws)
     assert any(d["code"] == "W104" for d in mmi["diagnostics"])
     assert not any(d["code"] == "W104" for d in ws_only["diagnostics"])
+
+
+@pytest.mark.parametrize("field", ["preset", "weather"])
+def test_an_unknown_bench_name_is_a_plain_error(ws, field):
+    """build_plant raises KeyError with the valid names in it, and that
+    reached the bench as an internal error."""
+    status, reply = api.dispatch("/api/bench", {
+        "text": "10\tON(SFAN)\n20\tGOTO 10\n", field: "no_such_name"}, ws)
+    assert status == 400
+    assert "no_such_name" in reply["error"] and "available" in reply["error"]
+    assert "traceback" not in reply

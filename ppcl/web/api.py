@@ -652,12 +652,17 @@ def api_bench(body, ws=None):
     dt = float(body.get("dt", 10.0))
     dt = max(1.0, min(dt, 60.0))
 
-    plant = build_plant(
-        {
-            "preset": body.get("preset", "single_zone_ahu"),
-            "weather": body.get("weather", "design_winter"),
-        }
-    )
+    try:
+        plant = build_plant(
+            {
+                "preset": body.get("preset", "single_zone_ahu"),
+                "weather": body.get("weather", "design_winter"),
+            }
+        )
+    except KeyError as exc:
+        # An unknown preset or weather name. The message already lists the
+        # valid ones; it was arriving as an internal error.
+        raise ApiError(exc.args[0] if exc.args else "unknown plant setting")
     bench = TestBench(prog, plant, default_bindings())
     undriven = bench.undriven_reason()
     if undriven:
