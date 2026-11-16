@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
-from .. import spec
+from .. import spec, textio
 from ..analyzer import analyze
 from ..simulator import Clock, Panel, Simulator
 from .systems import Plant
@@ -530,9 +530,8 @@ class TestBench:
 
 
 def load_scenario(path: str) -> dict:
-    """Load a bench scenario from JSON."""
-    with open(path, "r", encoding="utf-8") as fh:
-        return json.load(fh)
+    """Load a bench scenario from JSON, decoded the way a program file is."""
+    return json.loads(textio.read(path).text)
 
 
 def build_from_scenario(program, scenario: dict) -> TestBench:

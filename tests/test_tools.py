@@ -1312,3 +1312,33 @@ def test_renumber_from_one_in_steps_of_one_is_still_fine():
     prog = parser.parse("10\tGOTO 20\n20\tGOTO 10\n")
     result = formatter.renumber(prog, start=1, step=1)
     assert result.text == "00001\tGOTO 2\n00002\tGOTO 1\n"
+
+
+# A point export as Desigo writes it: Windows-1252, CRLF, and a degree sign
+# (0xB0) in a description, which is not valid UTF-8.
+_EXPORT_1252 = (b"Point Name,Point Type,Description\r\n"
+                b"MAT,LAI,mixed air temp \xb0F\r\n"
+                b"SFAN,LDO,supply fan\r\n")
+
+
+def test_a_windows_1252_point_export_keeps_its_degree_sign(tmp_path):
+    """Read as UTF-8 with errors="replace", 0xB0 became U+FFFD."""
+    from ppcl import points
+
+    path = tmp_path / "export.csv"
+    path.write_bytes(_EXPORT_1252)
+    db = points.load_file(str(path))
+    assert db.lookup("MAT").description == "mixed air temp \N{DEGREE SIGN}F"
+
+
+def test_the_cli_reads_a_windows_1252_point_file(tmp_path):
+    """load_point_types opened it as strict UTF-8 and stopped with a
+    UnicodeDecodeError and a traceback."""
+    from ppcl import cli
+
+    path = tmp_path / "types.csv"
+    path.write_bytes(b"MAT,LAI,\xb0F\r\nSFAN,LDO\r\n")
+    assert cli.load_point_types(str(path)) == {"MAT": "LAI", "SFAN": "LDO"}
+    program = tmp_path / "p.pcl"
+    program.write_bytes(b"00010\tC RESET AT 85\xb0F\r\n00020\tON(SFAN)\r\n")
+    assert cli.main(["lint", str(program), "--points", str(path)]) in (0, 1)

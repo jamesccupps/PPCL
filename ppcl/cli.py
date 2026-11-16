@@ -53,8 +53,7 @@ def load_point_types(path):
     """Load a point database: {"SFAN": "LDO", ...} or a CSV of name,type."""
     if not path:
         return {}
-    with open(path, "r", encoding="utf-8") as fh:
-        text = fh.read()
+    text = textio.read(path).text
     if path.lower().endswith(".json"):
         data = json.loads(text)
         return {
@@ -305,8 +304,7 @@ def cmd_run(args):
 
     panel = Panel()
     if args.scenario:
-        with open(args.scenario, "r", encoding="utf-8") as fh:
-            scenario = json.load(fh)
+        scenario = json.loads(textio.read(args.scenario).text)
         panel.load(scenario.get("points", scenario))
         clock_cfg = scenario.get("clock", {})
     else:
@@ -1197,13 +1195,12 @@ def cmd_blocks(args):
     """Compile a block diagram to PPCL, then lint the result."""
     from . import blocks
 
-    with open(args.path, "r", encoding="utf-8") as fh:
-        try:
-            diagram = blocks.loads(fh.read())
-        except (ValueError, KeyError, TypeError) as exc:
-            print("%s is not a block diagram: %s" % (args.path, exc),
-                  file=sys.stderr)
-            return 2
+    try:
+        diagram = blocks.loads(textio.read(args.path).text)
+    except (ValueError, KeyError, TypeError) as exc:
+        print("%s is not a block diagram: %s" % (args.path, exc),
+              file=sys.stderr)
+        return 2
 
     try:
         text, warnings, diags = blocks.compile_and_lint(
@@ -1302,8 +1299,8 @@ def cmd_db(args):
 
     status = 0
     for path in collect_files(args.check):
-        with open(path, "r", encoding="utf-8", errors="replace") as fh:
-            program = ppcl_parser.parse(fh.read(), name=os.path.basename(path))
+        program = ppcl_parser.parse(textio.read(path).text,
+                                    name=os.path.basename(path))
         missing = db.unresolved(program)
         print()
         print("%s: %d unresolved reference(s)" % (path, len(missing)))

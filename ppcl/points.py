@@ -26,7 +26,7 @@ import os
 import re
 from dataclasses import asdict, dataclass
 
-from . import spec
+from . import spec, textio
 
 #: Column aliases, lowercased and stripped of spaces and underscores. The
 #: first match wins, so put the most specific alias first.
@@ -461,8 +461,10 @@ def load(text, source=""):
 
 
 def load_file(path):
-    with open(path, "r", encoding="utf-8-sig", errors="replace") as fh:
-        return load(fh.read(), source=os.path.basename(path))
+    # Through textio, like a program file: a Desigo export with a degree
+    # sign in a description is Windows-1252, and reading it as UTF-8 with
+    # errors="replace" put U+FFFD where the degree sign was.
+    return load(textio.read(path).text, source=os.path.basename(path))
 
 
 def dumps(db: PointDatabase) -> str:
