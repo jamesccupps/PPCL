@@ -15,6 +15,13 @@ import { renderProgram } from './highlight.js';
 
 const GRID = 12;
 
+/** The selector for a block's node. A diagram file can carry any id, and
+ * one holding a quote or a bracket made querySelector throw, so the
+ * compile status never updated. */
+function blockSelector(id) {
+  return '.blk[data-id="' + CSS.escape(String(id)) + '"]';
+}
+
 export const blocks = {
   catalog: null,
   diagram: null,
@@ -444,7 +451,7 @@ export const blocks = {
         (e.clientX - rect.left - this.dragging.dx) / GRID) * GRID);
       block.y = Math.max(0, Math.round(
         (e.clientY - rect.top - this.dragging.dy) / GRID) * GRID);
-      const node = document.querySelector('.blk[data-id="' + block.id + '"]');
+      const node = document.querySelector(blockSelector(block.id));
       if (node) { node.style.left = block.x + 'px'; node.style.top = block.y + 'px'; }
       this.drawWires();
       return;
@@ -617,7 +624,7 @@ export const blocks = {
     if (!r.ok) {
       $('dia-status').innerHTML = '<span class="e">' + esc(r.error) + '</span>';
       if (r.block) {
-        const node = document.querySelector('.blk[data-id="' + r.block + '"]');
+        const node = document.querySelector(blockSelector(r.block));
         if (node) node.classList.add('bad');
       }
       clear($('diadiags'));
