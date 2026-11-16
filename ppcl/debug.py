@@ -240,10 +240,21 @@ class DebugSession:
         return frames
 
     def step(self, count=1) -> Stop:
-        """Execute ``count`` statements, ignoring breakpoints."""
-        for _ in range(max(1, count)):
+        """Execute ``count`` statements, ignoring breakpoints.
+
+        Held to the same budget as :meth:`run`, for the same reason: a
+        person is waiting. Uncapped, a count of a billion held a request
+        thread for about two hours.
+        """
+        count = max(1, count)
+        limit = min(count, self.RUN_BUDGET)
+        for _ in range(limit):
             if not self._execute_one():
                 return Stop("end", self.current_line, "the program has no code")
+        if limit < count:
+            return Stop("budget", self.current_line,
+                        "stepped %d of the %d statements asked for. Step "
+                        "again to carry on from here." % (limit, count))
         return Stop("step", self.current_line, "stepped")
 
     def step_over(self) -> Stop:

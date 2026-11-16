@@ -1196,3 +1196,25 @@ def test_a_point_database_that_cannot_be_loaded_is_said_at_start(ws):
         json.dump({"point_database": "gone.csv"}, fh)
     assert "could not be loaded" in api_ide.restore_point_database(ws)
     assert getattr(ws, "point_db", None) is None
+
+
+def test_step_is_held_to_the_run_budget(monkeypatch):
+    """run() stopped at RUN_BUDGET; step(count) ran whatever it was asked,
+    and /api/debug/step passes count straight through, so one request
+    could hold a thread for hours."""
+    monkeypatch.setattr(DebugSession, "RUN_BUDGET", 50)
+    session = DebugSession(PROGRAM)
+    stop = session.step(10 ** 200)
+    assert stop.reason == "budget"
+    assert "50 of the" in stop.detail
+    assert session.step(3).reason == "step"   # below the budget: as before
+
+
+def test_a_huge_step_request_comes_back(tmp_path):
+    from ppcl.web import api
+
+    ws = api.Workspace(str(tmp_path))
+    _s, started = api.dispatch("/api/debug/start", {"text": PROGRAM}, ws)
+    status, reply = api.dispatch("/api/debug/step", {
+        "session": started["session"], "count": 10 ** 12}, ws)
+    assert status == 200 and reply["stop"]["reason"] == "budget"
