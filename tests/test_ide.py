@@ -1235,3 +1235,27 @@ def test_a_transform_over_an_unreadable_line_names_it(tmp_path, op, extra):
                                  api.Workspace(str(tmp_path)))
     assert status == 200 and reply["ok"] is False
     assert reply["error"].startswith("line 10 cannot be read")
+
+
+def test_a_settings_save_that_fails_leaves_the_file_as_it_was(tmp_path):
+    """save() opened the file for writing before it had anything to write,
+    so a failure part way left it empty."""
+    store = settings.Settings(str(tmp_path))
+    store.save()
+    with open(store.path, "rb") as fh:
+        before = fh.read()
+    store.values["broken"] = object()            # json cannot write this
+    with pytest.raises(TypeError):
+        store.save()
+    with open(store.path, "rb") as fh:
+        assert fh.read() == before
+
+
+def test_a_settings_file_saved_as_ansi_still_loads(tmp_path):
+    """Hand-edited in Notepad and saved as ANSI, a degree sign made strict
+    UTF-8 raise a UnicodeDecodeError, which load() did not catch."""
+    path = os.path.join(str(tmp_path), settings.FILENAME)
+    with open(path, "wb") as fh:
+        fh.write(b'{"point_database": "points \xb0F.csv"}\n')
+    store = settings.Settings(str(tmp_path)).load()
+    assert store.values["point_database"] == "points \N{DEGREE SIGN}F.csv"

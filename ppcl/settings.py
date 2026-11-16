@@ -16,7 +16,7 @@ import json
 import os
 from dataclasses import dataclass
 
-from . import spec
+from . import spec, textio
 
 FILENAME = ".ppcl-workbench.json"
 
@@ -183,8 +183,10 @@ class Settings:
         if not os.path.isfile(self.path):
             return self
         try:
-            with open(self.path, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
+            # Decoded the way a program file is: hand-edited in Notepad and
+            # saved as ANSI, a non-ASCII character made strict UTF-8 raise a
+            # UnicodeDecodeError this did not catch.
+            data = json.loads(textio.read(self.path).text)
         except (OSError, json.JSONDecodeError) as exc:
             self.problems.append(
                 "%s could not be read (%s), so defaults are in use."
@@ -214,9 +216,11 @@ class Settings:
         return self
 
     def save(self):
-        with open(self.path, "w", encoding="utf-8", newline="\n") as fh:
-            json.dump(self.values, fh, indent=2, sort_keys=True)
-            fh.write("\n")
+        # Built in full before the file is touched, and written beside it
+        # then moved over it: opened in place, a failure part way left the
+        # settings file empty or half written.
+        text = json.dumps(self.values, indent=2, sort_keys=True) + "\n"
+        textio.write(self.path, textio.encode(text))
         return self
 
     def update(self, changes: dict):
