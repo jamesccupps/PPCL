@@ -354,6 +354,20 @@ def renumber(program: Program, start: int = 10, step: int = 10,
     """
     result = RenumberResult(text="")
 
+    # Lines run in number order from LINE_MIN. A start of 0 wrote a line 0,
+    # and a step of zero or less numbered the lines downward, so the file's
+    # order and the panel's disagreed -- and the self-check below passed
+    # whenever the program happened to run the same either way round.
+    if start < spec.LINE_MIN or step < 1 or (preserve_blocks
+                                             and block_size < 1):
+        result.warnings.append(
+            "refusing to renumber: the first line must be %d or more, and "
+            "the step and block size 1 or more (got start %d, step %d%s)"
+            % (spec.LINE_MIN, start, step,
+               ", block size %d" % block_size if preserve_blocks else ""))
+        result.refused = "numbering"
+        return result
+
     duplicates = find_duplicates(program)
     if duplicates and not (split_duplicates or allow_duplicates):
         detail = "; ".join(

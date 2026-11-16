@@ -1292,3 +1292,23 @@ def test_a_secnd_counter_times_from_when_it_was_reset(reset):
     sim.run(passes=20, seconds_per_pass=5.0)      # 350 s
     assert sim.panel.value("FAN") == 1.0
     assert sim._read("SECND3") == pytest.approx(350.0, abs=10)
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"start": 0}, {"start": -5}, {"step": 0}, {"step": -10},
+    {"preserve_blocks": True, "block_size": 0},
+])
+def test_renumber_refuses_numbering_a_panel_cannot_run(kwargs):
+    """start 0 wrote a line 0, and step -10 numbered the lines downward --
+    and for this program, which runs the same either way round, the
+    self-check passed both."""
+    prog = parser.parse("10\tGOTO 20\n20\tGOTO 10\n")
+    result = formatter.renumber(prog, **kwargs)
+    assert result.text == "" and result.refused == "numbering"
+    assert "refusing to renumber" in result.warnings[0]
+
+
+def test_renumber_from_one_in_steps_of_one_is_still_fine():
+    prog = parser.parse("10\tGOTO 20\n20\tGOTO 10\n")
+    result = formatter.renumber(prog, start=1, step=1)
+    assert result.text == "00001\tGOTO 2\n00002\tGOTO 1\n"
