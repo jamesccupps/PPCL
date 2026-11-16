@@ -17,6 +17,7 @@ from __future__ import annotations
 import math
 import os
 import shutil
+import sys
 import traceback
 
 from .. import (analyzer, formatter, linter, points, sequence, spec,
@@ -57,6 +58,11 @@ class Workspace:
 
     def __init__(self, root: str):
         self.root = os.path.abspath(root)
+        #: Whether only this machine can reach the server. An internal
+        #: error's traceback goes in the reply only then; on a LAN bind it
+        #: would show a colleague the server's folder layout, so it goes to
+        #: the server's console instead. serve() sets this from the bind.
+        self.local_only = True
 
     def resolve(self, relative: str) -> str:
         """Resolve a client-supplied path inside the workspace.
@@ -898,7 +904,10 @@ def dispatch(path: str, body: dict, ws: Workspace = None):
     except ApiError as exc:
         return exc.status, {"error": exc.message}
     except Exception as exc:  # a bug here must not take the server down
-        return 500, {
-            "error": "%s: %s" % (type(exc).__name__, exc),
-            "traceback": traceback.format_exc(limit=6),
-        }
+        reply = {"error": "%s: %s" % (type(exc).__name__, exc)}
+        detail = traceback.format_exc(limit=6)
+        if getattr(ws, "local_only", True):
+            reply["traceback"] = detail
+        else:
+            sys.stderr.write("internal error in %s\n%s" % (path, detail))
+        return 500, reply

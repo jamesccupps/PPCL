@@ -932,3 +932,17 @@ def test_debugger_fields_are_checked_too(ws):
             ("/api/debug/breakpoint", {"action": "remove", "index": {}})):
         status, reply = api.dispatch(route, dict(body, session=session), ws)
         assert status < 500 and "traceback" not in reply, (route, reply)
+
+
+def test_an_internal_error_keeps_its_traceback_off_a_lan(ws, monkeypatch,
+                                                         capsys):
+    """The 500 reply carried a traceback whatever the bind, so a server
+    started with --host for a colleague showed them its folder layout."""
+    monkeypatch.setitem(api.ROUTES, "/api/boom", lambda body, w: 1 / 0)
+    status, reply = api.dispatch("/api/boom", {}, ws)
+    assert status == 500 and "traceback" in reply      # this machine only
+    ws.local_only = False
+    status, reply = api.dispatch("/api/boom", {}, ws)
+    assert status == 500 and "traceback" not in reply
+    assert "ZeroDivisionError" in reply["error"]
+    assert "ZeroDivisionError" in capsys.readouterr().err

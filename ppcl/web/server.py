@@ -271,6 +271,7 @@ def serve(host="127.0.0.1", port=8765, workspace=".", open_browser=True,
     ws = Workspace(workspace)
     if not os.path.isdir(ws.root):
         raise SystemExit("workspace directory does not exist: %s" % ws.root)
+    ws.local_only = is_loopback(host)
 
     Handler.workspace = ws
     Handler.quiet = quiet
