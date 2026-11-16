@@ -715,6 +715,67 @@ def test_the_workspace_refuses_hidden_extensionless_and_drive_paths(ws, path):
     assert status == 400
 
 
+def _short_name(folder, name):
+    """Windows' 8.3 name for folder/name, or None where there is none."""
+    import ctypes  # Windows only; every caller is skipped elsewhere
+
+    buf = ctypes.create_unicode_buffer(260)
+    full = os.path.join(str(folder), name)
+    if not ctypes.windll.kernel32.GetShortPathNameW(full, buf, 260):
+        return None
+    short = os.path.basename(buf.value)
+    return None if short == name else short
+
+
+@pytest.mark.skipif(os.name != "nt", reason="8.3 short names are Windows only")
+@pytest.mark.parametrize("hidden, target", [
+    (".claude", "settings.json"), (".git", "x.json")])
+def test_a_short_name_does_not_reach_a_hidden_folder(ws, hidden, target):
+    """The dot test read the text sent, so CLAUDE~1/settings.json -- the
+    same folder as .claude -- passed, and Save could write Claude Code's
+    settings file, which can hold hooks that run commands."""
+    os.makedirs(os.path.join(ws.root, hidden))
+    short = _short_name(ws.root, hidden)
+    if short is None:
+        pytest.skip("this volume does not create 8.3 names")
+    for spelling in (short, short.lower()):
+        with pytest.raises(api.ApiError, match="hidden"):
+            ws.resolve("%s/%s" % (spelling, target))
+
+
+@pytest.mark.skipif(os.name != "nt", reason="8.3 short names are Windows only")
+def test_a_short_name_does_not_reach_a_refused_extension(ws):
+    """NOTES~1.PCL ends in an allowed extension and names notes.pclx."""
+    with open(os.path.join(ws.root, "notes.pclx"), "w") as fh:
+        fh.write("x")
+    short = _short_name(ws.root, "notes.pclx")
+    if short is None:
+        pytest.skip("this volume does not create 8.3 names")
+    assert os.path.splitext(short)[1].lower() in ws.ALLOWED
+    with pytest.raises(api.ApiError, match="pclx"):
+        ws.resolve(short)
+
+
+def test_a_link_does_not_reach_a_hidden_folder_or_a_refused_file(ws):
+    """The same hole without Windows: a link inside the workspace that
+    points at .claude, or at a file the workspace would refuse."""
+    os.makedirs(os.path.join(ws.root, ".claude"))
+    with open(os.path.join(ws.root, "notes.sh"), "w") as fh:
+        fh.write("x")
+    try:
+        os.symlink(os.path.join(ws.root, ".claude"),
+                   os.path.join(ws.root, "settings"),
+                   target_is_directory=True)
+        os.symlink(os.path.join(ws.root, "notes.sh"),
+                   os.path.join(ws.root, "notes.ppcl"))
+    except (OSError, NotImplementedError):
+        pytest.skip("this account cannot create links")
+    with pytest.raises(api.ApiError, match="hidden"):
+        ws.resolve("settings/settings.json")
+    with pytest.raises(api.ApiError, match=r"\.sh"):
+        ws.resolve("notes.ppcl")
+
+
 @pytest.mark.parametrize("path", ["programs/a.ppcl", "./programs/a.ppcl",
                                   "diagrams/ahu.blocks.json", "v1.2/a.pcl"])
 def test_the_workspace_still_takes_ordinary_paths(ws, path):

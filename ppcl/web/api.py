@@ -82,14 +82,25 @@ class Workspace:
         real = os.path.realpath(candidate)
         if real != root and not real.startswith(root + os.sep):
             raise ApiError("that path is outside the workspace")
-        ext = os.path.splitext(candidate)[1].lower()
-        if ext not in self.ALLOWED:
-            # An empty extension used to pass, so .git/hooks/pre-commit did.
-            raise ApiError(
-                "%s are not handled here; allowed: %s"
-                % ("%s files" % ext if ext else "files with no extension",
-                   ", ".join(self.ALLOWED))
-            )
+        # The tests above read the text the client sent, and a file has
+        # other names. On Windows CLAUDE~1 is .claude and GIT~1 is .git,
+        # and NOTES~1.PCL is an existing notes.pclx; anywhere, a link can
+        # point into either. So the path that would actually be opened is
+        # held to the same two rules.
+        inside = os.path.relpath(real, root).split(os.sep)
+        if any(part.startswith(".") and part not in (".", "..")
+               for part in inside):
+            raise ApiError("hidden files and folders are not handled here")
+        for path in (candidate, real):
+            ext = os.path.splitext(path)[1].lower()
+            if ext not in self.ALLOWED:
+                # An empty extension used to pass, so .git/hooks/pre-commit
+                # did.
+                raise ApiError(
+                    "%s are not handled here; allowed: %s"
+                    % ("%s files" % ext if ext else "files with no extension",
+                       ", ".join(self.ALLOWED))
+                )
         return candidate
 
     def listing(self) -> list:
