@@ -451,6 +451,34 @@ def test_a_windows_1252_export_keeps_its_degree_sign(ws):
         assert fh.read() == _EXPORT
 
 
+def test_a_crlf_export_saved_unchanged_comes_back_byte_for_byte(ws):
+    """Open returned the encoding but not the line endings, and Save wrote
+    LF, so one save of a Desigo export changed every line of it."""
+    path = os.path.join(ws.root, "programs", "export.pcl")
+    with open(path, "wb") as fh:
+        fh.write(_EXPORT)
+    assert _EXPORT.count(b"\r\n") >= 2
+
+    _s, opened = api.dispatch("/api/open", {"path": "programs/export.pcl"}, ws)
+    assert opened["newline"] == "\r\n"
+    status, _ = api.dispatch("/api/save", {
+        "path": "programs/export.pcl", "text": opened["text"],
+        "encoding": opened["encoding"], "newline": opened["newline"]}, ws)
+    assert status == 200
+    with open(path, "rb") as fh:
+        assert fh.read() == _EXPORT
+
+
+def test_save_writes_lf_unless_told_otherwise_and_nothing_but_lf_or_crlf(ws):
+    api.dispatch("/api/save", {"path": "programs/new.ppcl",
+                               "text": "10\tON(FAN)\n20\tGOTO 10\n"}, ws)
+    with open(os.path.join(ws.root, "programs", "new.ppcl"), "rb") as fh:
+        assert b"\r" not in fh.read()
+    status, payload = api.dispatch("/api/save", {
+        "path": "programs/new.ppcl", "text": "x\n", "newline": "\r"}, ws)
+    assert status == 400 and "newline" in payload["error"]
+
+
 def test_save_refuses_a_character_the_file_encoding_cannot_hold(ws):
     path = os.path.join(ws.root, "programs", "a.ppcl")
     with open(path, "rb") as fh:

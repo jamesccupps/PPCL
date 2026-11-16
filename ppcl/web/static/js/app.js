@@ -105,6 +105,7 @@ async function openFile(file) {
   }
   editor.set(r.text, file.path);
   editor.tab.encoding = r.encoding;
+  editor.tab.newline = r.newline;
   switchPane('editor');
 }
 
@@ -120,6 +121,7 @@ async function saveActive() {
   const r = await post('/api/save', {
     path: answer.path, text: editor.get(),
     encoding: editor.tab ? editor.tab.encoding : undefined,
+    newline: editor.tab ? editor.tab.newline : undefined,
     backup: SETTINGS.backup_on_save !== false,
   });
   if (r.error) { toast(r.error, 'bad'); return; }
@@ -151,7 +153,12 @@ function decodeProgram(buffer) {
     text = new TextDecoder('windows-1252').decode(buffer);
     encoding = 'cp1252';
   }
-  return { text: text.replace(/\r\n?/g, '\n'), encoding };
+  // The style most lines use, the same rule as ppcl/textio.py, so Save
+  // writes CRLF back as CRLF.
+  const crlf = (text.match(/\r\n/g) || []).length;
+  const lf = (text.match(/\n/g) || []).length;
+  const newline = crlf && crlf >= lf - crlf ? '\r\n' : '\n';
+  return { text: text.replace(/\r\n?/g, '\n'), encoding, newline };
 }
 
 async function openLocal(files) {
@@ -160,7 +167,7 @@ async function openLocal(files) {
       toast(file.name + ' is too large to be a PPCL program', 'bad');
       continue;
     }
-    const { text, encoding } = decodeProgram(await file.arrayBuffer());
+    const { text, encoding, newline } = decodeProgram(await file.arrayBuffer());
     if (text.includes('\0')) {
       toast(file.name + ' is not a text file', 'bad');
       continue;
@@ -172,6 +179,7 @@ async function openLocal(files) {
     }
     editor.set(text, file.name);
     editor.tab.encoding = encoding;
+    editor.tab.newline = newline;
     switchPane('editor');
     toast('opened ' + file.name + ' -- Save puts a copy in the workspace',
       'good');

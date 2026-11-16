@@ -751,10 +751,11 @@ def api_open(body, ws=None):
     path = ws.resolve(body.get("path"))
     if not os.path.isfile(path):
         raise ApiError("no such file: %s" % body.get("path"), 404)
-    # The tab keeps the encoding, so Save writes the file back the same way.
+    # The tab keeps the encoding and the line endings, so Save writes the
+    # file back the same way.
     read = textio.read(path)
     return {"path": body.get("path"), "text": read.text,
-            "encoding": read.encoding}
+            "encoding": read.encoding, "newline": read.newline}
 
 
 def api_save(body, ws=None):
@@ -765,8 +766,14 @@ def api_save(body, ws=None):
     encoding = body.get("encoding") or "utf-8"
     if encoding not in textio.ENCODINGS:
         raise ApiError("unknown encoding %r" % encoding)
+    # Without this every CRLF file -- every Desigo and Insight export --
+    # came back LF, and showed every line as changed after one save. A new
+    # file is LF, as the command line writes.
+    newline = body.get("newline") or "\n"
+    if newline not in ("\n", "\r\n"):
+        raise ApiError("newline must be \\n or \\r\\n")
     try:
-        data = textio.encode(text, encoding)
+        data = textio.encode(text, encoding, newline)
     except ValueError as exc:
         raise ApiError(str(exc))
     os.makedirs(os.path.dirname(path) or ws.root, exist_ok=True)
