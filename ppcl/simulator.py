@@ -181,11 +181,27 @@ class Panel:
         return {k: v.clone() for k, v in self.points.items()}
 
     def load(self, values: dict) -> None:
-        """Seed point values, e.g. from a JSON scenario file."""
+        """Seed point values, e.g. from a JSON scenario file.
+
+        Anything it cannot read is a ValueError naming the point. A list, or
+        "17:xx", used to escape as a TypeError or a bare float() message,
+        which the API reported as an internal error.
+        """
+        def unreadable(val, name):
+            return ValueError(
+                "cannot interpret %r as a value for point %s; use a "
+                "number, ON/OFF, or HH:MM" % (val, name))
+
+        def number(val, name):
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                raise unreadable(val, name) from None
+
         for name, val in values.items():
             pt = self.get(name)
             if isinstance(val, dict):
-                pt.value = float(val.get("value", 0.0))
+                pt.value = number(val.get("value", 0.0), name)
                 pt.priority = val.get("priority", "@NONE")
                 pt.ptype = val.get("type")
             elif isinstance(val, bool):
@@ -198,17 +214,14 @@ class Panel:
                     pt.value = named[text.upper()]
                 elif ":" in text:  # a military-time literal like 17:30
                     hh, _, mm = text.partition(":")
-                    pt.value = float(hh) + float(mm) / 60.0
-                else:
                     try:
-                        pt.value = float(text)
+                        pt.value = float(hh) + float(mm) / 60.0
                     except ValueError:
-                        raise ValueError(
-                            "cannot interpret %r as a value for point %s; use a "
-                            "number, ON/OFF, or HH:MM" % (val, name)
-                        )
+                        raise unreadable(val, name) from None
+                else:
+                    pt.value = number(text, name)
             else:
-                pt.value = float(val)
+                pt.value = number(val, name)
 
 
 @dataclass

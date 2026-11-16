@@ -19,7 +19,8 @@ import threading
 from .. import blocks, helpdocs, linter, points, settings, spec, transforms
 from .. import parser as ppcl_parser
 from ..debug import Breakpoint, DebugError, DebugSession
-from .api import ApiError, _diag_payload, _firmware, _hour, _text
+from .api import (ApiError, _diag_payload, _firmware, _hour, _integer,
+                  _list, _object, _text)
 
 #: How many debugger sessions this process will keep. One browser needs one.
 MAX_SESSIONS = 8
@@ -155,7 +156,7 @@ def api_debug_start(body, ws=None):
             return {"ok": False, "error": str(exc)}
     if body.get("start_hour") is not None:
         session.sim.clock.hours = _hour(body, "start_hour", 8.0)
-    for name in body.get("watch") or []:
+    for name in _list(body, "watch"):
         session.add_watch(str(name))
 
     session_id = "dbg%d" % next(_session_ids)
@@ -182,9 +183,9 @@ def api_debug_step(body, ws=None):
         elif mode == "run":
             stop = session.run()
         elif mode == "to":
-            stop = session.run_to(int(body.get("line", 0)))
+            stop = session.run_to(_integer(body, "line", 0))
         else:
-            stop = session.step(int(body.get("count", 1)))
+            stop = session.step(_integer(body, "count", 1))
     except DebugError as exc:
         raise ApiError(str(exc))
     session.stopped = stop
@@ -204,19 +205,21 @@ def api_debug_breakpoint(body, ws=None):
             session.add_breakpoint(
                 Breakpoint(
                     kind=str(body.get("kind", "line")),
-                    line=int(body["line"]) if body.get("line") else None,
-                    point=body.get("point") or None,
-                    expression=body.get("expression") or None,
-                    skip=int(body.get("skip", 0) or 0),
+                    line=(_integer(body, "line", None)
+                          if body.get("line") else None),
+                    point=str(body["point"]) if body.get("point") else None,
+                    expression=(str(body["expression"])
+                                if body.get("expression") else None),
+                    skip=_integer(body, "skip", 0) if body.get("skip") else 0,
                     label=str(body.get("label", "")),
                 )
             )
         elif action == "remove":
-            session.remove_breakpoint(int(body.get("index", -1)))
+            session.remove_breakpoint(_integer(body, "index", -1))
         elif action == "clear":
             session.clear_breakpoints()
         elif action == "toggle":
-            index = int(body.get("index", -1))
+            index = _integer(body, "index", -1)
             if not 0 <= index < len(session.breakpoints):
                 raise DebugError("no such breakpoint")
             bp = session.breakpoints[index]
@@ -334,7 +337,8 @@ def api_points_search(body, ws=None):
     db = _database(ws)
     if db is None:
         return {"ok": True, "loaded": False, "points": [], "count": 0}
-    found = db.search(body.get("query", ""), int(body.get("limit", 40)))
+    found = db.search(str(body.get("query", "")),
+                      _integer(body, "limit", 40))
     return {
         "ok": True,
         "loaded": True,
@@ -393,7 +397,7 @@ def api_settings_get(body, ws=None):
 
 def api_settings_save(body, ws=None):
     current = _settings(ws)
-    rejected = current.update(body.get("values") or {})
+    rejected = current.update(_object(body, "values"))
     if rejected:
         return {"ok": False, "rejected": rejected, "values": current.values}
     try:
@@ -422,16 +426,16 @@ TRANSFORMS = {
     "separators_underscore":
         lambda text, body: transforms.swap_separators(text, "_"),
     "disable": lambda text, body: transforms.set_disabled(
-        text, body.get("lines") or [], True),
+        text, _list(body, "lines"), True),
     "enable": lambda text, body: transforms.set_disabled(
-        text, body.get("lines") or [], False),
+        text, _list(body, "lines"), False),
     "toggle_comment": lambda text, body: transforms.toggle_comments(
-        text, body.get("lines") or []),
+        text, _list(body, "lines")),
     "clone": lambda text, body: transforms.clone_lines(
         text,
-        int(body.get("first", 0)),
-        int(body.get("last", 0)),
-        body.get("renames") or {},
+        _integer(body, "first", 0),
+        _integer(body, "last", 0),
+        _object(body, "renames"),
         start=body.get("start") or None,
         step=body.get("step") or None,
     ),
@@ -477,7 +481,7 @@ def api_complete(body, ws=None):
     from Desigo already knows.
     """
     text = _text(body)
-    offset = int(body.get("offset", len(text)))
+    offset = _integer(body, "offset", len(text))
     offset = max(0, min(offset, len(text)))
     line_start = text.rfind("\n", 0, offset) + 1
     prefix = text[line_start:offset]

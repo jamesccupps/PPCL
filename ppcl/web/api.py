@@ -172,6 +172,40 @@ def _number(body, key, default):
     return value
 
 
+def _integer(body, key, default):
+    """A whole number from the request, or an ApiError naming it.
+
+    int() on a request value raised ValueError or TypeError for "a" or a
+    list, and each was an internal error with a traceback where "start
+    must be a whole number" belonged.
+    """
+    value = body.get(key, default)
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        raise ApiError("%s must be a whole number" % key)
+
+
+def _object(body, key):
+    """A JSON object from the request; missing or null is empty."""
+    value = body.get(key)
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ApiError("%s must be an object" % key)
+    return value
+
+
+def _list(body, key):
+    """A JSON array from the request; missing or null is empty."""
+    value = body.get(key)
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ApiError("%s must be a list" % key)
+    return value
+
+
 def _hour(body, key, default):
     """A time of day in decimal hours, wrapped into 0-24."""
     return _number(body, key, default) % 24.0
@@ -196,7 +230,7 @@ def api_lint(body, ws=None):
     # The CLI's --workstation-only and --min-severity, so every caller can
     # narrow a report the same way. W104's statement half alone is 61-76%
     # of the warnings on real programs.
-    options = dict(body.get("options") or {})
+    options = dict(_object(body, "options"))
     if body.get("workstation_only"):
         options["wrap_long_lines"] = False
     order = [s.value for s in Severity]
@@ -206,8 +240,9 @@ def api_lint(body, ws=None):
     diags = linter.lint(
         prog,
         firmware=_firmware(body),
-        point_types=body.get("point_types") or (db.types() if db else {}),
-        disabled=body.get("disabled") or (),
+        point_types=_object(body, "point_types") or (
+            db.types() if db else {}),
+        disabled=[str(code) for code in _list(body, "disabled")],
         options=options,
     )
     diags = [d for d in diags
@@ -285,8 +320,8 @@ def api_renumber(body, ws=None):
     prog = ppcl_parser.parse(text)
     result = formatter.renumber(
         prog,
-        start=int(body.get("start", 10)),
-        step=int(body.get("step", 10)),
+        start=_integer(body, "start", 10),
+        step=_integer(body, "step", 10),
         preserve_blocks=bool(body.get("preserve_blocks", False)),
         split_duplicates=bool(body.get("split_duplicates", False)),
         allow_duplicates=bool(body.get("allow_duplicates", False)),
@@ -337,11 +372,11 @@ def api_run(body, ws=None):
             raise ApiError(str(exc))
 
     clock = Clock(hours=_hour(body, "time", 8.0),
-                  day_of_week=int(body.get("day_of_week", 2)))
+                  day_of_week=_integer(body, "day_of_week", 2))
     sim = Simulator(prog, panel=panel, clock=clock,
                     firmware=_firmware(body))
 
-    passes = int(body.get("passes", 10))
+    passes = _integer(body, "passes", 10)
     passes = max(1, min(passes, RUN_MAX_PASSES))
     # A pass is at most a day: a longer interval says nothing more and can
     # only push the clock somewhere absurd.
@@ -557,12 +592,25 @@ def api_seq_parse(body, ws=None):
     return {"ok": True, "document": sequence.to_dict(seq)}
 
 
-def api_seq_render(body, ws=None):
-    """Document -> text form."""
+def _document(body):
+    """The sequence document in a request, or an ApiError.
+
+    A document is JSON the client built, like a block diagram, and one of
+    the wrong shape -- "x", or points that are not objects -- failed deep
+    inside from_dict as an internal error.
+    """
     doc = body.get("document")
     if not isinstance(doc, dict):
         raise ApiError("a document object is required")
-    seq = sequence.from_dict(doc)
+    try:
+        return sequence.from_dict(doc)
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:
+        raise ApiError("that document cannot be read: %s" % exc)
+
+
+def api_seq_render(body, ws=None):
+    """Document -> text form."""
+    seq = _document(body)
     return {"ok": True, "text": sequence.render(seq)}
 
 
@@ -595,7 +643,7 @@ def api_seq_compile(body, ws=None):
     The UI never shows generated code that has not been checked.
     """
     if "document" in body:
-        seq = sequence.from_dict(body["document"])
+        seq = _document(body)
     else:
         try:
             seq = sequence.parse(_text(body))
@@ -647,18 +695,16 @@ def api_bench(body, ws=None):
             ],
         }
 
-    seconds = float(body.get("seconds", 10800))
-    seconds = max(60.0, min(seconds, 86400.0))
-    dt = float(body.get("dt", 10.0))
-    dt = max(1.0, min(dt, 60.0))
+    seconds = max(60.0, min(_number(body, "seconds", 10800), 86400.0))
+    dt = max(1.0, min(_number(body, "dt", 10.0), 60.0))
 
+    names = {"preset": body.get("preset", "single_zone_ahu"),
+             "weather": body.get("weather", "design_winter")}
+    for key, name in names.items():
+        if not isinstance(name, str):
+            raise ApiError("%s must be a name" % key)
     try:
-        plant = build_plant(
-            {
-                "preset": body.get("preset", "single_zone_ahu"),
-                "weather": body.get("weather", "design_winter"),
-            }
-        )
+        plant = build_plant(names)
     except KeyError as exc:
         # An unknown preset or weather name. The message already lists the
         # valid ones; it was arriving as an internal error.
@@ -692,22 +738,24 @@ def api_bench(body, ws=None):
         )
     for check in default_checks():
         bench.add_check(check)
-    for item in body.get("points", {}).items() if isinstance(
-        body.get("points"), dict
-    ) else []:
-        bench.panel.load({item[0]: item[1]})
-    for f in body.get("faults") or []:
+    try:
+        bench.panel.load(_object(body, "points"))
+    except ValueError as exc:
+        raise ApiError(str(exc))
+    for f in _list(body, "faults"):
+        if not isinstance(f, dict):
+            raise ApiError("each fault must be an object")
         bench.add_fault(
             Fault(
-                system=f.get("system", "AHU1"),
-                kind=f.get("kind", ""),
-                at_seconds=float(f.get("at", 0)),
-                value=float(f.get("value", 0)),
+                system=str(f.get("system", "AHU1")),
+                kind=str(f.get("kind", "")),
+                at_seconds=_number(f, "at", 0),
+                value=_number(f, "value", 0),
             )
         )
 
     result = bench.run(seconds=seconds, dt=dt)
-    variables = body.get("variables") or [
+    variables = [str(v) for v in _list(body, "variables")] or [
         "AHU1.actual_zone", "AHU1.actual_dat", "AHU1.coil_face",
         "AHU1.actual_mat", "AHU1.hw_position", "AHU1.cw_position",
         "AHU1.oa_position", "OUTSIDE",

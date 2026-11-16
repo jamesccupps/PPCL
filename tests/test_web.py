@@ -884,3 +884,51 @@ def test_an_unknown_bench_name_is_a_plain_error(ws, field):
     assert status == 400
     assert "no_such_name" in reply["error"] and "available" in reply["error"]
     assert "traceback" not in reply
+
+
+_P = "10\tON(SFAN)\n20\tGOTO 10\n"
+
+
+@pytest.mark.parametrize("route, body", [
+    ("/api/lint", {"text": _P, "options": []}),
+    ("/api/lint", {"text": _P, "point_types": "x"}),
+    ("/api/lint", {"text": _P, "disabled": 5}),
+    ("/api/renumber", {"text": _P, "start": "a"}),
+    ("/api/renumber", {"text": _P, "step": [10]}),
+    ("/api/run", {"text": _P, "passes": "a"}),
+    ("/api/run", {"text": _P, "day_of_week": {}}),
+    ("/api/run", {"text": _P, "points": {"SFAN": [1]}}),
+    ("/api/complete", {"text": _P, "offset": "a"}),
+    ("/api/seq/compile", {"document": "x"}),
+    ("/api/seq/compile", {"document": {"points": ["x"]}}),
+    ("/api/seq/render", {"document": {"points": ["x"]}}),
+    ("/api/settings/save", {"values": "x"}),
+    ("/api/bench", {"text": _P, "seconds": "long"}),
+    ("/api/bench", {"text": _P, "faults": ["x"]}),
+    ("/api/bench", {"text": _P, "preset": []}),
+    ("/api/bench", {"text": _P, "weather": 5}),
+    ("/api/bench", {"text": _P, "points": {"SFAN": "17:xx"}}),
+    ("/api/debug/start", {"text": _P, "watch": 5}),
+    ("/api/debug/start", {"text": _P, "points": {"SFAN": [1]}}),
+    ("/api/transform", {"text": _P, "op": "clone", "first": "a"}),
+    ("/api/transform", {"text": _P, "op": "disable", "lines": 5}),
+])
+def test_a_wrong_typed_field_is_a_plain_error(ws, route, body):
+    """Each of these was an internal error with a traceback: int() or
+    float() on a request value, or a string where an object belonged."""
+    status, reply = api.dispatch(route, body, ws)
+    assert status < 500, reply
+    assert "traceback" not in reply
+    assert status == 400 or reply.get("ok") is False
+
+
+def test_debugger_fields_are_checked_too(ws):
+    _s, started = api.dispatch("/api/debug/start", {"text": _P}, ws)
+    session = started["session"]
+    for route, body in (
+            ("/api/debug/step", {"mode": "into", "count": "a"}),
+            ("/api/debug/step", {"mode": "to", "line": [20]}),
+            ("/api/debug/breakpoint", {"action": "add", "line": "x"}),
+            ("/api/debug/breakpoint", {"action": "remove", "index": {}})):
+        status, reply = api.dispatch(route, dict(body, session=session), ws)
+        assert status < 500 and "traceback" not in reply, (route, reply)
