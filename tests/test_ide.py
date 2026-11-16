@@ -1218,3 +1218,20 @@ def test_a_huge_step_request_comes_back(tmp_path):
     status, reply = api.dispatch("/api/debug/step", {
         "session": started["session"], "count": 10 ** 12}, ws)
     assert status == 200 and reply["stop"]["reason"] == "budget"
+
+
+@pytest.mark.parametrize("op, extra", [
+    ("separators_dot", {}),
+    ("separators_underscore", {}),
+    ("clone", {"first": 10, "last": 20, "renames": {"FAN": "PMP"}}),
+])
+def test_a_transform_over_an_unreadable_line_names_it(tmp_path, op, extra):
+    """The lexer's LexError is neither ValueError nor TypeError, so it
+    escaped api_transform and came back as an internal error."""
+    from ppcl.web import api
+
+    body = dict({"text": '10\tON("FAN.X)\n20\tGOTO 10\n', "op": op}, **extra)
+    status, reply = api.dispatch("/api/transform", body,
+                                 api.Workspace(str(tmp_path)))
+    assert status == 200 and reply["ok"] is False
+    assert reply["error"].startswith("line 10 cannot be read")

@@ -145,7 +145,7 @@ def swap_separators(text, to="."):
             out_lines.append(raw)
             continue
         edits = []
-        for token in lexer.tokenize(body):
+        for token in _tokens(head, body):
             if token.kind not in (Tok.IDENT, Tok.QUOTED):
                 continue
             swapped = token.text.replace(frm, to)
@@ -165,6 +165,21 @@ def _split_line(raw):
     if not match:
         return raw, None
     return match.group(1), match.group(2)
+
+
+def _tokens(head, body):
+    """One line's tokens, or a refusal naming the line.
+
+    A transform that skipped a line it could not read would leave that line
+    unconverted without saying so. The LexError used to escape the API's
+    error handling instead and arrive as an internal error.
+    """
+    try:
+        return lexer.tokenize(body)
+    except lexer.LexError as exc:
+        raise ValueError(
+            "line %s cannot be read (%s), so the transform was not applied. "
+            "Fix that line first." % (head.strip(), exc.message)) from None
 
 
 def _is_comment(body):
@@ -342,7 +357,7 @@ def clone_lines(text, first, last, renames, start=None, step=None):
         # ACT used to qualify, so a limit of 100 in a block holding line 100
         # was rewritten to the copy's line number.
         references = {tok.col for tok in line_reference_tokens(body)}
-        for token in lexer.tokenize(body):
+        for token in _tokens(head, body):
             if (token.kind is Tok.QUOTED and "/" in token.text
                     and _OIP_BODY.search(body)):
                 # A keystroke sequence: rename its components, not the token.
