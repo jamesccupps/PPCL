@@ -843,7 +843,16 @@ def api_save(body, ws=None):
             shutil.copyfile(path, path + ".bak")
         except OSError:
             pass  # a missing backup must not block the save
-    textio.write(path, data)
+    try:
+        textio.write(path, data)
+    except OSError as exc:
+        # Windows refuses the final replace while another program has the
+        # file open -- an editor, a virus scanner, the search indexer just
+        # after the last save. textio.write has left the original intact;
+        # this was reported as an internal error with a traceback.
+        raise ApiError("could not write %s: %s. The file on disk is "
+                       "unchanged; try again." % (body.get("path"),
+                                                  exc.strerror or exc), 409)
     return {"ok": True, "path": body.get("path"), "bytes": len(data)}
 
 

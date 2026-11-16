@@ -946,3 +946,23 @@ def test_an_internal_error_keeps_its_traceback_off_a_lan(ws, monkeypatch,
     assert status == 500 and "traceback" not in reply
     assert "ZeroDivisionError" in reply["error"]
     assert "ZeroDivisionError" in capsys.readouterr().err
+
+
+def test_a_save_windows_refuses_is_reported_and_leaves_the_file(ws,
+                                                                monkeypatch):
+    """os.replace fails while another program holds the file; that was an
+    internal error. textio.write keeps the original, so say so."""
+    path = os.path.join(ws.root, "programs", "a.ppcl")
+    with open(path, "rb") as fh:
+        before = fh.read()
+
+    def locked(target, data, backup=False):
+        raise PermissionError(13, "Access is denied", target)
+
+    monkeypatch.setattr(api.textio, "write", locked)
+    status, reply = api.dispatch("/api/save", {
+        "path": "programs/a.ppcl", "text": "10\tOFF(SFAN)\n"}, ws)
+    assert status == 409 and "traceback" not in reply
+    assert "could not write programs/a.ppcl" in reply["error"]
+    with open(path, "rb") as fh:
+        assert fh.read() == before
