@@ -52,6 +52,7 @@ from .ast_nodes import (
     UnaryOp,
 )
 from .simulator import (
+    DIVIDE_BY_ZERO_WARNING,
     EXP_WARNING,
     NEGATIVE_ROOT_WARNING,
     OFF,
@@ -211,7 +212,10 @@ def _compile_binop(sim, node, cache):
         def divide():
             a = left()
             b = right()
-            return a / b if b else 0.0
+            if b:
+                return a / b
+            sim._warn(DIVIDE_BY_ZERO_WARNING)
+            return 0.0
         return divide
     if op == ".EQ.":
         return lambda: ON if left() == right() else OFF

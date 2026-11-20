@@ -83,6 +83,12 @@ BARE_RELEAS_SMOKE_WARNING = (
 NEGATIVE_ROOT_WARNING = (
     ".ROOT. of a negative value is not a real number; it was simulated as 0, "
     "and what a panel returns for it is not documented")
+DIVIDE_BY_ZERO_WARNING = (
+    "a division by zero was simulated as 0; what a panel returns for it is "
+    "not documented")
+NON_FINITE_WARNING = (
+    "a value written to %s overflowed and is not a finite number; it was "
+    "simulated as 0, and what a panel does with it is not documented")
 
 #: Functions that read something a simulator does not have. ALMPRI is a
 #: point's alarm priority, which lives in the panel's alarm configuration.
@@ -494,6 +500,11 @@ class Simulator:
         point is only commanded when the operation's priority is at least as
         high as the point's current priority.
         """
+        if not math.isfinite(value):
+            # X = X * 1000000.0 reaches infinity in a few dozen passes, and
+            # the next write crashed the run formatting its trace line.
+            self._warn(NON_FINITE_WARNING % name)
+            value = 0.0
         pt = self.panel.get(name)
         if pt.priority not in spec.PRIORITY_RANK:
             # An unranked priority used to resolve to rank 0, the lowest, so

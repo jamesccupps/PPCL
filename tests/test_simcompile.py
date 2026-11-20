@@ -182,3 +182,26 @@ def test_an_absurd_clock_advance_still_returns_at_once():
     clock = Clock()
     clock.advance(1e15)
     assert 1 <= clock.month <= 12 and 1 <= clock.day_of_month <= 31
+
+
+def test_an_overflow_is_simulated_as_zero_with_a_warning_not_a_crash():
+    """X = X * 1000000.0 reaches infinity after about fifty passes, and the
+    next write crashed the run formatting its trace line: an
+    OverflowError, and an internal error from ppcl run or the bench."""
+    sim = Simulator(parser.parse("10\tX = X * 1000000.0\n20\tON(FAN)\n"
+                                 "30\tGOTO 10\n"))
+    sim.panel.load({"X": 1.0})
+    sim.run(passes=80)
+    assert sim.panel.value("X") == 0.0
+    assert sim.panel.value("FAN") == 1.0
+    assert any("X overflowed" in w for w in sim.warnings)
+
+
+def test_a_division_by_zero_says_so():
+    """It was simulated as 0 without a word, though what a panel returns is
+    not documented -- the case .ROOT. of a negative already warned about."""
+    sim = Simulator(parser.parse("10\tZ = 1.0 / Y\n20\tW = 4.0 / 2.0\n"
+                                 "30\tGOTO 10\n"))
+    sim.run(passes=2)
+    assert sim.panel.value("Z") == 0.0 and sim.panel.value("W") == 2.0
+    assert any("division by zero" in w for w in sim.warnings)
