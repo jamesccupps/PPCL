@@ -827,3 +827,28 @@ def test_a_document_value_keeps_every_digit_and_no_exponent(value, written):
     from ppcl.sequence.compiler import render_value
 
     assert render_value(value) == written
+
+
+def _many_points_text(n):
+    names = ["D%02d" % i for i in range(n)]
+    return ('sequence "t"\npoints\n  MAT  LAI\n'
+            + "".join("  %s  LDO\n" % p for p in names)
+            + "modes\n  Normal  otherwise\ntable\n          Normal\n"
+            + "".join("  %s     closed\n" % p for p in names)
+            + "interlock Freeze\n  trip when MAT < 38\n  reset when MAT > 45\n"
+            + "".join("  force %s off at emer\n" % p for p in names))
+
+
+def test_statements_never_name_more_points_than_the_command_takes():
+    """The table grouped every command 16 points at a time though SET takes
+    15, and an interlock released all its points in one RELEAS(@EMER,...)
+    however many it forced -- both E111, which the panel's compiler
+    refuses."""
+    out, _w = compile_sequence(sequence.parse(_many_points_text(16)))
+    codes = {d.code for d in linter.lint(parser.parse(out))}
+    assert "E111" not in codes
+    releases = [ln for ln in out.splitlines() if "RELEAS(@EMER" in ln]
+    assert len(releases) == 2
+    released = {p for ln in releases
+                for p in ln.split("RELEAS(@EMER,")[1].rstrip(")").split(",")}
+    assert released == {"D%02d" % i for i in range(16)}

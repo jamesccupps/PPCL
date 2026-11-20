@@ -581,9 +581,11 @@ class Compiler:
                         % (il.name, point, action)
                     )
                 b.code('IF("$%s".EQ.1.0) THEN %s' % (flag, stmt))
-            released = ",".join(resolve(p, seq) for p, _ in il.forces)
-            b.code('IF("$%s".EQ.0.0) THEN RELEAS(%s,%s)'
-                   % (flag, il.priority, released))
+            forced = [resolve(p, seq) for p, _ in il.forces]
+            per = _points_per_statement("RELEAS", il.priority)
+            for chunk in _chunks(forced, per):
+                b.code('IF("$%s".EQ.0.0) THEN RELEAS(%s,%s)'
+                       % (flag, il.priority, ",".join(chunk)))
 
     def _emit_resets(self, b: Builder) -> None:
         b.blank()
@@ -691,7 +693,10 @@ class Compiler:
 
             b.comment("Mode %d: %s" % (index, mode.name))
             for key, points in grouped.items():
-                for chunk in _chunks(points, 16):
+                command = (key.upper() if key in ("on", "off", "auto",
+                                                  "fast", "slow")
+                           else "SET")
+                for chunk in _chunks(points, _points_per_statement(command)):
                     stmt = self._grouped_action(chunk, key)
                     b.code('IF("$%s".EQ.%.1f) THEN %s'
                            % (mode_local, index, stmt))
@@ -778,6 +783,20 @@ def _invert(cond, seq) -> str:
 
 def _num(value) -> str:
     return "%.1f" % value if float(value) == int(value) else "%g" % value
+
+
+def _points_per_statement(command, priority=None):
+    """How many points one statement of ``command`` may name.
+
+    E111's own arithmetic: the spec's parameter slots, less the fixed
+    parameters and one for an @priority. SET takes a value and 15 points,
+    not 16, and a RELEAS at a priority takes 15 -- the table grouped every
+    command 16 at a time, and an interlock released all its points in one
+    statement however many it forced.
+    """
+    cmd = spec.ALL[command]
+    slots = len(cmd.fixed) + len(cmd.repeat) * cmd.max_repeat
+    return slots - len(cmd.fixed) - (1 if priority else 0)
 
 
 def _chunks(items, size):
