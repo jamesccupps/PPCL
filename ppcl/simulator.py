@@ -923,6 +923,13 @@ class Simulator:
                 self.command(t.name, state, "@NONE", line, "TOD")
             return None
 
+        if len(args) < 7:
+            # Six fixed arguments and at least one point. Four or five ran
+            # off the end of the list, and the IndexError ended the run.
+            self._warn("TODSET at line %d has %d argument(s) and needs at "
+                       "least 7, so it was not run (lint reports it as E111)"
+                       % (line, len(args)))
+            return None
         t1, v1 = self._eval(args[2]), self._eval(args[3])
         t2, v2 = self._eval(args[4]), self._eval(args[5])
         targets = [a for a in args[6:] if isinstance(a, Ref)]

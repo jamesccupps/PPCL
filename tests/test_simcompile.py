@@ -147,3 +147,15 @@ def test_an_abbreviation_with_no_define_says_so():
     sim = _sim("10 ON(%NONE%FAN)", "20 GOTO 10")
     sim.run(passes=1)
     assert any("%NONE% has no DEFINE" in w for w in sim.warnings)
+
+
+@pytest.mark.parametrize("args", ["1,8:00,55.0,17:00", "1,1,8:00,55.0,17:00"])
+def test_a_short_todset_is_skipped_with_a_warning_not_a_crash(args):
+    """TODSET needs six fixed arguments and a point. With four or five it
+    indexed past the end of its arguments, and the IndexError ended the
+    whole run -- the bench, the debugger, ppcl run."""
+    sim = Simulator(parser.parse("10\tTODSET(%s)\n20\tON(FAN)\n30\tGOTO 10\n"
+                                 % args))
+    sim.run(passes=2)
+    assert sim.panel.value("FAN") == 1.0           # the rest still ran
+    assert any("TODSET at line 10" in w for w in sim.warnings)
