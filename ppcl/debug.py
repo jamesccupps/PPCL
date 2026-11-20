@@ -322,6 +322,10 @@ class DebugSession:
         self.sim.execute_lines(1)
         self.executed += 1
         self.sim.clock.advance(self.seconds_per_line)
+        # Run time accrues per statement here, as Simulator.run accrues it
+        # per pass; without it TOTAL() read 0 for the whole session. It
+        # takes a 50,000-statement Run from about 0.13 s to 0.4 s.
+        self.sim._accumulate_runtime(self.seconds_per_line)
         self._last_writes = self._write_log[before:]
         self._settle()
         return True

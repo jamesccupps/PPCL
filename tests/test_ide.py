@@ -1295,3 +1295,18 @@ def test_a_breakpoint_on_the_first_line_after_leading_comments_fires():
     assert session.current_line == 30
     stop = session.run(budget=50)
     assert stop.reason == "breakpoint" and stop.line == 30
+
+
+def test_run_time_accrues_while_debugging():
+    """The debugger advanced the clock but never the points' run time, so
+    TOTAL() read 0 for the whole session and anything gated on it never
+    happened."""
+    session = DebugSession("10\tON(FAN)\n"
+                           "20\tIF(TOTAL(FAN).GT.0.0) THEN ON(SEEN)\n"
+                           "30\tGOTO 10\n")
+    session.run(budget=600)
+    fan = session.sim.panel.get("FAN")
+    assert fan.runtime == pytest.approx(600 * session.seconds_per_line,
+                                        rel=0.01)
+    assert session.sim.panel.value("SEEN") == 1.0
+    assert session.sim.panel.get("SEEN").runtime < fan.runtime
