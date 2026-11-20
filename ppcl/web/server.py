@@ -55,6 +55,40 @@ CONTENT_TYPES = {
 }
 
 
+def _static_files() -> dict:
+    """Every file under the static folder: URL path -> (file, content type).
+
+    Built once at start, so a request selects an entry and never names a
+    path. The checks this replaces -- no "..", no drive letter, the resolved
+    file inside the folder -- were sound, but each was an argument; a table
+    of what exists needs none, and its content types come from file names
+    the workbench ships rather than from the request. A file added to the
+    folder while the server runs is served after a restart; one edited is
+    served as edited, since it is read on each request.
+    """
+    table = {}
+    root = os.path.realpath(STATIC_DIR)
+    for folder, dirs, names in os.walk(root):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        for name in names:
+            if name.startswith("."):
+                continue
+            full = os.path.join(folder, name)
+            ext = os.path.splitext(name)[1].lower()
+            ctype = CONTENT_TYPES.get(ext)
+            if ctype is None:
+                ctype = mimetypes.guess_type(name)[0] or \
+                    "application/octet-stream"
+                if ctype.startswith("text/"):
+                    ctype += "; charset=utf-8"
+            url = os.path.relpath(full, root).replace(os.sep, "/")
+            table[url] = (full, ctype)
+    return table
+
+
+STATIC_FILES = _static_files()
+
+
 def is_loopback(host) -> bool:
     """True for any loopback bind, not only the three usual spellings.
 
@@ -220,26 +254,17 @@ class Handler(BaseHTTPRequestHandler):
     # -- static files ------------------------------------------------------
 
     def _static(self, relative):
-        relative = unquote(relative)
-        safe = os.path.normpath(relative).replace("\\", "/")
-        if safe.startswith("..") or os.path.isabs(safe) or ":" in safe:
-            # On Windows normpath("D:secret.txt") is neither absolute nor
-            # "..", and joined to the static folder it names that drive.
-            return self._send(403, {"error": "forbidden"})
-        full = os.path.realpath(os.path.join(STATIC_DIR, safe))
-        root = os.path.realpath(STATIC_DIR)
-        if os.path.commonpath([full, root]) != root:
-            return self._send(403, {"error": "forbidden"})
-        if not os.path.isfile(full):
+        # A lookup, not a path: the request picks an entry from the table
+        # built at start, and no part of the URL is joined to anything.
+        entry = STATIC_FILES.get(unquote(relative))
+        if entry is None:
             return self._send(404, {"error": "not found"})
-        ext = os.path.splitext(full)[1].lower()
-        ctype = CONTENT_TYPES.get(ext)
-        if ctype is None:
-            ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
-            if ctype.startswith("text/"):
-                ctype += "; charset=utf-8"
-        with open(full, "rb") as fh:
-            return self._send(200, fh.read(), ctype)
+        full, ctype = entry
+        try:
+            with open(full, "rb") as fh:
+                return self._send(200, fh.read(), ctype)
+        except OSError:
+            return self._send(404, {"error": "not found"})
 
 
 class ThreadingHTTPServer(socketserver.ThreadingMixIn, HTTPServer):

@@ -814,12 +814,31 @@ def test_static_files_stay_inside_the_static_folder(live):
     """normpath("D:secret.txt") is neither absolute nor "..", so on Windows
     the join escaped to that drive's current directory."""
     port, _root = live
-    for path in ("/static/C:secret.txt", "/static/D:..%5Csecret.txt"):
-        status, _payload = _request(port, path)
-        assert status == 403, path
-    status, _payload = _request(port, "/static/js/app.js".replace(
-        "js/app.js", "nope.js"))
-    assert status == 404
+    for path in ("/static/C:secret.txt", "/static/D:..%5Csecret.txt",
+                 "/static/../server.py", "/static/%2e%2e/api.py",
+                 "/static/js/../../server.py", "/static/nope.js"):
+        status, payload = _request(port, path)
+        assert status == 404 and payload == {"error": "not found"}, path
+
+
+def test_every_shipped_static_file_is_served_and_nothing_else(live):
+    """The static folder is served from a table built at start: a request
+    picks an entry and never becomes part of a path that is opened."""
+    from ppcl.web import server
+
+    port, _root = live
+    assert "index.html" in server.STATIC_FILES
+    assert "js/app.js" in server.STATIC_FILES
+    for url, (full, ctype) in server.STATIC_FILES.items():
+        assert os.path.isfile(full)
+        assert "\r" not in ctype and "\n" not in ctype
+    import urllib.request
+
+    with urllib.request.urlopen("http://127.0.0.1:%d/static/js/app.js" % port,
+                                timeout=10) as resp:
+        assert resp.status == 200
+        assert resp.headers["Content-Type"].startswith("text/javascript")
+        assert b"import" in resp.read()
 
 
 @pytest.mark.parametrize("host, loopback", [
