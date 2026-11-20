@@ -647,7 +647,8 @@ export const editor = {
           placeholder: 'AHU1.SFAN = AHU2.SFAN',
           doc: 'One per line, OLD = NEW. The manual is explicit that reused ' +
                'code must have its points renamed, because each point name ' +
-               'has to be unique.' },
+               'has to be unique. %X% = %Y% renames a DEFINE abbreviation ' +
+               'wherever a reference starts with it.' },
       ], 'Clone');
       if (!answer) return;
       body.first = Number(answer.first);

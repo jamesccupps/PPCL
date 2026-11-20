@@ -1351,3 +1351,25 @@ def test_clone_to_the_last_valid_numbers_still_works():
     result = transforms.clone_lines("10\tON(A)\n20\tGOTO 10\n", 10, 20, {},
                                     start=32757, step=10)
     assert "32767\tGOTO 32757" in result.text
+
+
+def test_clone_renames_a_define_reference_whole_or_by_its_abbreviation():
+    """A %X%FAN reference is one MACRO token, and clone only looked at plain
+    and quoted names, so neither rename touched it."""
+    text = ('10\tON(%X%FAN)\n20\tIF("%X%SAT".GT.55.0) THEN OFF(%X%FAN)\n'
+            "30\tGOTO 10\n")
+    whole = transforms.clone_lines(text, 10, 20, {"%X%FAN": "%Y%FAN"},
+                                   start=100)
+    assert "00100\tON(%Y%FAN)" in whole.text
+    assert '"%X%SAT"' in whole.text.split("00100")[1]   # not named: kept
+    prefix = transforms.clone_lines(text, 10, 20, {"%X%": "%Y%"}, start=100)
+    copy = prefix.text.split("00100")[1]
+    assert "ON(%Y%FAN)" in copy and '"%Y%SAT"' in copy
+    assert "%X%" not in copy
+
+
+def test_a_bare_name_rename_does_not_reach_into_an_abbreviation():
+    text = "10\tON(%X%FAN)\n20\tON(FAN)\n30\tGOTO 10\n"
+    result = transforms.clone_lines(text, 10, 20, {"FAN": "PMP"}, start=100)
+    copy = result.text.split("00100")[1]
+    assert "ON(%X%FAN)" in copy and "ON(PMP)" in copy

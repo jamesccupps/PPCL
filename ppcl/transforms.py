@@ -208,6 +208,25 @@ def _span(token):
     return len(token.text) + (2 if token.kind is Tok.QUOTED else 0)
 
 
+_ABBREVIATION = re.compile(r"%[A-Za-z0-9_]+%")
+
+
+def _rename_abbreviation(name, lookup):
+    """Rename the DEFINE abbreviation a reference starts with, or None.
+
+    Only when the rename's key is itself a bare abbreviation: %X% -> %Y%
+    turns %X%FAN into %Y%FAN, the usual way to reuse a block under another
+    DEFINE. Anything else stays a whole-name rename.
+    """
+    match = _ABBREVIATION.match(name)
+    if not match:
+        return None
+    new = lookup.get(match.group(0).upper())
+    if not new or not _ABBREVIATION.fullmatch(new):
+        return None
+    return new + name[match.end():]
+
+
 def _requote(token, replacement):
     """Put a replacement back in the form the original token had."""
     return '"%s"' % replacement if token.kind is Tok.QUOTED else replacement
@@ -392,8 +411,11 @@ def clone_lines(text, first, last, renames, start=None, step=None):
                     renamed += hits
                     edits.append((token.col, _span(token),
                                   _requote(token, seq)))
-            elif token.kind in (Tok.IDENT, Tok.QUOTED):
-                replacement = lookup.get(token.text.upper())
+            elif token.kind in (Tok.IDENT, Tok.QUOTED, Tok.MACRO):
+                # A %X%FAN reference is one MACRO token, and only plain and
+                # quoted names used to be looked at, so it was never renamed.
+                replacement = (lookup.get(token.text.upper())
+                               or _rename_abbreviation(token.text, lookup))
                 if replacement:
                     renamed += 1
                     edits.append((token.col, _span(token),

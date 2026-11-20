@@ -194,7 +194,9 @@ Under the Transform menu, each reports exactly what it changed:
   search-and-replace gets wrong.
 * **Clone lines** -- copy a block of statements to the end of the program with
   point renames applied and line references retargeted. This is the manual's
-  own advice about reusing code between similar devices, made mechanical.
+  own advice about reusing code between similar devices, made mechanical. A
+  rename names a whole point; `%X% = %Y%` renames a DEFINE abbreviation in
+  every reference that starts with it.
 * **Disable / enable** -- a disabled line is written as a comment carrying a
   marker. A text file has nowhere to keep a real disable flag, so this is a
   workbench convention: **re-enable before loading to a panel**, or the
