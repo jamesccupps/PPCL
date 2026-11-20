@@ -1259,3 +1259,17 @@ def test_a_settings_file_saved_as_ansi_still_loads(tmp_path):
         fh.write(b'{"point_database": "points \xb0F.csv"}\n')
     store = settings.Settings(str(tmp_path)).load()
     assert store.values["point_database"] == "points \N{DEGREE SIGN}F.csv"
+
+
+@pytest.mark.parametrize("to", [".", "_"])
+def test_a_separator_swap_leaves_bacnet_object_references_alone(to):
+    """BAC_1101_BO_3 names device 1101's Binary Output 3; swapping its
+    underscores made BAC.1101.BO.3, which names nothing."""
+    text = ('10\tIF("AHU1_SAT".GT.55.0) THEN ON("BAC_1101_BO_3")\n'
+            '20\tSET(1.0,BAC_7_AO_11)\n30\tGOTO 10\n')
+    if to == "_":
+        text = text.replace("AHU1_SAT", "AHU1.SAT")
+    result = transforms.swap_separators(text, to)
+    assert '"BAC_1101_BO_3"' in result.text and "BAC_7_AO_11" in result.text
+    assert ('"AHU1.SAT"' if to == "." else '"AHU1_SAT"') in result.text
+    assert any("2 BACnet object reference" in n for n in result.notes)

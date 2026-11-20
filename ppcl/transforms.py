@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from . import lexer
+from . import lexer, spec
 from . import parser as ppcl_parser
 from .formatter import line_reference_tokens
 from .lexer import Tok
@@ -138,7 +138,7 @@ def swap_separators(text, to="."):
         raise ValueError("separator must be '.' or '_'")
     frm = "_" if to == "." else "."
     out_lines = []
-    count = 0
+    count = kept = 0
     for raw in text.split("\n"):
         head, body = _split_line(raw)
         if body is None or _is_comment(body):
@@ -148,16 +148,27 @@ def swap_separators(text, to="."):
         for token in _tokens(head, body):
             if token.kind not in (Tok.IDENT, Tok.QUOTED):
                 continue
+            if _BACNET_REFERENCE.match(token.text):
+                # BAC_<device>_<type>_<instance> names a third-party BACnet
+                # object; its underscores are the reference's own syntax,
+                # not a hierarchy separator. BAC_1101_BO_3 became
+                # BAC.1101.BO.3, which names nothing.
+                kept += 1
+                continue
             swapped = token.text.replace(frm, to)
             if swapped == token.text:
                 continue
             count += 1
             edits.append((token.col, _span(token), _requote(token, swapped)))
         out_lines.append((head + _apply_edits(body, edits)) if edits else raw)
-    return TransformResult(
-        "\n".join(out_lines), count,
-        notes=["changed %d point name(s) to use '%s'" % (count, to)],
-    )
+    notes = ["changed %d point name(s) to use '%s'" % (count, to)]
+    if kept:
+        notes.append("left %d BACnet object reference(s) (BAC_<device>_<type>"
+                     "_<instance>) as they are" % kept)
+    return TransformResult("\n".join(out_lines), count, notes=notes)
+
+
+_BACNET_REFERENCE = re.compile(spec.BACNET_REFERENCE, re.IGNORECASE)
 
 
 def _split_line(raw):
