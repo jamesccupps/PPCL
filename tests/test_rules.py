@@ -1475,3 +1475,23 @@ def test_the_simulator_names_outputs_only_for_commands_it_skips():
     for name, positions in UNMODELLED_OUTPUTS.items():
         assert name in UNMODELLED
         assert positions == WRITTEN_INDEXES[name]
+
+
+def test_a_rule_that_crashes_does_not_take_the_others_with_it(monkeypatch):
+    """lint called each rule with no guard, so one rule's bug ended lint and
+    the editor, CLI and MCP lost every other rule's findings."""
+    def broken(ctx):
+        yield from ()
+        raise KeyError("boom")
+
+    linter._load_rules()
+    fake = linter.Rule(code="X999", name="broken", summary="test only",
+                       func=broken,
+                       default_severity=linter.Severity.WARNING)
+    monkeypatch.setattr(linter, "REGISTRY", [fake] + linter.REGISTRY)
+    text = '10\tLOCAL("A","A")\n20\tGOTO 10\n'
+    found = linter.lint(parser.parse(text))
+    codes = {d.code for d in found}
+    assert "X999" in codes and len(codes) > 1           # the rest still ran
+    crash = next(d for d in found if d.code == "X999")
+    assert "could not finish" in crash.message and "KeyError" in crash.message

@@ -183,7 +183,25 @@ def lint(
     for r in REGISTRY:
         if r.code in ctx.disabled:
             continue
-        for diag in r.func(ctx) or ():
+        found = []
+        try:
+            for diag in r.func(ctx) or ():
+                found.append(diag)
+        except Exception as exc:  # one broken rule must not lose the rest
+            # It used to end lint altogether, so the editor, the CLI and
+            # MCP lost every other rule's findings to one rule's bug.
+            found.append(Diagnostic(
+                code=r.code,
+                severity=Severity.WARNING,
+                message="rule %s could not finish checking this program "
+                        "(%s: %s)" % (r.code, type(exc).__name__, exc),
+                detail="A defect in the workbench, not in the program: "
+                       "the rule stopped part way, so anything it would "
+                       "have found after that is missing. Every other rule "
+                       "ran. Please report it with the program that "
+                       "triggers it.",
+            ))
+        for diag in found:
             if diag.code in ctx.disabled:
                 continue
             diag.program = diag.program or program.name
