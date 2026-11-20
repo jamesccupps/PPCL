@@ -36,9 +36,12 @@ grammar at the top level — PPCL has no blocks, no indentation, no nesting.
   number. Everything after it is prose. It is not a line prefix character —
   `10 C text` is a comment, `10 CLG = 1` is an assignment.
 - **Continuation**: a trailing `&` joins the next line into one statement.
-- **Disabled line**: on PXC.A only, a literal `# ` at the very front of the
-  line, before the line number. On older panels the disabled state is **not in
-  the text at all** — it lives in the panel. Do not invent a representation.
+- **Disabled line**: on PXC.A only, a literal `# ` at the front of the
+  statement, after the line number: `00020  # OFF(FAN)`. The statement behind
+  it is still PPCL and should be highlighted as one, dimmed. A `#` before the
+  line number is not this form; the workbench reports it as a parse error. On
+  older panels the disabled state is **not in the text at all** — it lives in
+  the panel. Do not invent a representation.
 - **`UNKNOWN (...)`**: written by the compiler around a statement it could not
   resolve. The line is kept and ignored by the panel. Treat it as inert.
 
