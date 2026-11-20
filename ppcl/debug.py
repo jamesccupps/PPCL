@@ -122,6 +122,7 @@ class DebugSession:
         self.seconds_per_line = 1.0 / 500.0
         self._write_log = []
         self._install_write_hook()
+        self._settle()
 
     # -- breakpoints -------------------------------------------------------
 
@@ -322,7 +323,26 @@ class DebugSession:
         self.executed += 1
         self.sim.clock.advance(self.seconds_per_line)
         self._last_writes = self._write_log[before:]
+        self._settle()
         return True
+
+    def _settle(self):
+        """Move the counter onto the next line that will actually run.
+
+        The simulator skips comments and disabled lines on its way to the
+        next statement, but only when it next executes; until then the
+        counter rested on the comment. A breakpoint on the line after a
+        comment was compared against the comment's number, and never fired.
+        Skipping them here first changes nothing the panel does.
+        """
+        sim = self.sim
+        for _ in range(len(sim.numbers)):
+            if sim._pc >= len(sim.numbers):
+                sim._pc = 0
+            if not (sim._skip_at[sim._pc]
+                    or sim.numbers[sim._pc] in sim.disabled_lines):
+                return
+            sim._pc += 1
 
     def _check_breakpoints(self):
         """Return a :class:`Stop` if any enabled breakpoint fires."""

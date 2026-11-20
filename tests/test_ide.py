@@ -1273,3 +1273,25 @@ def test_a_separator_swap_leaves_bacnet_object_references_alone(to):
     assert '"BAC_1101_BO_3"' in result.text and "BAC_7_AO_11" in result.text
     assert ('"AHU1.SAT"' if to == "." else '"AHU1_SAT"') in result.text
     assert any("2 BACnet object reference" in n for n in result.notes)
+
+
+@pytest.mark.parametrize("between", ["20\tC a note\n", "20\t# OFF(FAN)\n"])
+def test_a_breakpoint_after_a_comment_fires(between):
+    """The counter rested on the comment between steps, so a breakpoint on
+    the line after it was compared against the comment and never fired."""
+    session = DebugSession("10\tX = 1.0\n" + between + "30\tY = 2.0\n"
+                           "40\tGOTO 10\n")
+    session.add_breakpoint(Breakpoint(kind="line", line=30))
+    stop = session.run(budget=50)
+    assert stop.reason == "breakpoint" and stop.line == 30
+    assert session.sim.panel.value("Y") == 0.0       # stopped before it ran
+    assert session.sim.panel.value("X") == 1.0
+
+
+def test_a_breakpoint_on_the_first_line_after_leading_comments_fires():
+    session = DebugSession("10\tC header\n20\tC more\n30\tX = 1.0\n"
+                           "40\tGOTO 30\n")
+    session.add_breakpoint(Breakpoint(kind="line", line=30))
+    assert session.current_line == 30
+    stop = session.run(budget=50)
+    assert stop.reason == "breakpoint" and stop.line == 30
