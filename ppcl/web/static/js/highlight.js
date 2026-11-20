@@ -59,7 +59,10 @@ function markMatches(raw, html, opts) {
 export function highlightLine(line) {
   const m = line.match(/^(\s*)(\d+)([ \t]+)([\s\S]*)$/);
   if (!m) return esc(line);
-  const head = m[1] + '<span class="t-num">' + esc(m[2]) + '</span>' + esc(m[3]);
+  // m[1] can only be whitespace, but every piece of program text goes
+  // through esc() so that "it is escaped" never needs an argument.
+  const head = esc(m[1]) + '<span class="t-num">' + esc(m[2]) + '</span>' +
+               esc(m[3]);
   const body = m[4];
 
   if (body.startsWith(DISABLED)) {
