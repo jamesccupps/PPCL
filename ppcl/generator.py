@@ -13,7 +13,9 @@ are placeholders and the setpoints are conventional defaults.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
+from decimal import Decimal
 
 from . import spec
 
@@ -241,10 +243,24 @@ def table_statement(inp: str, out: str, pairs) -> str:
     return "TABLE(%s,%s,%s)" % (_q(inp), _q(out), body)
 
 
+def number_literal(value) -> str:
+    """A number as PPCL source: every digit kept, never an exponent.
+
+    "%g" kept six significant digits -- a setpoint of 1234.5678 compiled as
+    1234.57 -- and wrote small and large values with an exponent, 1e-05,
+    which PPCL cannot read. Every compiler that writes a number goes
+    through this.
+    """
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("%r is not a number a panel can hold" % (value,))
+    if number == int(number):
+        return "%.1f" % number
+    return format(Decimal(repr(number)), "f")
+
+
 def _num(value) -> str:
-    if isinstance(value, int):
-        return "%d.0" % value
-    return ("%g" % value) if "." in ("%g" % value) else "%g.0" % value
+    return number_literal(value)
 
 
 def _q(name: str) -> str:
@@ -507,7 +523,7 @@ def lead_lag(pumps=("PMP1", "PMP2"), enable: str = "PMPENA",
 
 def _fl(value) -> str:
     """Render a number as a PPCL decimal literal."""
-    return "%.1f" % value if float(value) == int(value) else "%g" % value
+    return number_literal(value)
 
 
 #: Template name -> callable, for the CLI.

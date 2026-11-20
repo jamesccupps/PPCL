@@ -818,3 +818,12 @@ def test_a_bad_number_is_a_syntax_error_on_its_line(old, new, says):
     assert caught.value.line_no == line
     status, reply = api.dispatch("/api/seq/parse", {"text": text}, None)
     assert status == 200 and reply["ok"] is False and reply["line"] == line
+
+
+@pytest.mark.parametrize("value, written", [(1234.5678, "1234.5678"),
+                                            (0.00001, "0.00001")])
+def test_a_document_value_keeps_every_digit_and_no_exponent(value, written):
+    """A setpoint of 1234.5678 compiled as 1234.57, and 0.00001 as 1e-05."""
+    from ppcl.sequence.compiler import render_value
+
+    assert render_value(value) == written

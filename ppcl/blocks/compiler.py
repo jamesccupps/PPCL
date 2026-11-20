@@ -38,7 +38,7 @@ from dataclasses import dataclass
 
 from .. import linter, points, spec
 from .. import parser as ppcl_parser
-from ..generator import Builder
+from ..generator import Builder, number_literal
 from .catalog import CATALOG, BlockError
 from .model import Diagram
 
@@ -227,8 +227,7 @@ class Context:
 
     @staticmethod
     def fmt(value):
-        number = float(value)
-        return "%.1f" % number if number == int(number) else "%g" % number
+        return number_literal(value)
 
     def const(self, value):
         return Value(self.fmt(value), operands=1, operators=0)

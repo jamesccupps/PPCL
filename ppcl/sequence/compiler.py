@@ -42,7 +42,8 @@ from __future__ import annotations
 import re
 
 from .. import spec
-from ..generator import Builder, integral_gain, proportional_gain, table_statement
+from ..generator import (Builder, integral_gain, number_literal,
+                         proportional_gain, table_statement)
 from .model import (
     All,
     Always,
@@ -139,7 +140,7 @@ def render_value(value, seq: Sequence = None) -> str:
     if isinstance(value, bool):
         return "1.0" if value else "0.0"
     if isinstance(value, (int, float)):
-        return "%.1f" % value if float(value) == int(value) else "%g" % value
+        return number_literal(value)
     text = str(value).strip()
     if not text:
         return '""'

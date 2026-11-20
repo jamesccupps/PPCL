@@ -649,3 +649,15 @@ def test_a_latch_holds_its_trip_unless_told_reset_wins(params, expected):
     sim.panel.load({"TRIP": 1.0, "RST": 1.0})
     sim.run(passes=3)
     assert sim.panel.value("OUT") == expected
+
+
+@pytest.mark.parametrize("value, written", [(1234.5678, "1234.5678"),
+                                            (0.00001, "0.00001")])
+def test_a_constant_keeps_every_digit_and_no_exponent(value, written):
+    """"%g" kept six significant digits and wrote small values with an
+    exponent, 1e-05, which PPCL cannot read."""
+    d = diagram(("k", "constant", {"value": value}),
+                ("w", "assign", {"point": "Y"}))
+    d.connect("k", "out", "w", "in")
+    text = compile_text(d)
+    assert written in text and "e-" not in text.lower()
