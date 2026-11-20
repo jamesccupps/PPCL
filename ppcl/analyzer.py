@@ -206,8 +206,10 @@ class Analysis:
     one_shot: set = field(default_factory=set)
     #: Lowest line number of the main steady-state loop, if there is one.
     loop_entry: int = None
-    _every_pass: dict = field(default_factory=dict, repr=False,
-                              compare=False)
+    #: Built on first use: the main loop's successor lists, and the lines
+    #: every trip round it passes through.
+    _loop_succ: dict = field(default=None, repr=False, compare=False)
+    _every_pass: set = field(default=None, repr=False, compare=False)
 
     # -- convenience -------------------------------------------------------
 
@@ -248,11 +250,13 @@ class Analysis:
     # -- the main loop -----------------------------------------------------
 
     def _loop_successors(self, number: int):
-        ln = self.index.get(number)
-        if ln is None:
-            return []
-        return [s for s in _successors_wrapping(self, ln)
-                if s in self.steady_state]
+        if self._loop_succ is None:
+            self._loop_succ = {
+                n: [s for s in _successors_wrapping(self, self.index[n])
+                    if s in self.steady_state]
+                for n in self.steady_state if n in self.index
+            }
+        return self._loop_succ.get(number, [])
 
     def runs_every_pass(self, number: int) -> bool:
         """True when every trip round the main loop executes this line.
@@ -263,31 +267,84 @@ class Analysis:
         one of them runs on any given pass. A line counts here when going
         round the loop without it is impossible.
         """
-        cache = self._every_pass
-        if number in cache:
-            return cache[number]
         ln = self.index.get(number)
+        if ln is None or ln.disabled or ln.unknown:
+            return False
+        if self._every_pass is None:
+            self._every_pass = self._unavoidable_lines()
+        return number in self._every_pass
+
+    def _unavoidable_lines(self) -> set:
+        """Every line each trip round the main loop passes through, at once.
+
+        The trip starts at the loop's entry and ends when control comes back
+        to it. Send every edge back into the entry to a sink instead, and
+        the lines on every trip are exactly the sink's dominators -- found
+        for all lines in one pass, by Cooper, Harvey and Kennedy's iterative
+        algorithm. Asking line by line walked the loop each time: W332 spent
+        11 of a 4,000-line program's 11.5 seconds of lint doing it.
+        """
         entry = self.loop_entry
-        if (ln is None or ln.disabled or ln.unknown or entry is None
-                or number not in self.steady_state):
-            result = False
-        elif number == entry:
-            result = True
-        else:
-            result = True
-            seen = set()
-            stack = list(self._loop_successors(entry))
-            while stack:
-                n = stack.pop()
-                if n == entry:
-                    result = False    # round the loop without touching it
+        if entry is None or entry not in self.steady_state:
+            return set()
+        sink = object()
+
+        def succ(n):
+            return [sink if s == entry else s
+                    for s in self._loop_successors(n)]
+
+        # Depth-first from the entry, for a reverse postorder.
+        order, seen, stack = [], {entry}, [(entry, iter(succ(entry)))]
+        while stack:
+            node, it = stack[-1]
+            for nxt in it:
+                if nxt is not sink and nxt not in seen:
+                    seen.add(nxt)
+                    stack.append((nxt, iter(succ(nxt))))
                     break
-                if n == number or n in seen:
+            else:
+                stack.pop()
+                order.append(node)
+        order.reverse()
+        position = {n: i for i, n in enumerate(order)}
+        position[sink] = len(order)
+        preds = {n: [] for n in order}
+        preds[sink] = []
+        for n in order:
+            for s in succ(n):
+                preds[s].append(n)
+        if not preds[sink]:
+            return {entry}
+
+        idom = {entry: entry}
+
+        def intersect(a, b):
+            while a is not b and a != b:
+                while position[a] > position[b]:
+                    a = idom[a]
+                while position[b] > position[a]:
+                    b = idom[b]
+            return a
+
+        changed = True
+        while changed:
+            changed = False
+            for node in order[1:] + [sink]:
+                done = [p for p in preds[node] if p in idom]
+                if not done:
                     continue
-                seen.add(n)
-                stack.extend(self._loop_successors(n))
-        cache[number] = result
-        return result
+                new = done[0]
+                for p in done[1:]:
+                    new = intersect(p, new)
+                if idom.get(node) != new:
+                    idom[node] = new
+                    changed = True
+        out, node = set(), idom[sink]
+        while node != entry:
+            out.add(node)
+            node = idom[node]
+        out.add(entry)
+        return out
 
     def lines_after(self, number: int, stops) -> set:
         """Lines a pass can execute after ``number`` before reaching a stop.
