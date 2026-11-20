@@ -67,9 +67,6 @@ SETTINGS = [
     Setting("autocomplete", "Command Assist", "bool", True,
             "Suggest commands, points and priorities as you type.",
             group="Editor"),
-    Setting("hover_help", "Hover help", "bool", True,
-            "Show a command's signature and notes when the pointer rests on "
-            "it.", group="Editor"),
     Setting("lint_delay", "Lint delay (ms)", "int", 220,
             "How long to wait after the last keystroke before checking.",
             minimum=0, maximum=3000, group="Editor"),
@@ -119,6 +116,13 @@ SETTINGS = [
 ]
 
 BY_KEY = {s.key: s for s in SETTINGS}
+
+#: Settings that were declared and are gone. A file that still holds one is
+#: not reporting a newer version's setting, so it is dropped quietly rather
+#: than kept and listed as unrecognised.
+#: hover_help promised a command's signature when the pointer rested on it;
+#: no version ever had that feature, so the switch did nothing.
+RETIRED = frozenset({"hover_help"})
 
 
 def defaults() -> dict:
@@ -200,6 +204,8 @@ class Settings:
             )
             return self
         for key, value in data.items():
+            if key in RETIRED:
+                continue
             if key not in BY_KEY:
                 self.unknown_keys.append(key)
                 self.values[key] = value

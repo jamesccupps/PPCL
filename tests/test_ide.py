@@ -1373,3 +1373,15 @@ def test_a_bare_name_rename_does_not_reach_into_an_abbreviation():
     result = transforms.clone_lines(text, 10, 20, {"FAN": "PMP"}, start=100)
     copy = result.text.split("00100")[1]
     assert "ON(%X%FAN)" in copy and "ON(PMP)" in copy
+
+
+def test_a_retired_setting_is_dropped_quietly(tmp_path):
+    """hover_help was declared and did nothing; a file that still holds it
+    is from an older version, not a newer one, so it is not reported."""
+    path = os.path.join(str(tmp_path), settings.FILENAME)
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump({"hover_help": False, "font_size": 15}, fh)
+    store = settings.Settings(str(tmp_path)).load()
+    assert "hover_help" not in store.values and store.values["font_size"] == 15
+    assert not store.unknown_keys and not store.problems
+    assert "hover_help" not in settings.BY_KEY
