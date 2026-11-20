@@ -224,6 +224,10 @@ class Panel:
                 pt.value = number(val, name)
 
 
+#: Days in each month. The clock carries no year, so February has 28.
+_DAYS_IN_MONTH = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+
 @dataclass
 class Clock:
     """Simulated wall clock, in decimal hours since midnight."""
@@ -244,7 +248,14 @@ class Clock:
         if days:
             days = int(days)
             self.day_of_week = (self.day_of_week - 1 + days) % 7 + 1
-            self.day_of_month += days
+            # The month rolls over: June 30 plus a day was June 31. There is
+            # no year, so February has 28 days, and whole years leave the
+            # date where it was -- which also keeps this loop short however
+            # far the clock is moved.
+            self.day_of_month += days % 365
+            while self.day_of_month > _DAYS_IN_MONTH[(self.month - 1) % 12]:
+                self.day_of_month -= _DAYS_IN_MONTH[(self.month - 1) % 12]
+                self.month = self.month % 12 + 1
 
 
 # --------------------------------------------------------------------------

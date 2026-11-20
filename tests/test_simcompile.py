@@ -159,3 +159,26 @@ def test_a_short_todset_is_skipped_with_a_warning_not_a_crash(args):
     sim.run(passes=2)
     assert sim.panel.value("FAN") == 1.0           # the rest still ran
     assert any("TODSET at line 10" in w for w in sim.warnings)
+
+
+@pytest.mark.parametrize("month, day, hours, expect", [
+    (6, 30, 1, (7, 1)), (12, 31, 1, (1, 1)), (2, 28, 1, (3, 1)),
+    (1, 31, 24 * 31, (3, 3)), (6, 15, 24 * 365, (6, 15)),
+])
+def test_the_clock_rolls_the_month_over(month, day, hours, expect):
+    """June 30 plus an hour past midnight was June 31: day_of_month grew
+    and the month never changed, so HOLIDA dates and the MONTH and DAYOFM
+    points went wrong on any run that crossed a month end."""
+    from ppcl.simulator import Clock
+
+    clock = Clock(hours=23.5, day_of_month=day, month=month)
+    clock.advance(hours * 3600.0)
+    assert (clock.month, clock.day_of_month) == expect
+
+
+def test_an_absurd_clock_advance_still_returns_at_once():
+    from ppcl.simulator import Clock
+
+    clock = Clock()
+    clock.advance(1e15)
+    assert 1 <= clock.month <= 12 and 1 <= clock.day_of_month <= 31
