@@ -1,0 +1,12 @@
+00010	C ============================================================
+00020	C T1 -- DOES A BARE RELEAS CLEAR @SMOKE?
+00030	C Open question 3, docs/PPCL-REFERENCE.md section 8.
+00040	C Virtual points: T1.SET, T1.BARE, T1.CLEAN (binary), T1.OUT
+00050	C (analog). Turn SET on, then off; BARE on, then off; read the
+00060	C priority OUT is at; then CLEAN on and off. See README.md.
+00070	C Spare or bench controller only; virtual points only.
+00080	C ============================================================
+00100	IF("T1.SET".EQ.ON) THEN SET(@SMOKE,50.0,"T1.OUT")
+00110	IF("T1.BARE".EQ.ON) THEN RELEAS("T1.OUT")
+00120	IF("T1.CLEAN".EQ.ON) THEN RELEAS(@SMOKE,"T1.OUT")
+00130	GOTO 100

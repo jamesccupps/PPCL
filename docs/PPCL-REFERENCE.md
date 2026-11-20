@@ -755,7 +755,10 @@ The decision table is equipment against mode:
 
 ### Still open
 
-Questions this toolkit does not answer, each with the test that would settle it:
+Questions this toolkit does not answer, each with the test that would settle it.
+Questions 1, 2 and 3 -- and the simulator's assumptions about `SECND`, `TOD`,
+division by zero and overflow -- have a ready-made program each in
+`panel-tests/`, whose README says what to record and what the workbench predicts:
 
 1. **Exact `LOOP` PID form.** *Test:* drive a known `pv` step on an isolated
    PXC with logged `cv`, and fit against candidate forms.

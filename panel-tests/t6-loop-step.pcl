@@ -1,0 +1,10 @@
+00010	C ============================================================
+00020	C T6 -- THE LOOP PID FORM, FROM AN OPEN-LOOP STEP
+00030	C Open question 1. PV and SP are set by hand, so nothing closes
+00040	C the loop: CV shows the controller alone. Run once as written
+00050	C (proportional only), then again with ig = 200 on line 100.
+00060	C Virtual points: T6.PV, T6.SP, T6.CV (analog). Trend CV at the
+00070	C sample time. Spare or bench controller only.
+00080	C ============================================================
+00100	LOOP(0,"T6.PV","T6.CV","T6.SP",1000,0,0,1,50.0,0.0,100.0,0)
+00110	GOTO 100

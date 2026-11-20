@@ -1,0 +1,10 @@
+00010	C ============================================================
+00020	C T5 -- HOW MANY LINES A SECOND DOES THIS PANEL RUN?
+00030	C Open question 2. Three executable lines a pass, so lines per
+00040	C second = COUNT x 3 / seconds timed. The simulator assumes 500.
+00050	C Virtual points: T5.RESET (binary), T5.COUNT (analog).
+00060	C Spare or bench controller only.
+00070	C ============================================================
+00100	IF("T5.RESET".EQ.ON) THEN "T5.COUNT" = 0.0
+00110	"T5.COUNT" = "T5.COUNT" + 1.0
+00120	GOTO 100

@@ -1,0 +1,13 @@
+00010	C ============================================================
+00020	C T4 -- WHAT DOES A PANEL DO WITH 1/0, AND WITH AN OVERFLOW?
+00030	C The simulator writes 0 for both and warns that the panel
+00040	C answer is not documented. A panel value is likely a 32-bit
+00050	C float: BIG passes its range on about the seventh pass.
+00060	C Virtual points: T4.ZERO, T4.DIV, T4.BIG (analog), T4.RESET
+00070	C (binary). Spare or bench controller only.
+00080	C ============================================================
+00100	"T4.ZERO" = 0.0
+00110	"T4.DIV" = 1.0 / "T4.ZERO"
+00120	IF("T4.RESET".EQ.ON) THEN "T4.BIG" = 1.0
+00130	"T4.BIG" = "T4.BIG" * 1000000.0
+00140	GOTO 100

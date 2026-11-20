@@ -1,0 +1,12 @@
+00010	C ============================================================
+00020	C T2 -- IS SECND1 A RESETTABLE SECONDS COUNTER?
+00030	C The simulator assumes it is: it counts up from the last value
+00040	C written to it, past 60. Every real program that uses one
+00050	C zeroes it and tests it against 90 or 300.
+00060	C Virtual points: T2.RESET, T2.DONE (binary), T2.SECS (analog).
+00070	C Spare or bench controller only.
+00080	C ============================================================
+00100	IF("T2.RESET".EQ.ON) THEN SECND1 = 0.0
+00110	"T2.SECS" = SECND1
+00120	IF(SECND1.GT.90.0) THEN ON("T2.DONE") ELSE OFF("T2.DONE")
+00130	GOTO 100

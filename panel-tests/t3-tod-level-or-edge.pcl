@@ -1,0 +1,12 @@
+00010	C ============================================================
+00020	C T3 -- DOES TOD COMMAND EVERY PASS, OR ONLY AT ITS TIMES?
+00030	C The simulator commands every pass inside the window (level).
+00040	C The manual says time1 is the time the ON command runs (edge).
+00050	C Virtual points: T3.KICK, T3.FAN (binary). Turn KICK on once;
+00060	C line 120 turns FAN off and KICK back off. Then watch FAN.
+00070	C Spare or bench controller only.
+00080	C ============================================================
+00100	TODMOD(1,1,1,1,1,1,1)
+00110	TOD(1,0,0:00,23:59,"T3.FAN")
+00120	IF("T3.KICK".EQ.ON) THEN OFF("T3.FAN","T3.KICK")
+00130	GOTO 100
