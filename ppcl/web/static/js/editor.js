@@ -614,9 +614,13 @@ export const editor = {
     if (!this.find.re) return;
     const before = this.find.matches.length;
     if (!before) return;
+    // A function, not the string: String.replace reads $&, $1 and $$ in
+    // a replacement string as patterns, and find is literal text, so the
+    // replacement must be too.
+    const replacement = $('find-r').value;
     this.code.value = this.code.value.replace(
       new RegExp(this.find.re.source, this.find.re.flags),
-      $('find-r').value,
+      () => replacement,
     );
     this.touch();
     this.paint();
