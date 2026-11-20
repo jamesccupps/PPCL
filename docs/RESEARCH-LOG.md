@@ -4207,6 +4207,16 @@ what the workbench predicts for each and `tests/test_panel_tests.py` holds
 the simulator to it -- so the first result back from a real panel either
 confirms a prediction or changes the simulator and the table together.
 
+### CodeQL's first scan
+
+Five alerts, all closed as fixed by the next push. Two were the highlighter
+concatenating a line's leading whitespace without `esc()` -- whitespace only,
+so never markup, and checked in Node over 20,000 hostile lines before and
+after -- now escaped so the claim needs no argument. Three were the static
+route: request text reaching a path and a header through checks that were
+sound but had to be argued. The folder is now a table built at start, and a
+request only picks an entry. Neither was exploitable; both are now obvious.
+
 ### Left
 
 The roadmap's larger items: a flow graph pane, a diff preview, copy and
