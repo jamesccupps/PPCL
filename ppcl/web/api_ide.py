@@ -12,6 +12,7 @@ dropped, because a browser tab that goes away cannot tell us it has.
 
 from __future__ import annotations
 
+import functools
 import itertools
 import os
 import threading
@@ -28,6 +29,8 @@ MAX_SESSIONS = 8
 _sessions = {}
 _session_order = []
 _session_lock = threading.Lock()
+#: One lock per session, so its requests run one at a time.
+_session_busy = {}
 _session_ids = itertools.count(1)
 
 
@@ -140,6 +143,30 @@ def _session(body):
     return session
 
 
+def _one_at_a_time(handler):
+    """Refuse a request for a session that is still busy with the last one.
+
+    The server is threaded and a DebugSession is not: holding the Step key
+    sent overlapping requests, and two threads stepped one simulator at
+    once. Refused rather than queued, so a held key does not pile up a
+    backlog of steps to work through after it is let go.
+    """
+    @functools.wraps(handler)
+    def wrapped(body, ws=None):
+        with _session_lock:
+            busy = _session_busy.get(str(body.get("session", "")))
+        if busy is None:
+            return handler(body, ws)   # _session reports an expired one
+        if not busy.acquire(blocking=False):
+            raise ApiError("the debugger is still working on the last "
+                           "request; try again in a moment", 409)
+        try:
+            return handler(body, ws)
+        finally:
+            busy.release()
+    return wrapped
+
+
 def api_debug_start(body, ws=None):
     """Load a program into a fresh debug session."""
     text = _text(body)
@@ -162,16 +189,21 @@ def api_debug_start(body, ws=None):
     session_id = "dbg%d" % next(_session_ids)
     with _session_lock:
         _sessions[session_id] = session
+        _session_busy[session_id] = threading.Lock()
         _session_order.append(session_id)
         while len(_session_order) > MAX_SESSIONS:
-            _sessions.pop(_session_order.pop(0), None)
+            gone = _session_order.pop(0)
+            _sessions.pop(gone, None)
+            _session_busy.pop(gone, None)
     return {"ok": True, "session": session_id, "state": session.state()}
 
 
+@_one_at_a_time
 def api_debug_state(body, ws=None):
     return {"ok": True, "state": _session(body).state()}
 
 
+@_one_at_a_time
 def api_debug_step(body, ws=None):
     session = _session(body)
     mode = str(body.get("mode", "into"))
@@ -197,6 +229,7 @@ def api_debug_step(body, ws=None):
     }
 
 
+@_one_at_a_time
 def api_debug_breakpoint(body, ws=None):
     session = _session(body)
     action = str(body.get("action", "add"))
@@ -233,6 +266,7 @@ def api_debug_breakpoint(body, ws=None):
     return {"ok": True, "state": session.state()}
 
 
+@_one_at_a_time
 def api_debug_point(body, ws=None):
     """Read, override or watch a point mid-run."""
     session = _session(body)
@@ -257,6 +291,7 @@ def api_debug_point(body, ws=None):
     return {"ok": True, "state": session.state()}
 
 
+@_one_at_a_time
 def api_debug_reset(body, ws=None):
     session = _session(body)
     session.reset(keep_points=bool(body.get("keep_points", False)))
@@ -267,6 +302,7 @@ def api_debug_stop(body, ws=None):
     session_id = str(body.get("session", ""))
     with _session_lock:
         _sessions.pop(session_id, None)
+        _session_busy.pop(session_id, None)
         if session_id in _session_order:
             _session_order.remove(session_id)
     return {"ok": True}

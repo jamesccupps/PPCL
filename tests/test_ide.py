@@ -1310,3 +1310,27 @@ def test_run_time_accrues_while_debugging():
                                         rel=0.01)
     assert session.sim.panel.value("SEEN") == 1.0
     assert session.sim.panel.get("SEEN").runtime < fan.runtime
+
+
+def test_a_session_busy_with_one_request_refuses_the_next(tmp_path):
+    """Two threads stepped one simulator at once when a held key sent
+    overlapping requests; the second is now refused until the first ends."""
+    from ppcl.web import api, api_ide
+
+    ws = api.Workspace(str(tmp_path))
+    _s, started = api.dispatch("/api/debug/start", {"text": PROGRAM}, ws)
+    session = started["session"]
+    busy = api_ide._session_busy[session]
+    assert busy.acquire(blocking=False)           # a request in progress
+    try:
+        for route in ("/api/debug/step", "/api/debug/state",
+                      "/api/debug/breakpoint", "/api/debug/point",
+                      "/api/debug/reset"):
+            status, reply = api.dispatch(route, {"session": session}, ws)
+            assert status == 409 and "still working" in reply["error"], route
+    finally:
+        busy.release()
+    status, _ = api.dispatch("/api/debug/step", {"session": session}, ws)
+    assert status == 200
+    api.dispatch("/api/debug/stop", {"session": session}, ws)
+    assert session not in api_ide._session_busy

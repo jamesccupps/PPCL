@@ -178,15 +178,27 @@ export const bench = {
     return r.state;
   },
 
+  /* One step at a time: a held key used to send overlapping requests into
+   * one session. Presses that arrive while a step is in flight are
+   * dropped, as the server would refuse them anyway. */
   async stepDebug(mode) {
-    if (!this.session) { await this.startDebug(); if (!this.session) return; }
-    const r = await post('/api/debug/step', { session: this.session, mode });
-    if (r.error) { toast(r.error, 'bad'); return; }
-    this.renderState(r.state);
-    const stop = r.stop || {};
-    $('dbg-status').innerHTML = stop.reason === 'breakpoint'
-      ? '<span class="w">stopped: ' + esc(stop.detail) + '</span>'
-      : esc(stop.detail || '');
+    if (this.stepping) return;
+    this.stepping = true;
+    try {
+      if (!this.session) {
+        await this.startDebug();
+        if (!this.session) return;
+      }
+      const r = await post('/api/debug/step', { session: this.session, mode });
+      if (r.error) { toast(r.error, 'bad'); return; }
+      this.renderState(r.state);
+      const stop = r.stop || {};
+      $('dbg-status').innerHTML = stop.reason === 'breakpoint'
+        ? '<span class="w">stopped: ' + esc(stop.detail) + '</span>'
+        : esc(stop.detail || '');
+    } finally {
+      this.stepping = false;
+    }
   },
 
   async resetDebug() {
