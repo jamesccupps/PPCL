@@ -4128,3 +4128,86 @@ and both starters compiling byte for byte as before.
   rules' conditions, reference rewriting, priority arbitration -- is right
   against the manual. That is what the test suite and the self-checking
   writers guard, and what a further pass would cover.
+
+---
+
+## 2026-11-20 (forty-second pass) — the leftovers, measured, and a kit for the panel
+
+GitHub held nothing to act on: no issue or pull request had ever been opened,
+and the Security tab showed no reports, alerts or exposed secrets. So the
+work for the next release came from the first review's untouched Lows,
+performance and polish items, re-checked one by one against the code, and
+from measuring rather than reading.
+
+### The one that was mine
+
+Measuring lint against program length found it quadratic: 0.9 s at 1,000
+lines, 21 s at 4,000, 79 s at 8,000, with W332 98% of it. The every-pass test
+added on 2026-11-06 walked the main loop once per question. Real programs
+here are under 400 lines, where it never showed -- which is exactly why it
+was found by measuring and not by use. The lines every trip passes through
+are the dominators of the trip's return to the loop entry; computed once,
+lint is 0.7 s at 4,000 lines and 1.6 s at 8,000, and the answer agrees with
+the old walk on all 4,819 lines tried. The test counts successor calls rather
+than timing, so it cannot flake on a slow runner. The review's own guesses
+at the slow spots -- W321, W322, P705, the lexer -- measured as nothing.
+
+### The Lows, re-checked
+
+Most still held, and several were worse than written. Each is its own commit
+with a test that failed first:
+
+- The separator swap turned `BAC_1101_BO_3` into `BAC.1101.BO.3` -- 125 such
+  references across the real programs, all on BACnet ALN panels.
+- A line breakpoint on the statement after a comment never fired; TOTAL()
+  read 0 under the debugger; two requests could step one session at once.
+- Clone wrote line 32770, and never renamed a `%X%` reference.
+- The compilers wrote 1234.5678 as 1234.57 and 0.00001 as 1e-05; the
+  sequence compiler put 16 points in a SET, which takes 15.
+- A short TODSET crashed the simulator; June 30 rolled into June 31; and an
+  overflow -- reachable only by repetition, since PPCL has no exponent
+  literals, which is why the first probe of it was wrong -- crashed the run
+  formatting its trace line.
+- One crashing rule lost the whole lint report.
+- Loop counts included comments; Replace All read `$&`; the plugin never
+  said program text is data; the MCP no-writes test was a denylist; Tab
+  width did nothing, and Hover help promised a feature that never existed.
+
+Two of the review's items turned out already fixed, and one finding of this
+pass was a test that was wrong, not the code: clone's 0 means "the default".
+
+### Undo
+
+Format, Renumber, the transforms, Replace, quick numbering and Command
+Assist all assigned `textarea.value`, which drops the undo history -- so
+pressing Enter on a numbered line lost every undo step before it. They now
+edit through `execCommand('insertText')`, which keeps the browser's own
+history, replacing only the span that changed. An apparent cross-tab leak
+in testing turned out to be the test: New reuses the untitled tab. With two
+real tabs, undo stays in its own file.
+
+### Tests that keep it that way
+
+A seeded API fuzz -- 34 routes, 46 fields, three wrong types -- fails on
+seven routes of the code as it was before the 2026-11-16 type checks. A
+round-trip test normalizes every shipped program and one built from the
+constructs that have broken writers before; with the disabled-line fix
+taken back out, it fails. CI now syntax-checks the UI's modules with the
+runner's own Node, and CodeQL's default setup scans Python, JavaScript and
+the workflows.
+
+### The panel test kit
+
+The open questions that need a panel, and the assumptions the simulator
+makes in their place, now each have a program in `panel-tests/`: a bare
+RELEAS against @SMOKE, SECND as a counter, TOD level or edge, 1/0 and
+overflow, the line rate, and the LOOP form from an open-loop step. Virtual
+points, a spare controller, lint-clean on both generations. The README says
+what the workbench predicts for each and `tests/test_panel_tests.py` holds
+the simulator to it -- so the first result back from a real panel either
+confirms a prediction or changes the simulator and the table together.
+
+### Left
+
+The roadmap's larger items: a flow graph pane, a diff preview, copy and
+paste in Blocks, autosave, SARIF output, accessibility. And the kit, run.
