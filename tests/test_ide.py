@@ -1334,3 +1334,20 @@ def test_a_session_busy_with_one_request_refuses_the_next(tmp_path):
     assert status == 200
     api.dispatch("/api/debug/stop", {"session": session}, ws)
     assert session not in api_ide._session_busy
+
+
+@pytest.mark.parametrize("start, step", [(32760, 10), (-5, 10),
+                                         (100, -10)])
+def test_clone_refuses_line_numbers_a_panel_cannot_hold(start, step):
+    """The copy of lines 10-20 at 32760 was written as 32760 and 32770 --
+    past LINE_MAX -- without a word."""
+    text = "10\tON(A)\n20\tGOTO 10\n"
+    result = transforms.clone_lines(text, 10, 20, {}, start=start, step=step)
+    assert result.text == text and result.changed == 0
+    assert "outside 1-32767" in result.warnings[0]
+
+
+def test_clone_to_the_last_valid_numbers_still_works():
+    result = transforms.clone_lines("10\tON(A)\n20\tGOTO 10\n", 10, 20, {},
+                                    start=32757, step=10)
+    assert "32767\tGOTO 32757" in result.text

@@ -324,6 +324,20 @@ def clone_lines(text, first, last, renames, start=None, step=None):
     mapping = {
         ln.number: start + i * step for i, ln in enumerate(block)
     }
+    # Renumber refuses a number outside the panel's range; clone wrote
+    # 32770 without a word.
+    out_of_range = sorted(n for n in mapping.values()
+                          if not spec.LINE_MIN <= n <= spec.LINE_MAX)
+    if step < 1 or out_of_range:
+        return TransformResult(
+            text, 0,
+            warnings=[
+                "the copy would need line number(s) %s, outside %d-%d. "
+                "Choose a lower starting line or a smaller step."
+                % (", ".join(str(n) for n in out_of_range[:8]) or "below 1",
+                   spec.LINE_MIN, spec.LINE_MAX)
+            ],
+        )
     clash = sorted(set(mapping.values()) & set(numbers))
     if clash:
         return TransformResult(
