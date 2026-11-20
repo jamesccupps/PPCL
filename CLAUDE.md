@@ -151,7 +151,7 @@ on idiomatic PPCL gets turned off.
 ## Testing
 
 ```bash
-python -m pytest tests -q          # 973 tests, ~1-2 min; CI runs 3.10-3.14
+python -m pytest tests -q          # 987 tests, ~1-2 min; CI runs 3.10-3.14
 python -m ppcl.cli lint samples    # exercises the CLI against real programs
 ```
 
