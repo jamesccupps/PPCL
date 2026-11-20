@@ -247,6 +247,18 @@ class Analysis:
             seen.setdefault(u.name.upper(), u.name)
         return sorted(seen.values())
 
+    def count_executable(self, numbers) -> int:
+        """How many of ``numbers`` are lines the panel actually evaluates.
+
+        ``reachable``, ``steady_state`` and ``one_shot`` hold every line on
+        a path, comments included, because control passes over them.
+        Counted as they are, the status bar said "2 executable lines, 4 in
+        the main loop".
+        """
+        return sum(1 for n in numbers
+                   if (ln := self.index.get(n)) is not None
+                   and ln.is_executable)
+
     # -- the main loop -----------------------------------------------------
 
     def _loop_successors(self, number: int):

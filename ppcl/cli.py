@@ -151,8 +151,8 @@ def cmd_lint(args):
                     % (
                         len(prog.lines),
                         len(prog.executable_lines()),
-                        len(analysis.steady_state),
-                        len(analysis.one_shot),
+                        analysis.count_executable(analysis.steady_state),
+                        analysis.count_executable(analysis.one_shot),
                     )
                 )
             for d in diags:
@@ -1086,7 +1086,9 @@ def cmd_graph(args):
     print("Program: %s" % (prog.name or args.path))
     print("  %d lines, %d executable" % (len(prog.lines), len(prog.executable_lines())))
     print("  reachable: %d   main loop: %d   run-once: %d"
-          % (len(a.reachable), len(a.steady_state), len(a.one_shot)))
+          % (a.count_executable(a.reachable),
+             a.count_executable(a.steady_state),
+             a.count_executable(a.one_shot)))
     if a.loop_entry is not None:
         print("  main loop entry: line %d" % a.loop_entry)
     print()

@@ -966,3 +966,14 @@ def test_a_save_windows_refuses_is_reported_and_leaves_the_file(ws,
     assert "could not write programs/a.ppcl" in reply["error"]
     with open(path, "rb") as fh:
         assert fh.read() == before
+
+
+def test_lint_stats_count_only_lines_the_panel_runs(ws):
+    """Comments are on the loop's path, so counting every line on it said
+    "2 executable lines, 4 in the main loop"."""
+    text = "10\tC a note\n20\tC another\n30\tON(FAN)\n40\tGOTO 10\n"
+    _s, reply = api.dispatch("/api/lint", {"text": text}, ws)
+    stats = reply["stats"]
+    assert stats["executable"] == 2
+    assert stats["steady_state"] == 2 and stats["reachable"] == 2
+    assert stats["one_shot"] == 0

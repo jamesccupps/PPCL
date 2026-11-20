@@ -261,9 +261,9 @@ def api_lint(body, ws=None):
         "stats": {
             "lines": len(prog.lines),
             "executable": len(prog.executable_lines()),
-            "reachable": len(a.reachable),
-            "steady_state": len(a.steady_state),
-            "one_shot": len(a.one_shot),
+            "reachable": a.count_executable(a.reachable),
+            "steady_state": a.count_executable(a.steady_state),
+            "one_shot": a.count_executable(a.one_shot),
             "loop_entry": a.loop_entry,
             "starved": sorted(set(a.numbers) - a.reachable)[:20],
         },
