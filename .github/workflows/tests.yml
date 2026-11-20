@@ -46,10 +46,27 @@ jobs:
         run: python -m pip install "pytest>=8,<10" "pyflakes>=3.2,<4"
 
       - name: pyflakes
-        run: python -m pyflakes ppcl tests
+        run: python -m pyflakes ppcl tests ppcl_mcp.py
 
       - name: Tests
         run: python -m pytest tests -q -p no:cacheprovider
 
       - name: CLI starts
         run: python -m ppcl --version
+
+  ui:
+    name: UI modules parse
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      # The UI is ES modules with no build step and no JavaScript tests, so
+      # a syntax error would reach the browser with nothing to stop it. The
+      # runner's own Node parses each module; the package.json written here
+      # makes it read them as modules, and is never committed.
+      - name: Syntax-check every module
+        run: |
+          node --version
+          echo '{"type":"module"}' > ppcl/web/static/js/package.json
+          for f in ppcl/web/static/js/*.js; do node --check "$f"; done
