@@ -85,6 +85,23 @@ def test_no_file_writing_endpoint_is_exposed():
         assert forbidden not in exposed
 
 
+#: Every endpoint an agent may reach, each one read-only with respect to the
+#: workspace: it takes text and returns text. A denylist of three file
+#: routes let anything else through -- a tool for /api/settings/save, which
+#: writes the workspace's settings file, would have passed. Adding a tool
+#: means adding it here, which is the moment to ask whether it writes.
+_READ_ONLY_ENDPOINTS = {
+    "/api/analyze", "/api/bench", "/api/explain", "/api/format",
+    "/api/help", "/api/lint", "/api/meta", "/api/renumber", "/api/run",
+    "/api/seq/compile", "/api/transform",
+}
+
+
+def test_every_mcp_tool_is_on_the_read_only_list():
+    exposed = {tool["endpoint"] for tool in mcp_server.TOOLS}
+    assert exposed <= _READ_ONLY_ENDPOINTS, exposed - _READ_ONLY_ENDPOINTS
+
+
 def test_firmware_enums_in_schemas_stay_in_step_with_the_spec():
     """A stale enum would offer an agent a firmware that no longer exists."""
     values = {f.value for f in spec.Firmware}
