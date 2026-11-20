@@ -342,7 +342,8 @@ button.icon:hover { color: var(--accent); border-color: var(--line); }
   position: absolute; left: 66px; top: 0; right: 0;
   margin: 0; padding: 10px 14px;
   font-family: var(--mono); font-size: var(--code-size); line-height: 20px;
-  white-space: pre; overflow: hidden; border: 0; tab-size: 8;
+  white-space: pre; overflow: hidden; border: 0;
+  tab-size: var(--tab-size, 8);   /* both layers, or the colors drift */
 }
 .hl { pointer-events: none; color: var(--ink); }
 .hl .cur { background: var(--accent-bg); display: inline-block; width: 100%; }

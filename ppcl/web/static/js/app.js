@@ -396,6 +396,9 @@ function applySettings(values) {
   document.documentElement.setAttribute('data-theme', SETTINGS.theme || 'dark');
   document.documentElement.style.setProperty(
     '--code-size', (SETTINGS.font_size || 13) + 'px');
+  // Declared in Settings and read by nothing until now.
+  document.documentElement.style.setProperty(
+    '--tab-size', String(SETTINGS.tab_width || 8));
   setTooltipsEnabled(SETTINGS.show_tooltips !== false);
   editor.settings = SETTINGS;
   bench.settings = SETTINGS;
