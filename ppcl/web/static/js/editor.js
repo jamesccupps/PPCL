@@ -34,6 +34,9 @@ export const editor = {
 
     const relint = debounce(() => this.lint(), this.settings.lint_delay || 220);
     this.code.addEventListener('input', () => {
+      // An edit made through replaceRange does its own bookkeeping, and
+      // must not open Command Assist as if the user had typed it.
+      if (this.programmatic) return;
       this.touch();
       this.paint();
       relint();
@@ -127,6 +130,61 @@ export const editor = {
   /* ------------------------------------------------------------ content */
 
   get() { return this.code.value; },
+
+  /* Edit the text as one step the browser can undo.
+   *
+   * Format, Renumber, the transforms, Replace, quick numbering and Command
+   * Assist all used to assign textarea.value, which throws the undo history
+   * away: a bad Renumber could only be undone by reopening the file, and
+   * pressing Enter on a numbered line lost everything before it.
+   * execCommand('insertText') over the replaced range goes through the
+   * browser's own editing, so Ctrl+Z takes each one back in one step. It is
+   * deprecated in name only -- every browser still implements it -- and if
+   * one ever refuses, the old assignment still makes the edit.
+   *
+   * Opening a file or switching tabs still assigns the value: undo must not
+   * reach back into another file. Callers lint as they did before. */
+  replaceRange(start, end, text) {
+    const ta = this.code;
+    const wrap = $('editwrap');           // the editor scrolls here
+    const top = wrap ? wrap.scrollTop : 0;
+    const value = ta.value;
+    const expected = value.slice(0, start) + text + value.slice(end);
+    ta.focus();
+    ta.setSelectionRange(start, end);
+    this.programmatic = true;
+    try {
+      if (text) document.execCommand('insertText', false, text);
+      else if (start !== end) document.execCommand('delete');
+    } catch (err) {
+      // fall through to the check below
+    } finally {
+      this.programmatic = false;
+    }
+    if (ta.value !== expected) {
+      ta.value = expected;      // the old way: correct, but not undoable
+      ta.setSelectionRange(start + text.length, start + text.length);
+    }
+    if (wrap) wrap.scrollTop = top;
+    this.touch();
+    this.paint();
+  },
+
+  /* Replace the whole text, as one undoable step that covers only the part
+   * that changed, so the caret and the view stay where the change is. */
+  replaceText(text) {
+    const old = this.code.value;
+    if (text === old) return;
+    let start = 0;
+    while (start < old.length && start < text.length &&
+           old[start] === text[start]) start++;
+    let endOld = old.length;
+    let endNew = text.length;
+    while (endOld > start && endNew > start &&
+           old[endOld - 1] === text[endNew - 1]) { endOld--; endNew--; }
+    this.replaceRange(start, endOld, text.slice(start, endNew));
+    this.lint();
+  },
 
   set(text, path) {
     if (path) {
@@ -345,13 +403,7 @@ export const editor = {
   },
 
   insert(text) {
-    const start = this.code.selectionStart;
-    const end = this.code.selectionEnd;
-    const value = this.code.value;
-    this.code.value = value.slice(0, start) + text + value.slice(end);
-    this.code.selectionStart = this.code.selectionEnd = start + text.length;
-    this.touch();
-    this.paint();
+    this.replaceRange(this.code.selectionStart, this.code.selectionEnd, text);
   },
 
   /* ----------------------------------------------- Command Assist */
@@ -430,16 +482,10 @@ export const editor = {
   accept(index) {
     const item = this.completeItems[index];
     if (!item) return;
-    const value = this.code.value;
     const caret = this.code.selectionStart;
     const insert = item.insert || item.text;
-    this.code.value = value.slice(0, this.completeFrom) + insert +
-                      value.slice(caret);
-    const at = this.completeFrom + insert.length;
-    this.code.selectionStart = this.code.selectionEnd = at;
+    this.replaceRange(this.completeFrom, caret, insert);
     this.hideComplete();
-    this.touch();
-    this.paint();
     this.lint();
     this.code.focus();
     setTimeout(() => this.assist(), 10);
@@ -601,11 +647,7 @@ export const editor = {
     if (!this.find.matches.length) return;
     const at = this.find.matches[this.find.index];
     const length = $('find-q').value.length;
-    const value = this.code.value;
-    this.code.value = value.slice(0, at) + $('find-r').value +
-                      value.slice(at + length);
-    this.touch();
-    this.paint();
+    this.replaceRange(at, at + length, $('find-r').value);
     this.lint();
     this.runFind();
   },
@@ -618,13 +660,10 @@ export const editor = {
     // a replacement string as patterns, and find is literal text, so the
     // replacement must be too.
     const replacement = $('find-r').value;
-    this.code.value = this.code.value.replace(
+    this.replaceText(this.code.value.replace(
       new RegExp(this.find.re.source, this.find.re.flags),
       () => replacement,
-    );
-    this.touch();
-    this.paint();
-    this.lint();
+    ));
     this.runFind();
     toast('replaced ' + before + ' occurrence' + (before === 1 ? '' : 's'), 'good');
   },
@@ -669,12 +708,7 @@ export const editor = {
 
     const r = await post('/api/transform', body);
     if (r.error || !r.ok) { toast(r.error || 'the transform failed', 'bad'); return; }
-    if (r.changed) {
-      this.code.value = r.text;
-      this.touch();
-      this.paint();
-      this.lint();
-    }
+    if (r.changed) this.replaceText(r.text);
     (r.notes || []).forEach((note) => toast(note, r.changed ? 'good' : null));
     (r.warnings || []).forEach((note) => toast(note, 'bad'));
     if (!r.changed && !(r.warnings || []).length) toast('nothing changed');

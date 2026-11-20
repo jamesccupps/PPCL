@@ -156,7 +156,7 @@ memory transfers.
 | `Ctrl` `F` | Find, and replace when the editor is focused |
 | `Ctrl` `O` | Open a file from anywhere on this computer |
 | `Ctrl` `S` | Save |
-| `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo |
+| `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo. Format, Renumber, a transform and Replace All are each one step |
 | `Ctrl` `/` | Comment or uncomment the selected statements |
 | `Ctrl` `Space` | Command Assist |
 | `Ctrl` wheel | Zoom the editor font |

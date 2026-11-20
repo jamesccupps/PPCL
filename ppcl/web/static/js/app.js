@@ -470,7 +470,7 @@ async function boot() {
   $('btn-fmt').onclick = async () => {
     const r = await post('/api/format', { text: editor.get(), sort: true });
     if (r.error) { toast(r.error, 'bad'); return; }
-    if (r.text) { editor.set(r.text); toast('formatted', 'good'); }
+    if (r.text) { editor.replaceText(r.text); toast('formatted', 'good'); }
   };
 
   /* A renumber can succeed and still have something to say: duplicates
@@ -478,7 +478,7 @@ async function boot() {
    * discarded, a reference left on a line that does not exist. Those were
    * dropped behind the success toast. */
   const renumbered = (r) => {
-    editor.set(r.text);
+    editor.replaceText(r.text);
     toast('renumbered, ' + r.rewritten + ' reference(s) rewritten', 'good');
     (r.warnings || []).forEach((w) => toast(w, 'bad'));
   };
